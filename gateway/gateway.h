@@ -117,7 +117,6 @@ typedef struct
   u32 flow_id;
 } gw_lookup_trace_t;
 
-format_function_t format_gw_lookup_trace;
 format_function_t format_gw_flow;
 format_function_t format_gw_flow_with_dir;
 

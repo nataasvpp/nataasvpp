@@ -370,6 +370,22 @@ VLIB_NODE_FN (gw_lookup_node)
   return frame->n_vectors;
 }
 
+static u8 *
+format_gw_lookup_trace (u8 *s, va_list *args)
+{
+  vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
+  vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
+  gw_lookup_trace_t *t = va_arg (*args, gw_lookup_trace_t *);
+
+  s = format (s,
+	      "fh-lookup: sw_if_index %d, next index %d hash 0x%x "
+	      "flow-id %u (%u:%u)",
+	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
+	      t->flow_id >> GW_LOG2_FLOWS_PER_THREAD,
+	      t->flow_id & pow2_mask (GW_LOG2_FLOWS_PER_THREAD));
+  return s;
+}
+
 /* *INDENT-OFF* */
 VLIB_REGISTER_NODE (gw_lookup_node) =
 {
