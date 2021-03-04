@@ -173,6 +173,9 @@ gw_get_flow (u32 flow_id)
   return pool_elt_at_index (ptd->flows, gw_local_index_from_flow_id (flow_id));
 }
 
+int gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
+			    int enable_disable);
+
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_gateway_h__ */
