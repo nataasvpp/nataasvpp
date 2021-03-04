@@ -41,7 +41,9 @@ clean:
 	@rm -rf $(build_dir)
 
 fixstyle:
-	@for i in */*.[ch]; do clang-format -i $$i; done
+	@for i in */*.[ch] */*/*.[ch] ; do clang-format -i $$i; done
+#	@find . -regex '\./gateway/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
+#	@find . -regex '\./vcdp/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
 
 .PHONY: ctags
 ctags:

@@ -126,14 +126,15 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
 
 static_always_inline int
 gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
-	     u32 first_flow_index, gw_ip4_key_t *k, u64 *h, u32 *fid)
+		   u32 first_flow_index, gw_ip4_key_t *k, u64 *h, u32 *fid)
 {
   clib_bihash_kv_24_8_t kv = {};
   gw_session_t *f;
 
   pool_get_zero (ptd->sessions, f);
   clib_memcpy_fast (&kv.key, k, 16);
-  kv.value = gw_flow_id (GW_SESSION_TYPE_IP4, thread_index, f - ptd->sessions, 0);
+  kv.value =
+    gw_flow_id (GW_SESSION_TYPE_IP4, thread_index, f - ptd->sessions, 0);
 
   if (clib_bihash_add_del_24_8 (&fm->table4, &kv, 2))
     {
@@ -274,7 +275,8 @@ VLIB_NODE_FN (gw_lookup_node)
       if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
 	{
 	  /* if there is colision, we just reiterate */
-	  if (gw_create_session (fm, ptd, thread_index, first_flow_index, k, h, f))
+	  if (gw_create_session (fm, ptd, thread_index, first_flow_index, k, h,
+				 f))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   GW_LOOKUP_ERROR_COLLISION, 1);

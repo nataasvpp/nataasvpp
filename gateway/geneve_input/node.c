@@ -38,7 +38,8 @@ format_vcdp_geneve_input_trace (u8 *s, va_list *args)
   return s;
 }
 
-#define foreach_vcdp_geneve_input_error _ (SWAPPED, "Mac swap packets processed")
+#define foreach_vcdp_geneve_input_error                                       \
+  _ (SWAPPED, "Mac swap packets processed")
 
 typedef enum
 {
@@ -78,4 +79,3 @@ VLIB_REGISTER_NODE (vcdp_geneve_input_node) = {
 
   .n_next_nodes = 0,
 };
-

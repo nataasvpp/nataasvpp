@@ -19,7 +19,6 @@
 #include <vnet/feature/feature.h>
 #include <gateway/gateway.h>
 
-
 /*
  * Add CLI:
  *  vcdp geneve-input <enable/disable> [port <port>]
