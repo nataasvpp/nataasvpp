@@ -20,6 +20,7 @@
 #include <vppinfra/error.h>
 #include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.h>
+#include <vcdp/common.h>
 #include <gateway/gateway.h>
 
 /* packet trace format function */
@@ -112,9 +113,9 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
 
   /* extract tcp flags */
   if (pr == IP_PROTOCOL_TCP)
-    vnet_buffer (b)->dont_waste_me = *(u8 *) next_header + 13;
+    vcdp_buffer (b)->tcp_flags = *(u8 *) next_header + 13;
   else
-    vnet_buffer (b)->dont_waste_me = 0;
+    vcdp_buffer (b)->tcp_flags = 0;
 
   /* store key */
   key->as_u8x16 = k;
