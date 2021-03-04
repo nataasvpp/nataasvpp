@@ -70,7 +70,7 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
   if (enable_disable)
     {
       if (gm->table4.nbuckets == 0)
-	clib_bihash_init_16_8 (&gm->table4, "gateway ipv4",
+	clib_bihash_init_24_8 (&gm->table4, "gateway ipv4",
 			       BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
 
       gateway_enable_one (vm, vnm, gm, sw_if_index1, sw_if_index2);
@@ -152,7 +152,7 @@ show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	return err;
     }
 
-  vlib_cli_output (vm, "%U", format_bihash_16_8, &gm->table4, 0);
+  vlib_cli_output (vm, "%U", format_bihash_24_8, &gm->table4, 0);
   vec_foreach (ptd, gm->per_thread_data)
     {
       vlib_cli_output (vm, "Thread %u: %u flows\n", ptd - gm->per_thread_data,

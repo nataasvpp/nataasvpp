@@ -23,7 +23,7 @@
 #include <vppinfra/error.h>
 #include <vppinfra/elog.h>
 
-#include <vppinfra/bihash_16_8.h>
+#include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.h>
 
 #define GW_LOG2_FLOWS_PER_THREAD 26
@@ -92,7 +92,7 @@ typedef struct
 {
   u32 *next_index_by_rx_sw_if_index;
   u32 *tx_sw_if_index_by_rx_sw_if_index;
-  clib_bihash_16_8_t table4;
+  clib_bihash_24_8_t table4;
   u32 frame_queue_index;
 
   /* poll of tenants */

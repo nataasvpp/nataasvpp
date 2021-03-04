@@ -18,7 +18,7 @@
 #include <vnet/pg/pg.h>
 #include <vnet/ethernet/ethernet.h>
 #include <vppinfra/error.h>
-#include <vppinfra/bihash_16_8.h>
+#include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.h>
 #include <gateway/gateway.h>
 
@@ -120,21 +120,21 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
   key->as_u8x16 = k;
 
   /* calculate hash */
-  h[0] = clib_bihash_hash_16_8 ((clib_bihash_kv_16_8_t *) (key));
+  h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (key));
 }
 
 static_always_inline int
 gw_add_flow (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
 	     u32 first_flow_index, gw_ip4_key_t *k, u64 *h, u32 *fid)
 {
-  clib_bihash_kv_16_8_t kv = {};
+  clib_bihash_kv_24_8_t kv = {};
   gw_flow_t *f;
 
   pool_get_zero (ptd->flows, f);
   clib_memcpy_fast (&kv.key, k, 16);
   kv.value = gw_flow_id (GW_FLOW_TYPE_IP4, thread_index, f - ptd->flows, 0);
 
-  if (clib_bihash_add_del_16_8 (&fm->table4, &kv, 2))
+  if (clib_bihash_add_del_24_8 (&fm->table4, &kv, 2))
     {
       /* colision - remote thread created same entry */
       pool_put (ptd->flows, f);
@@ -151,7 +151,7 @@ gw_add_flow (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
 }
 
 static_always_inline void
-gw_lookup_four (clib_bihash_16_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
+gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
 		u32 *f, u64 *h, int prefetch_buffer_stride)
 {
   u8 off = sizeof (ethernet_header_t);
@@ -199,7 +199,7 @@ VLIB_NODE_FN (gw_lookup_node)
   gw_per_thread_data_t *ptd =
     vec_elt_at_index (fm->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
-  clib_bihash_kv_16_8_t kv = {};
+  clib_bihash_kv_24_8_t kv = {};
   u32 *bi, *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
@@ -267,10 +267,10 @@ VLIB_NODE_FN (gw_lookup_node)
   while (n_left)
     {
       if (PREDICT_TRUE (n_left > 8))
-	clib_bihash_prefetch_bucket_16_8 (&fm->table4, h[8]);
+	clib_bihash_prefetch_bucket_24_8 (&fm->table4, h[8]);
 
       clib_memcpy_fast (&kv.key, k, 16);
-      if (clib_bihash_search_inline_with_hash_16_8 (&fm->table4, h[0], &kv))
+      if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
 	{
 	  /* if there is colision, we just reiterate */
 	  if (gw_add_flow (fm, ptd, thread_index, first_flow_index, k, h, f))
