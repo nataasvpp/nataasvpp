@@ -84,7 +84,8 @@ static const u8x16 dst_ip_byteswap_x2 = { 15, 14, 13, 12, -1, -1, -1, -1,
 					  15, 14, 13, 12, -1, -1, -1, -1 };
 
 static_always_inline void
-gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
+gw_calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
+	     gw_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
 {
   u8 pr;
   i64x2 norm, zero = {};
@@ -117,7 +118,7 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
   k = (u8x16) u32x4_insert (k, l4_hdr, 0);
 
   k = u8x16_shuffle (k, swap);
-  f[0] = ((u32x4) norm)[0];
+  lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
   /* extract tcp flags */
   if (pr == IP_PROTOCOL_TCP)
@@ -126,43 +127,44 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
     vcdp_buffer (b)->tcp_flags = 0;
 
   /* store key */
-  key->as_u8x16 = k;
+  skey->ip4_key.as_u8x16 = k;
 
   /* calculate hash */
-  h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (key));
+  h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));
 }
 
 static_always_inline int
 gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
-		   u32 first_flow_index, gw_ip4_key_t *k, u64 *h, u32 *fid)
+		   gw_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
-  gw_session_t *f;
-
-  pool_get_zero (ptd->sessions, f);
-  clib_memcpy_fast (&kv.key, k, 16);
-  kv.value =
-    gw_flow_id (GW_SESSION_TYPE_IP4, thread_index, f - ptd->sessions, 0);
+  gw_session_t *session;
+  u32 session_idx;
+  u32 pseudo_flow_idx;
+  pool_get_zero (ptd->sessions, session);
+  session_idx = session - ptd->sessions;
+  clib_memcpy_fast (&kv.key, k, 24);
+  pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
+  kv.value = gw_session_mk_table_value (thread_index, pseudo_flow_idx);
 
   if (clib_bihash_add_del_24_8 (&fm->table4, &kv, 2))
     {
       /* colision - remote thread created same entry */
-      pool_put (ptd->sessions, f);
+      pool_put (ptd->sessions, session);
       return 1;
     }
-
-  f->ip_addr_hi = k->ip_addr_hi;
-  f->ip_addr_lo = k->ip_addr_lo;
-  f->port_hi = k->port_hi;
-  f->port_lo = k->port_lo;
-  f->proto = k->proto;
-  fid[0] |= kv.value;
+  session->type = GW_SESSION_TYPE_IP4;
+  session->bitmaps[GW_FLOW_FORWARD] = 0x1;  /* TODO: inherit from tenant */
+  session->bitmaps[GW_FLOW_BACKWARD] = 0x1; /* TODO: inherit from tenant */
+  /*TODO: timer wheel start*/
+  lookup_val[0] ^= kv.value;
   return 0;
 }
 
 static_always_inline void
-gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
-		u32 *f, u64 *h, int prefetch_buffer_stride)
+gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
+		gw_session_ip4_key_t *k, u64 *lookup_val, u64 *h,
+		int prefetch_buffer_stride)
 {
   u8 off = sizeof (ethernet_header_t);
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
@@ -173,7 +175,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
       clib_prefetch_load (pb[0]->data);
     }
 
-  gw_calc_key (b[0], off, k + 0, f + 0, h + 0);
+  gw_calc_key (b[0], off, b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
 
   if (prefetch_buffer_stride)
     {
@@ -181,7 +183,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
       clib_prefetch_load (pb[1]->data);
     }
 
-  gw_calc_key (b[1], off, k + 1, f + 1, h + 1);
+  gw_calc_key (b[1], off, b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
 
   if (prefetch_buffer_stride)
     {
@@ -189,7 +191,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
       clib_prefetch_load (pb[2]->data);
     }
 
-  gw_calc_key (b[2], off, k + 2, f + 2, h + 2);
+  gw_calc_key (b[2], off, b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
 
   if (prefetch_buffer_stride)
     {
@@ -197,7 +199,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b, gw_ip4_key_t *k,
       clib_prefetch_load (pb[3]->data);
     }
 
-  gw_calc_key (b[3], off, k + 3, f + 3, h + 3);
+  gw_calc_key (b[3], off, b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
 }
 
 VLIB_NODE_FN (gw_lookup_node)
@@ -205,7 +207,6 @@ VLIB_NODE_FN (gw_lookup_node)
 {
   gw_main_t *fm = &gateway_main;
   u32 thread_index = vm->thread_index;
-  u32 first_flow_index = thread_index << GW_LOG2_SESSIONS_PER_THREAD;
   gw_per_thread_data_t *ptd =
     vec_elt_at_index (fm->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
@@ -215,9 +216,12 @@ VLIB_NODE_FN (gw_lookup_node)
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
-  gw_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
+  gw_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
-  u32 __attribute__ ((aligned (32))) flow_ids[VLIB_FRAME_SIZE], *f = flow_ids;
+  /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
+   * flow_index */
+  u64 __attribute__ ((aligned (32))) lookup_vals[VLIB_FRAME_SIZE],
+    *lv = lookup_vals;
   u16 hit_count = 0;
 
   vlib_get_buffers (vm, from, bufs, n_left);
@@ -227,12 +231,12 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   while (n_left >= 8)
     {
-      gw_lookup_four (&fm->table4, b, k, f, h, 4);
+      gw_lookup_four (&fm->table4, b, k, lv, h, 4);
 
       b += 4;
       k += 4;
+      lv += 4;
       h += 4;
-      f += 4;
       n_left -= 4;
     }
 
@@ -240,51 +244,41 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   if (n_left >= 4)
     {
-      gw_lookup_four (&fm->table4, b, k, f, h, 0);
+      gw_lookup_four (&fm->table4, b, k, lv, h, 0);
 
       b += 4;
       k += 4;
+      lv += 4;
       h += 4;
-      f += 4;
       n_left -= 4;
     }
 
   while (n_left > 0)
     {
       u8 off = sizeof (ethernet_header_t);
-      gw_calc_key (b[0], off, k + 0, f + 0, h + 0);
+      gw_calc_key (b[0], off, b[0]->flow_id, k + 0, lv + 0, h + 0);
 
       b += 1;
       k += 1;
+      lv += 1;
       h += 1;
-      f += 1;
       n_left -= 1;
     }
-
-#ifdef CLIB_HAVE_VEC256
-  for (int i = 0; i < frame->n_vectors; i += 8)
-    *(u32x8 *) (flow_ids + i) &= u32x8_splat (GW_FLOW_ID_DIRECTION_MASK);
-#else
-  for (int i = 0; i < frame->n_vectors; i++)
-    flow_ids[i] &= GW_FLOW_ID_DIRECTION_MASK;
-#endif
 
   n_left = frame->n_vectors;
   h = hashes;
   k = keys;
-  f = flow_ids;
-
+  lv = lookup_vals;
   while (n_left)
     {
       if (PREDICT_TRUE (n_left > 8))
 	clib_bihash_prefetch_bucket_24_8 (&fm->table4, h[8]);
 
-      clib_memcpy_fast (&kv.key, k, 16);
+      clib_memcpy_fast (&kv.key, k, 24);
       if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
 	{
 	  /* if there is colision, we just reiterate */
-	  if (gw_create_session (fm, ptd, thread_index, first_flow_index, k, h,
-				 f))
+	  if (gw_create_session (fm, ptd, thread_index, k, h, lv))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   GW_LOOKUP_ERROR_COLLISION, 1);
@@ -293,28 +287,36 @@ VLIB_NODE_FN (gw_lookup_node)
 	}
       else
 	{
-	  f[0] |= kv.value;
+	  lv[0] ^= kv.value;
 	  hit_count++;
 	}
 
       n_left -= 1;
       k += 1;
       h += 1;
-      f += 1;
+      lv += 1;
     }
 
   n_left = frame->n_vectors;
-  f = flow_ids;
+  lv = lookup_vals;
   b = bufs;
   bi = from;
 
   while (n_left)
     {
-      u32 flow_thread_index = gw_thread_index_from_flow_id (f[0]);
-      b[0]->flow_id = f[0];
+      u32 flow_thread_index = gw_thread_index_from_lookup (lv[0]);
+      u32 flow_index = lv[0] & (~(u32) 0);
+      u32 session_index = flow_index >> 1;
+      b[0]->flow_id = flow_index;
       if (flow_thread_index == thread_index)
 	{
 	  /* known flow which belongs to this thread */
+	  gw_session_t *session = gw_session_at_index (ptd, session_index);
+	  u32 pbmp =
+	    session->bitmaps[gw_direction_from_flow_index (flow_index)];
+
+	  /* TODO: store packet bitmap at the right place */
+	  (void) pbmp;
 	  to_local[n_local] = bi[0];
 	  n_local++;
 	}
@@ -327,7 +329,7 @@ VLIB_NODE_FN (gw_lookup_node)
 	}
 
       n_left -= 1;
-      f += 1;
+      lv += 1;
       b += 1;
       bi += 1;
     }
@@ -389,10 +391,9 @@ format_gw_lookup_trace (u8 *s, va_list *args)
 
   s = format (s,
 	      "fh-lookup: sw_if_index %d, next index %d hash 0x%x "
-	      "flow-id %u (%u:%u)",
+	      "flow-id %u (session %u, %s)",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
-	      t->flow_id >> GW_LOG2_SESSIONS_PER_THREAD,
-	      t->flow_id & pow2_mask (GW_LOG2_SESSIONS_PER_THREAD));
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
   return s;
 }
 
