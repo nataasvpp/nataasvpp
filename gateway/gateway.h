@@ -26,9 +26,9 @@
 #include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.h>
 
-#define GW_LOG2_FLOWS_PER_THREAD 26
+#define GW_LOG2_SESSIONS_PER_THREAD 26
 
-#define BIHASH_IP4_NUM_BUCKETS (1 << (GW_LOG2_FLOWS_PER_THREAD - 2))
+#define BIHASH_IP4_NUM_BUCKETS (1 << (GW_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP4_MEM_SIZE    (2ULL << 30)
 
 #define GW_FLOW_ID_DIRECTION_SHIFT (31)
@@ -74,13 +74,13 @@ typedef struct
   u16 port_hi;
   u16 port_lo;
   u8 proto;
-} gw_flow_t;
+} gw_session_t;
 
-STATIC_ASSERT_SIZEOF (gw_flow_t, 16);
+STATIC_ASSERT_SIZEOF (gw_session_t, 16);
 
 typedef struct
 {
-  gw_flow_t *flows;
+  gw_session_t *sessions;
 } gw_per_thread_data_t;
 
 typedef struct
@@ -117,27 +117,27 @@ typedef struct
   u32 flow_id;
 } gw_lookup_trace_t;
 
-format_function_t format_gw_flow;
-format_function_t format_gw_flow_with_dir;
+format_function_t format_gw_session;
+format_function_t format_gw_session_with_dir;
 
 typedef enum
 {
-  GW_FLOW_TYPE_IP4,
-  GW_FLOW_TYPE_IP6,
+  GW_SESSION_TYPE_IP4,
+  GW_SESSION_TYPE_IP6,
   /* last */
-  GW_FLOW_N_TYPES,
-} gw_flow_type_t;
+  GW_SESSION_N_TYPES,
+} gw_session_type_t;
 
 static_always_inline u32
-gw_flow_id (gw_flow_type_t type, u32 thread_index, u32 local_index,
+gw_flow_id (gw_session_type_t type, u32 thread_index, u32 local_index,
 	    u32 direction)
 {
   u32 flow_id;
-  ASSERT (type < GW_FLOW_N_TYPES);
-  ASSERT (local_index < (1 << GW_LOG2_FLOWS_PER_THREAD));
+  ASSERT (type < GW_SESSION_N_TYPES);
+  ASSERT (local_index < (1 << GW_LOG2_SESSIONS_PER_THREAD));
 
   flow_id = local_index;
-  flow_id |= thread_index << GW_LOG2_FLOWS_PER_THREAD;
+  flow_id |= thread_index << GW_LOG2_SESSIONS_PER_THREAD;
   flow_id |= type << 29;
   flow_id |= direction << 31;
   return flow_id;
@@ -147,13 +147,13 @@ static_always_inline u32
 gw_thread_index_from_flow_id (u32 flow_id)
 {
   flow_id &= ~(GW_FLOW_ID_DIRECTION_MASK | GW_FLOW_ID_TYPE_MASK);
-  return flow_id >> GW_LOG2_FLOWS_PER_THREAD;
+  return flow_id >> GW_LOG2_SESSIONS_PER_THREAD;
 }
 
 static_always_inline u32
 gw_local_index_from_flow_id (u32 flow_id)
 {
-  return flow_id & pow2_mask (GW_LOG2_FLOWS_PER_THREAD);
+  return flow_id & pow2_mask (GW_LOG2_SESSIONS_PER_THREAD);
 }
 
 static_always_inline u8
@@ -162,14 +162,15 @@ gw_direction_from_flow_id (u32 flow_id)
   return flow_id >> GW_FLOW_ID_DIRECTION_SHIFT;
 }
 
-static_always_inline gw_flow_t *
-gw_get_flow (u32 flow_id)
+static_always_inline gw_session_t *
+gw_get_session (u32 flow_id)
 {
   gw_main_t *fm = &gateway_main;
   u32 thread_index = gw_thread_index_from_flow_id (flow_id);
   gw_per_thread_data_t *ptd =
     vec_elt_at_index (fm->per_thread_data, thread_index);
-  return pool_elt_at_index (ptd->flows, gw_local_index_from_flow_id (flow_id));
+  return pool_elt_at_index (ptd->sessions,
+			    gw_local_index_from_flow_id (flow_id));
 }
 
 int gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,

@@ -60,7 +60,7 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
 	{
 	  gw_per_thread_data_t *ptd =
 	    vec_elt_at_index (gm->per_thread_data, i);
-	  pool_init_fixed (ptd->flows, 1ULL << GW_LOG2_FLOWS_PER_THREAD);
+	  pool_init_fixed (ptd->sessions, 1ULL << GW_LOG2_SESSIONS_PER_THREAD);
 	}
 
       gm->frame_queue_index =

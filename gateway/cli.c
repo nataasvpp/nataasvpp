@@ -98,13 +98,13 @@ show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
   vlib_cli_output (vm, "%U", format_bihash_24_8, &gm->table4, 0);
   vec_foreach (ptd, gm->per_thread_data)
     {
-      vlib_cli_output (vm, "Thread %u: %u flows\n", ptd - gm->per_thread_data,
-		       pool_elts (ptd->flows));
+      vlib_cli_output (vm, "Thread %u: %u sessions\n",
+		       ptd - gm->per_thread_data, pool_elts (ptd->sessions));
       if (verbose)
-	pool_foreach_index (i, ptd->flows)
+	pool_foreach_index (i, ptd->sessions)
 	  {
-	    gw_flow_t *f = pool_elt_at_index (ptd->flows, i);
-	    vlib_cli_output (vm, "%7u: %U\n", i, format_gw_flow, f);
+	    gw_session_t *session = pool_elt_at_index (ptd->sessions, i);
+	    vlib_cli_output (vm, "%7u: %U\n", i, format_gw_session, session);
 	  }
     }
 

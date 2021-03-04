@@ -125,20 +125,20 @@ gw_calc_key (vlib_buffer_t *b, int off, gw_ip4_key_t *key, u32 *f, u64 *h)
 }
 
 static_always_inline int
-gw_add_flow (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
+gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
 	     u32 first_flow_index, gw_ip4_key_t *k, u64 *h, u32 *fid)
 {
   clib_bihash_kv_24_8_t kv = {};
-  gw_flow_t *f;
+  gw_session_t *f;
 
-  pool_get_zero (ptd->flows, f);
+  pool_get_zero (ptd->sessions, f);
   clib_memcpy_fast (&kv.key, k, 16);
-  kv.value = gw_flow_id (GW_FLOW_TYPE_IP4, thread_index, f - ptd->flows, 0);
+  kv.value = gw_flow_id (GW_SESSION_TYPE_IP4, thread_index, f - ptd->sessions, 0);
 
   if (clib_bihash_add_del_24_8 (&fm->table4, &kv, 2))
     {
       /* colision - remote thread created same entry */
-      pool_put (ptd->flows, f);
+      pool_put (ptd->sessions, f);
       return 1;
     }
 
@@ -196,7 +196,7 @@ VLIB_NODE_FN (gw_lookup_node)
 {
   gw_main_t *fm = &gateway_main;
   u32 thread_index = vm->thread_index;
-  u32 first_flow_index = thread_index << GW_LOG2_FLOWS_PER_THREAD;
+  u32 first_flow_index = thread_index << GW_LOG2_SESSIONS_PER_THREAD;
   gw_per_thread_data_t *ptd =
     vec_elt_at_index (fm->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
@@ -274,7 +274,7 @@ VLIB_NODE_FN (gw_lookup_node)
       if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
 	{
 	  /* if there is colision, we just reiterate */
-	  if (gw_add_flow (fm, ptd, thread_index, first_flow_index, k, h, f))
+	  if (gw_create_session (fm, ptd, thread_index, first_flow_index, k, h, f))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   GW_LOOKUP_ERROR_COLLISION, 1);
@@ -381,8 +381,8 @@ format_gw_lookup_trace (u8 *s, va_list *args)
 	      "fh-lookup: sw_if_index %d, next index %d hash 0x%x "
 	      "flow-id %u (%u:%u)",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
-	      t->flow_id >> GW_LOG2_FLOWS_PER_THREAD,
-	      t->flow_id & pow2_mask (GW_LOG2_FLOWS_PER_THREAD));
+	      t->flow_id >> GW_LOG2_SESSIONS_PER_THREAD,
+	      t->flow_id & pow2_mask (GW_LOG2_SESSIONS_PER_THREAD));
   return s;
 }
 

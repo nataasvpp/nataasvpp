@@ -18,9 +18,9 @@
 #include <gateway/gateway.h>
 
 u8 *
-format_gw_flow (u8 *s, va_list *args)
+format_gw_session (u8 *s, va_list *args)
 {
-  gw_flow_t *f = va_arg (*args, gw_flow_t *);
+  gw_session_t *f = va_arg (*args, gw_session_t *);
   s = format (s, "%U:%u <-> %U:%u", format_ip4_address, &f->ip_addr_lo,
 	      clib_net_to_host_u16 (f->port_lo), format_ip4_address,
 	      &f->ip_addr_hi, clib_net_to_host_u16 (f->port_hi));
@@ -28,9 +28,9 @@ format_gw_flow (u8 *s, va_list *args)
 }
 
 u8 *
-format_gw_flow_with_dir (u8 *s, va_list *args)
+format_gw_session_with_dir (u8 *s, va_list *args)
 {
-  gw_flow_t *f = va_arg (*args, gw_flow_t *);
+  gw_session_t *f = va_arg (*args, gw_session_t *);
   u32 dir = va_arg (*args, u32);
 
   if (dir)
