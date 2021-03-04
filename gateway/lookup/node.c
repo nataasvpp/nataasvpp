@@ -56,6 +56,14 @@ typedef enum
     GW_LOOKUP_N_NEXT,
 } gw_lookup_next_t;
 
+typedef struct
+{
+  u32 next_index;
+  u32 sw_if_index;
+  u64 hash;
+  u32 flow_id;
+} gw_lookup_trace_t;
+
 #define u32x4_insert(v, x, i) (u32x4) _mm_insert_epi32 ((__m128i) (v), x, i)
 
 static const u8 l4_mask_bits[256] = {

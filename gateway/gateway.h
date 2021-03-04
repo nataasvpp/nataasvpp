@@ -109,14 +109,6 @@ extern vlib_node_registration_t gw_lookup_node;
 extern vlib_node_registration_t gw_counter_node;
 extern vlib_node_registration_t gw_exporter_node;
 
-typedef struct
-{
-  u32 next_index;
-  u32 sw_if_index;
-  u64 hash;
-  u32 flow_id;
-} gw_lookup_trace_t;
-
 format_function_t format_gw_session;
 format_function_t format_gw_session_with_dir;
 
