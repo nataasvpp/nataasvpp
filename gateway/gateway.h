@@ -95,10 +95,10 @@ typedef struct
   clib_bihash_24_8_t table4;
   u32 frame_queue_index;
 
-  /* poll of tenants */
+  /* pool of tenants */
   gw_tenant_t *tenants;
 
-  /* per-thrad data */
+  /* per-thread data */
   gw_per_thread_data_t *per_thread_data;
 
 } gw_main_t;
