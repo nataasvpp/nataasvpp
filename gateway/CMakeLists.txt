@@ -19,6 +19,7 @@ add_vpp_plugin(gateway
   gateway.c
   format.c
   cli.c
+  service.c
   geneve_input/node.c
   geneve_input/cli.c
 
