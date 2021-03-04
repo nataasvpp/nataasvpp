@@ -27,7 +27,7 @@ gw_main_t gateway_main;
 
 static void
 gateway_enable_one (vlib_main_t *vm, vnet_main_t *vnm, gw_main_t *gm,
-			u32 rx_sw_if_index, u32 tx_sw_if_index)
+		    u32 rx_sw_if_index, u32 tx_sw_if_index)
 {
   vnet_hw_interface_t *hi = vnet_get_sup_hw_interface (vnm, tx_sw_if_index);
   u16 next_index =
@@ -42,7 +42,7 @@ gateway_enable_one (vlib_main_t *vm, vnet_main_t *vnm, gw_main_t *gm,
 
 int
 gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
-			    int enable_disable)
+			int enable_disable)
 {
   vlib_main_t *vm = vlib_get_main ();
   vnet_main_t *vnm = vnet_get_main ();
@@ -82,9 +82,8 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
 }
 
 static clib_error_t *
-gateway_enable_disable_command_fn (vlib_main_t *vm,
-				       unformat_input_t *input,
-				       vlib_cli_command_t *cmd)
+gateway_enable_disable_command_fn (vlib_main_t *vm, unformat_input_t *input,
+				   vlib_cli_command_t *cmd)
 {
   vnet_main_t *vnm = vnet_get_main ();
   gw_main_t *sm = &gateway_main;
@@ -106,8 +105,7 @@ gateway_enable_disable_command_fn (vlib_main_t *vm,
 
   if (sw_if_index1 == ~0 || sw_if_index2 == ~0)
     return clib_error_return (0, "Please specify an interface...");
-  rv = gateway_enable_disable (sm, sw_if_index1, sw_if_index2,
-				   enable_disable);
+  rv = gateway_enable_disable (sm, sw_if_index1, sw_if_index2, enable_disable);
   switch (rv)
     {
     case 0:
@@ -116,8 +114,7 @@ gateway_enable_disable_command_fn (vlib_main_t *vm,
       return clib_error_return (0, "Invalid interface");
       break;
     default:
-      return clib_error_return (0, "gateway_enable_disable returned %d",
-				rv);
+      return clib_error_return (0, "gateway_enable_disable returned %d", rv);
     }
   return 0;
 }
@@ -132,7 +129,7 @@ VLIB_CLI_COMMAND (gateway_enable_disable_command, static) = {
 
 static clib_error_t *
 show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			     vlib_cli_command_t *cmd)
+			 vlib_cli_command_t *cmd)
 {
   unformat_input_t _line_input, *line_input = &_line_input;
   gw_main_t *gm = &gateway_main;

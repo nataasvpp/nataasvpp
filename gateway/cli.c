@@ -17,7 +17,6 @@
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
 
-
 /*
  * add CLI:
  * vcdp tenant <add/del> <tenant-id>
