@@ -22,6 +22,7 @@
 #include <vppinfra/bihash_template.h>
 #include <vcdp/common.h>
 #include <gateway/gateway.h>
+#include <gateway/service.h>
 
 /* packet trace format function */
 
@@ -72,6 +73,9 @@ static const u8 l4_mask_bits[256] = {
   [IP_PROTOCOL_IPSEC_ESP] = 32, [IP_PROTOCOL_IPSEC_AH] = 32,
 };
 
+/* TODO: add ICMP, ESP, and AH (+ additional
+ * branching or lookup for different
+ * shuffling mask) */
 static const u64 tcp_udp_bitmask =
   ((1 << IP_PROTOCOL_TCP) | (1 << IP_PROTOCOL_UDP));
 static const u8x16 key_shuff_no_norm = { 0, 1, 2,  3,  -1, 5,  -1, -1,
@@ -216,6 +220,9 @@ VLIB_NODE_FN (gw_lookup_node)
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
+  u16 local_next_indices[VLIB_FRAME_SIZE];
+  vlib_buffer_t *local_bufs[VLIB_FRAME_SIZE];
+  u32 local_flow_indices[VLIB_FRAME_SIZE];
   gw_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
@@ -274,6 +281,9 @@ VLIB_NODE_FN (gw_lookup_node)
       if (PREDICT_TRUE (n_left > 8))
 	clib_bihash_prefetch_bucket_24_8 (&fm->table4, h[8]);
 
+      if (PREDICT_TRUE (n_left > 1))
+	vlib_prefetch_buffer_header (b[1], STORE);
+
       clib_memcpy_fast (&kv.key, k, 24);
       if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
 	{
@@ -291,6 +301,7 @@ VLIB_NODE_FN (gw_lookup_node)
 	  hit_count++;
 	}
 
+      b[0]->flow_id = lv[0] & (~(u32) 0);
       n_left -= 1;
       k += 1;
       h += 1;
@@ -306,18 +317,13 @@ VLIB_NODE_FN (gw_lookup_node)
     {
       u32 flow_thread_index = gw_thread_index_from_lookup (lv[0]);
       u32 flow_index = lv[0] & (~(u32) 0);
-      u32 session_index = flow_index >> 1;
-      b[0]->flow_id = flow_index;
+
       if (flow_thread_index == thread_index)
 	{
 	  /* known flow which belongs to this thread */
-	  gw_session_t *session = gw_session_at_index (ptd, session_index);
-	  u32 pbmp =
-	    session->bitmaps[gw_direction_from_flow_index (flow_index)];
-
-	  /* TODO: store packet bitmap at the right place */
-	  (void) pbmp;
 	  to_local[n_local] = bi[0];
+	  local_flow_indices[n_local] = flow_index;
+	  local_bufs[n_local] = b[0];
 	  n_local++;
 	}
       else
@@ -350,8 +356,29 @@ VLIB_NODE_FN (gw_lookup_node)
   /* enqueue local */
   if (n_local)
     {
-      vlib_buffer_enqueue_to_single_next (vm, node, to_local,
-					  GW_LOOKUP_NEXT_GW_COUNTER, n_local);
+      u16 *current_next = local_next_indices;
+      u32 *local_flow_index = local_flow_indices;
+      b = local_bufs;
+      n_left = n_local;
+
+      /* TODO: prefetch session and buffer + 4 loop */
+      while (n_left)
+	{
+	  u32 session_index = local_flow_index[0] >> 1;
+	  gw_session_t *session = gw_session_at_index (ptd, session_index);
+	  u32 pbmp =
+	    session
+	      ->bitmaps[gw_direction_from_flow_index (local_flow_index[0])];
+	  vcdp_buffer (b[0])->service_bitmap = pbmp;
+	  vcdp_next (b[0], current_next);
+
+	  local_flow_index += 1;
+	  current_next += 1;
+	  b += 1;
+	  n_left -= 1;
+	}
+      vlib_buffer_enqueue_to_next (vm, node, to_local, local_next_indices,
+				   n_local);
       vlib_node_increment_counter (vm, node->node_index, GW_LOOKUP_ERROR_LOCAL,
 				   n_local);
     }

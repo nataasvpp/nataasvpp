@@ -17,6 +17,8 @@
 #include <sys/mman.h>
 
 #include <gateway/gateway.h>
+#include <gateway/service.h>
+
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
 
@@ -84,7 +86,7 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
 static clib_error_t *
 gateway_init (vlib_main_t *vm)
 {
-  return 0;
+  return vcdp_service_init (vm);
 }
 
 VLIB_INIT_FUNCTION (gateway_init);

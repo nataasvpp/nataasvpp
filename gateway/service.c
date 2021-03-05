@@ -16,7 +16,7 @@
 #include <gateway/gateway.h>
 u8 vcdp_base_next_index;
 
-void
+clib_error_t *
 vcdp_service_init (vlib_main_t *vm)
 {
   u32 idx[VCDP_SERVICE_N];
@@ -29,4 +29,9 @@ vcdp_service_init (vlib_main_t *vm)
   foreach_service
 #undef _
     vcdp_base_next_index = idx[VCDP_SERVICE_DROP];
+  /* Sanity check */
+  for (int i = 0; i < VCDP_SERVICE_DROP; i++)
+    if (idx[i] != i + vcdp_base_next_index && idx[i] != idx[VCDP_SERVICE_DROP])
+      return clib_error_return (0, "inconsistent next indices!");
+  return 0;
 }

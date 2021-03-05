@@ -15,6 +15,7 @@
 #ifndef __included_service_h__
 #define __included_service_h__
 #include <vlib/vlib.h>
+#include <vcdp/common.h>
 
 /* clang-format off */
 #define foreach_service                         \
@@ -30,12 +31,19 @@ enum
     VCDP_SERVICE_N
 };
 
-#define vcdp_bmp_to_next_index(bmp)                                           \
-  (__builtin_ffs ((bmp)) + vcdp_base_next_index);
-
-/* Next index of the last next node of vcdp-lookup which is NOT a service */
+/* Next index of the first next node of vcdp-lookup which is a service */
 extern u8 vcdp_base_next_index;
 
-void vcdp_service_init (vlib_main_t *vm);
+static_always_inline void
+vcdp_next (vlib_buffer_t *b, u16 *next_index)
+{
+  u32 bmp = vcdp_buffer (b)->service_bitmap;
+  u8 first = __builtin_ffs (bmp);
+  ASSERT (first != 0);
+  *next_index = (first - 1) + vcdp_base_next_index;
+  vcdp_buffer (b)->service_bitmap ^= 1 << (first - 1);
+}
+
+clib_error_t *vcdp_service_init (vlib_main_t *vm);
 
 #endif //__included_service_h__
