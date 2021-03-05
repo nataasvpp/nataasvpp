@@ -24,8 +24,6 @@
 #include <gateway/gateway.h>
 #include <gateway/service.h>
 
-/* packet trace format function */
-
 #define foreach_gw_lookup_next _ (GW_COUNTER, "fh-counter")
 
 #define foreach_gw_lookup_error                                               \
@@ -57,6 +55,22 @@ typedef enum
     GW_LOOKUP_N_NEXT,
 } gw_lookup_next_t;
 
+#define foreach_gw_handoff_error _ (NOERROR, "no error")
+
+typedef enum
+{
+#define _(sym, str) GW_LOOKUP_ERROR_##sym,
+  foreach_gw_handoff_error
+#undef _
+    GW_HANDOFF_N_ERROR,
+} gw_handoff_error_t;
+
+static char *gw_handoff_error_strings[] = {
+#define _(sym, string) string,
+  foreach_gw_handoff_error
+#undef _
+};
+
 typedef struct
 {
   u32 next_index;
@@ -64,6 +78,12 @@ typedef struct
   u64 hash;
   u32 flow_id;
 } gw_lookup_trace_t;
+
+typedef struct
+{
+  u32 next_index;
+  u32 flow_id;
+} gw_handoff_trace_t;
 
 #define u32x4_insert(v, x, i) (u32x4) _mm_insert_epi32 ((__m128i) (v), x, i)
 
@@ -409,6 +429,60 @@ VLIB_NODE_FN (gw_lookup_node)
   return frame->n_vectors;
 }
 
+VLIB_NODE_FN (gw_handoff_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  gw_main_t *fm = &gateway_main;
+  u32 thread_index = vm->thread_index;
+  gw_per_thread_data_t *ptd =
+    vec_elt_at_index (fm->per_thread_data, thread_index);
+  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
+  u32 *from = vlib_frame_vector_args (frame);
+  u32 n_left = frame->n_vectors;
+  u16 next_indices[VLIB_FRAME_SIZE], *current_next;
+
+  vlib_get_buffers (vm, from, bufs, n_left);
+  b = bufs;
+  current_next = next_indices;
+
+  /*TODO: prefetch, quad or octo loop...*/
+  while (n_left)
+    {
+      u32 flow_index = b[0]->flow_id;
+      u32 session_index = flow_index >> 1;
+      gw_session_t *session = gw_session_at_index (ptd, session_index);
+      u32 pbmp = session->bitmaps[gw_direction_from_flow_index (flow_index)];
+      vcdp_buffer (b[0])->service_bitmap = pbmp;
+      vcdp_next (b[0], current_next);
+
+      current_next += 1;
+      b += 1;
+      n_left -= 1;
+    }
+  vlib_buffer_enqueue_to_next (vm, node, from, next_indices, frame->n_vectors);
+  if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))
+    {
+      int i;
+      b = bufs;
+      current_next = next_indices;
+      for (i = 0; i < frame->n_vectors; i++)
+	{
+	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
+	    {
+	      gw_handoff_trace_t *t =
+		vlib_add_trace (vm, node, b[0], sizeof (*t));
+	      t->flow_id = b[0]->flow_id;
+	      t->next_index = current_next[0];
+	      b++;
+	      current_next++;
+	    }
+	  else
+	    break;
+	}
+    }
+  return frame->n_vectors;
+}
+
 static u8 *
 format_gw_lookup_trace (u8 *s, va_list *args)
 {
@@ -417,10 +491,25 @@ format_gw_lookup_trace (u8 *s, va_list *args)
   gw_lookup_trace_t *t = va_arg (*args, gw_lookup_trace_t *);
 
   s = format (s,
-	      "fh-lookup: sw_if_index %d, next index %d hash 0x%x "
+	      "gw-lookup: sw_if_index %d, next index %d hash 0x%x "
 	      "flow-id %u (session %u, %s)",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
 	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+  return s;
+}
+
+static u8 *
+format_gw_handoff_trace (u8 *s, va_list *args)
+{
+  vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
+  vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
+  gw_handoff_trace_t *t = va_arg (*args, gw_handoff_trace_t *);
+
+  s = format (s,
+	      "gw-handoff: next index %d "
+	      "flow-id %u (session %u, %s)",
+	      t->next_index, t->flow_id, t->flow_id >> 1,
+	      t->flow_id & 0x1 ? "backward" : "forward");
   return s;
 }
 
@@ -443,4 +532,17 @@ VLIB_REGISTER_NODE (gw_lookup_node) =
       foreach_gw_lookup_next
 #undef _
   },
+};
+
+VLIB_REGISTER_NODE (gw_handoff_node) = {
+  .name = "vcdp-handoff",
+  .vector_size = sizeof (u32),
+  .format_trace = format_gw_handoff_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+
+  .n_errors = ARRAY_LEN (gw_handoff_error_strings),
+  .error_strings = gw_handoff_error_strings,
+
+  .sibling_of = "vcdp-lookup",
+
 };

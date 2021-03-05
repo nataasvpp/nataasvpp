@@ -172,6 +172,7 @@ typedef struct
 
 extern gw_main_t gateway_main;
 extern vlib_node_registration_t gw_lookup_node;
+extern vlib_node_registration_t gw_handoff_node;
 extern vlib_node_registration_t gw_counter_node;
 extern vlib_node_registration_t gw_exporter_node;
 

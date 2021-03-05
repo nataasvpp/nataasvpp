@@ -66,7 +66,7 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
 	}
 
       gm->frame_queue_index =
-	vlib_frame_queue_main_init (gw_counter_node.index, 0);
+	vlib_frame_queue_main_init (gw_handoff_node.index, 0);
     }
 
   if (enable_disable)
