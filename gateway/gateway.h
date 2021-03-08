@@ -24,6 +24,8 @@
 #include <vppinfra/elog.h>
 
 #include <vppinfra/bihash_24_8.h>
+#include <vppinfra/bihash_8_8.h>
+
 #include <vppinfra/bihash_template.h>
 
 #define GW_LOG2_SESSIONS_PER_THREAD 26
@@ -157,6 +159,10 @@ typedef struct
 {
   u32 *next_index_by_rx_sw_if_index;
   u32 *tx_sw_if_index_by_rx_sw_if_index;
+
+  /* key = (u64) tenant_id; val= (u64) tenant_idx; */
+  clib_bihash_8_8_t tenant_idx_by_id;
+
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_24_8_t table4;
