@@ -12,13 +12,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef __included_service_h__
-#define __included_service_h__
+#ifndef __included_vcdp_service_h__
+#define __included_vcdp_service_h__
 #include <vlib/vlib.h>
 #include <vcdp/common.h>
 
 /* clang-format off */
-#define foreach_service                         \
+#define foreach_vcdp_service                         \
   _(DROP, "vcdp-drop", 0)                       \
   _(TCP_CHECK, "vcdp-tcp-checks", 1)            \
   _(GENEVE_OUTPUT, "vcdp-geneve-output", 2)
@@ -26,13 +26,10 @@
 enum
 {
 #define _(x, y, z) VCDP_SERVICE_##x = z,
-  foreach_service
+  foreach_vcdp_service
 #undef _
     VCDP_SERVICE_N
 };
-
-/* Next index of the first next node of vcdp-lookup which is a service */
-extern u8 vcdp_base_next_index;
 
 static_always_inline void
 vcdp_next (vlib_buffer_t *b, u16 *next_index)
@@ -40,10 +37,8 @@ vcdp_next (vlib_buffer_t *b, u16 *next_index)
   u32 bmp = vcdp_buffer (b)->service_bitmap;
   u8 first = __builtin_ffs (bmp);
   ASSERT (first != 0);
-  *next_index = (first - 1) + vcdp_base_next_index;
+  *next_index = (first - 1) + VCDP_SERVICE_DROP;
   vcdp_buffer (b)->service_bitmap ^= 1 << (first - 1);
 }
-
-clib_error_t *vcdp_service_init (vlib_main_t *vm);
 
 #endif //__included_service_h__

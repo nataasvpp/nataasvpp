@@ -2,7 +2,6 @@
 #define __included_vcdp_common_h__
 
 #include <vnet/vnet.h>
-
 typedef struct
 {
   u32 service_bitmap;

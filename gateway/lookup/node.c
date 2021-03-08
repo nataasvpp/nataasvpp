@@ -21,10 +21,8 @@
 #include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.h>
 #include <vcdp/common.h>
+#include <vcdp/service.h>
 #include <gateway/gateway.h>
-#include <gateway/service.h>
-
-#define foreach_gw_lookup_next _ (GW_COUNTER, "fh-counter")
 
 #define foreach_gw_lookup_error                                               \
   _ (MISS, "flow miss")                                                       \
@@ -46,14 +44,6 @@ static char *gw_lookup_error_strings[] = {
   foreach_gw_lookup_error
 #undef _
 };
-
-typedef enum
-{
-#define _(s, n) GW_LOOKUP_NEXT_##s,
-  foreach_gw_lookup_next
-#undef _
-    GW_LOOKUP_N_NEXT,
-} gw_lookup_next_t;
 
 #define foreach_gw_handoff_error _ (NOERROR, "no error")
 
@@ -407,7 +397,10 @@ VLIB_NODE_FN (gw_lookup_node)
     {
       int i;
       b = bufs;
+      bi = from;
       h = hashes;
+      u32 *in_local = to_local;
+      u32 *in_remote = to_remote;
 
       for (i = 0; i < frame->n_vectors; i++)
 	{
@@ -417,8 +410,17 @@ VLIB_NODE_FN (gw_lookup_node)
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->sw_if_index = vnet_buffer (b[0])->sw_if_index[VLIB_RX];
 	      t->flow_id = b[0]->flow_id;
-	      t->next_index = GW_LOOKUP_NEXT_GW_COUNTER;
 	      t->hash = h[0];
+	      if (bi[0] == in_local[0])
+		{
+		  t->next_index = local_next_indices[(in_local++) - to_local];
+		}
+	      else
+		{
+		  t->next_index = ~0;
+		  in_remote++;
+		}
+	      bi++;
 	      b++;
 	      h++;
 	    }
@@ -524,12 +526,12 @@ VLIB_REGISTER_NODE (gw_lookup_node) =
   .n_errors = ARRAY_LEN(gw_lookup_error_strings),
   .error_strings = gw_lookup_error_strings,
 
-  .n_next_nodes = GW_LOOKUP_N_NEXT,
+  .n_next_nodes = VCDP_SERVICE_N,
 
   /* edit / add dispositions here */
   .next_nodes = {
-#define _(s, n) [GW_LOOKUP_NEXT_##s] = n,
-      foreach_gw_lookup_next
+#define _(s, n, x) [VCDP_SERVICE_##s] = n,
+      foreach_vcdp_service
 #undef _
   },
 };
