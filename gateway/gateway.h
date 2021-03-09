@@ -237,49 +237,6 @@ gw_direction_from_flow_index (u32 flow_index)
 {
   return (flow_index & 0x1);
 }
-/* static_always_inline u32
-gw_flow_id (gw_flow_type_t type, u32 thread_index, u32 local_index,
-	    u32 direction)
-{
-  u32 flow_id;
-  ASSERT (type < GW_SESSION_N_TYPES);
-  ASSERT (local_index < (1 << GW_LOG2_SESSIONS_PER_THREAD));
-
-  flow_id = local_index;
-  flow_id |= thread_index << GW_LOG2_SESSIONS_PER_THREAD;
-  flow_id |= type << 29;
-  flow_id |= direction << 31;
-  return flow_id;
-}
-
-static_always_inline u32
-gw_thread_index_from_flow_id (u32 flow_id)
-{
-  flow_id &= ~(GW_FLOW_ID_DIRECTION_MASK | GW_FLOW_ID_TYPE_MASK);
-  return flow_id >> GW_LOG2_SESSIONS_PER_THREAD;
-}
-
-static_always_inline u32
-gw_local_index_from_flow_id (u32 flow_id)
-{
-  return flow_id & pow2_mask (GW_LOG2_SESSIONS_PER_THREAD);
-}
-
-static_always_inline u8
-gw_direction_from_flow_id (u32 flow_id)
-{
-  return flow_id >> GW_FLOW_ID_DIRECTION_SHIFT;
-}
-
-static_always_inline gw_session_t *
-gw_get_session (u32 flow_id)
-{
-  gw_main_t *fm = &gateway_main;
-  u32 thread_index = gw_thread_index_from_flow_id (flow_id);
-  gw_per_thread_data_t *ptd =
-    vec_elt_at_index (fm->per_thread_data, thread_index);
-  return pool_elt_at_index (ptd->flows, gw_local_index_from_flow_id (flow_id));
-} */
 
 int gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
 			    int enable_disable);
