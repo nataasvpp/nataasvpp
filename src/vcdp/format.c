@@ -15,12 +15,12 @@
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
 
-#include <gateway/gateway.h>
+#include <vcdp/vcdp.h>
 
 u8 *
-format_gw_session (u8 *s, va_list *args)
+format_vcdp_session (u8 *s, va_list *args)
 {
-  gw_session_t *f = va_arg (*args, gw_session_t *);
+  vcdp_session_t *f = va_arg (*args, vcdp_session_t *);
   s = format (s, "%U:%u <-> %U:%u", format_ip4_address, &f->ip_addr_lo,
 	      clib_net_to_host_u16 (f->port_lo), format_ip4_address,
 	      &f->ip_addr_hi, clib_net_to_host_u16 (f->port_hi));
@@ -28,9 +28,9 @@ format_gw_session (u8 *s, va_list *args)
 }
 
 u8 *
-format_gw_session_with_dir (u8 *s, va_list *args)
+format_vcdp_session_with_dir (u8 *s, va_list *args)
 {
-  gw_session_t *f = va_arg (*args, gw_session_t *);
+  vcdp_session_t *f = va_arg (*args, vcdp_session_t *);
   u32 dir = va_arg (*args, u32);
 
   if (dir)

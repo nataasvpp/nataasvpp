@@ -22,9 +22,9 @@
 #include <vppinfra/bihash_template.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
-#include <gateway/gateway.h>
+#include <vcdp/vcdp.h>
 
-#define foreach_gw_lookup_error                                               \
+#define foreach_vcdp_lookup_error                                             \
   _ (MISS, "flow miss")                                                       \
   _ (LOCAL, "local flow")                                                     \
   _ (REMOTE, "remote flow")                                                   \
@@ -33,31 +33,31 @@
 
 typedef enum
 {
-#define _(sym, str) GW_LOOKUP_ERROR_##sym,
-  foreach_gw_lookup_error
+#define _(sym, str) VCDP_LOOKUP_ERROR_##sym,
+  foreach_vcdp_lookup_error
 #undef _
-    GW_LOOKUP_N_ERROR,
-} gw_lookup_error_t;
+    VCDP_LOOKUP_N_ERROR,
+} vcdp_lookup_error_t;
 
-static char *gw_lookup_error_strings[] = {
+static char *vcdp_lookup_error_strings[] = {
 #define _(sym, string) string,
-  foreach_gw_lookup_error
+  foreach_vcdp_lookup_error
 #undef _
 };
 
-#define foreach_gw_handoff_error _ (NOERROR, "no error")
+#define foreach_vcdp_handoff_error _ (NOERROR, "no error")
 
 typedef enum
 {
-#define _(sym, str) GW_LOOKUP_ERROR_##sym,
-  foreach_gw_handoff_error
+#define _(sym, str) VCDP_LOOKUP_ERROR_##sym,
+  foreach_vcdp_handoff_error
 #undef _
-    GW_HANDOFF_N_ERROR,
-} gw_handoff_error_t;
+    VCDP_HANDOFF_N_ERROR,
+} vcdp_handoff_error_t;
 
-static char *gw_handoff_error_strings[] = {
+static char *vcdp_handoff_error_strings[] = {
 #define _(sym, string) string,
-  foreach_gw_handoff_error
+  foreach_vcdp_handoff_error
 #undef _
 };
 
@@ -67,13 +67,13 @@ typedef struct
   u32 sw_if_index;
   u64 hash;
   u32 flow_id;
-} gw_lookup_trace_t;
+} vcdp_lookup_trace_t;
 
 typedef struct
 {
   u32 next_index;
   u32 flow_id;
-} gw_handoff_trace_t;
+} vcdp_handoff_trace_t;
 
 #define u32x4_insert(v, x, i) (u32x4) _mm_insert_epi32 ((__m128i) (v), x, i)
 
@@ -98,8 +98,8 @@ static const u8x16 dst_ip_byteswap_x2 = { 15, 14, 13, 12, -1, -1, -1, -1,
 					  15, 14, 13, 12, -1, -1, -1, -1 };
 
 static_always_inline void
-gw_calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
-	     gw_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
+calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
+	  vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
 {
   u8 pr;
   i64x2 norm, zero = {};
@@ -148,27 +148,27 @@ gw_calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
 }
 
 static_always_inline int
-gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd,
-		   gw_tenant_t *tenant, u32 thread_index,
-		   gw_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
+vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
+		     vcdp_tenant_t *tenant, u32 thread_index,
+		     vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
-  gw_session_t *session;
+  vcdp_session_t *session;
   u32 session_idx;
   u32 pseudo_flow_idx;
   pool_get_zero (ptd->sessions, session);
   session_idx = session - ptd->sessions;
   clib_memcpy_fast (&kv.key, k, 24);
   pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
-  kv.value = gw_session_mk_table_value (thread_index, pseudo_flow_idx);
+  kv.value = vcdp_session_mk_table_value (thread_index, pseudo_flow_idx);
 
-  if (clib_bihash_add_del_24_8 (&fm->table4, &kv, 2))
+  if (clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 2))
     {
       /* colision - remote thread created same entry */
       pool_put (ptd->sessions, session);
       return 1;
     }
-  session->type = GW_SESSION_TYPE_IP4;
+  session->type = VCDP_SESSION_TYPE_IP4;
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
   /*TODO: timer wheel start*/
@@ -177,9 +177,9 @@ gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd,
 }
 
 static_always_inline void
-gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
-		gw_session_ip4_key_t *k, u64 *lookup_val, u64 *h,
-		int prefetch_buffer_stride)
+vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
+		  vcdp_session_ip4_key_t *k, u64 *lookup_val, u64 *h,
+		  int prefetch_buffer_stride)
 {
   u8 off = sizeof (ethernet_header_t);
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
@@ -190,7 +190,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[0]->data);
     }
 
-  gw_calc_key (b[0], off, b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
+  calc_key (b[0], off, b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
 
   if (prefetch_buffer_stride)
     {
@@ -198,7 +198,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[1]->data);
     }
 
-  gw_calc_key (b[1], off, b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
+  calc_key (b[1], off, b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
 
   if (prefetch_buffer_stride)
     {
@@ -206,7 +206,7 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[2]->data);
     }
 
-  gw_calc_key (b[2], off, b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
+  calc_key (b[2], off, b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
 
   if (prefetch_buffer_stride)
     {
@@ -214,19 +214,19 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[3]->data);
     }
 
-  gw_calc_key (b[3], off, b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
+  calc_key (b[3], off, b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
 }
 
-VLIB_NODE_FN (gw_lookup_node)
+VLIB_NODE_FN (vcdp_lookup_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  gw_main_t *gm = &gateway_main;
+  vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  gw_per_thread_data_t *ptd =
-    vec_elt_at_index (gm->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index (vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   clib_bihash_kv_24_8_t kv = {};
-  gw_tenant_t *tenant;
+  vcdp_tenant_t *tenant;
   u32 *bi, *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
@@ -235,7 +235,7 @@ VLIB_NODE_FN (gw_lookup_node)
   u16 local_next_indices[VLIB_FRAME_SIZE];
   vlib_buffer_t *local_bufs[VLIB_FRAME_SIZE];
   u32 local_flow_indices[VLIB_FRAME_SIZE];
-  gw_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
+  vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
    * flow_index */
@@ -250,7 +250,7 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   while (n_left >= 8)
     {
-      gw_lookup_four (&gm->table4, b, k, lv, h, 4);
+      vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 4);
 
       b += 4;
       k += 4;
@@ -263,7 +263,7 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   if (n_left >= 4)
     {
-      gw_lookup_four (&gm->table4, b, k, lv, h, 0);
+      vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 0);
 
       b += 4;
       k += 4;
@@ -275,7 +275,7 @@ VLIB_NODE_FN (gw_lookup_node)
   while (n_left > 0)
     {
       u8 off = sizeof (ethernet_header_t);
-      gw_calc_key (b[0], off, b[0]->flow_id, k + 0, lv + 0, h + 0);
+      calc_key (b[0], off, b[0]->flow_id, k + 0, lv + 0, h + 0);
 
       b += 1;
       k += 1;
@@ -291,20 +291,21 @@ VLIB_NODE_FN (gw_lookup_node)
   while (n_left)
     {
       if (PREDICT_TRUE (n_left > 8))
-	clib_bihash_prefetch_bucket_24_8 (&gm->table4, h[8]);
+	clib_bihash_prefetch_bucket_24_8 (&vcdp->table4, h[8]);
 
       if (PREDICT_TRUE (n_left > 1))
 	vlib_prefetch_buffer_header (b[1], STORE);
 
       clib_memcpy_fast (&kv.key, k, 24);
-      if (clib_bihash_search_inline_with_hash_24_8 (&gm->table4, h[0], &kv))
+      if (clib_bihash_search_inline_with_hash_24_8 (&vcdp->table4, h[0], &kv))
 	{
-	  tenant = gw_tenant_at_index (gm, vcdp_buffer (b[0])->tenant_index);
+	  tenant =
+	    vcdp_tenant_at_index (vcdp, vcdp_buffer (b[0])->tenant_index);
 	  /* if there is colision, we just reiterate */
-	  if (gw_create_session (gm, ptd, tenant, thread_index, k, h, lv))
+	  if (vcdp_create_session (vcdp, ptd, tenant, thread_index, k, h, lv))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
-					   GW_LOOKUP_ERROR_COLLISION, 1);
+					   VCDP_LOOKUP_ERROR_COLLISION, 1);
 	      continue;
 	    }
 	}
@@ -328,7 +329,7 @@ VLIB_NODE_FN (gw_lookup_node)
 
   while (n_left)
     {
-      u32 flow_thread_index = gw_thread_index_from_lookup (lv[0]);
+      u32 flow_thread_index = vcdp_thread_index_from_lookup (lv[0]);
       u32 flow_index = lv[0] & (~(u32) 0);
 
       if (flow_thread_index == thread_index)
@@ -358,11 +359,11 @@ VLIB_NODE_FN (gw_lookup_node)
     {
       u32 n_remote_enq;
       n_remote_enq = vlib_buffer_enqueue_to_thread (
-	vm, gm->frame_queue_index, to_remote, thread_indices, n_remote, 1);
+	vm, vcdp->frame_queue_index, to_remote, thread_indices, n_remote, 1);
       vlib_node_increment_counter (vm, node->node_index,
-				   GW_LOOKUP_ERROR_REMOTE, n_remote_enq);
+				   VCDP_LOOKUP_ERROR_REMOTE, n_remote_enq);
       vlib_node_increment_counter (vm, node->node_index,
-				   GW_LOOKUP_ERROR_CON_DROP,
+				   VCDP_LOOKUP_ERROR_CON_DROP,
 				   n_remote - n_remote_enq);
     }
 
@@ -378,10 +379,10 @@ VLIB_NODE_FN (gw_lookup_node)
       while (n_left)
 	{
 	  u32 session_index = local_flow_index[0] >> 1;
-	  gw_session_t *session = gw_session_at_index (ptd, session_index);
+	  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
 	  u32 pbmp =
 	    session
-	      ->bitmaps[gw_direction_from_flow_index (local_flow_index[0])];
+	      ->bitmaps[vcdp_direction_from_flow_index (local_flow_index[0])];
 	  vcdp_buffer (b[0])->service_bitmap = pbmp;
 	  vcdp_next (b[0], current_next);
 
@@ -392,8 +393,8 @@ VLIB_NODE_FN (gw_lookup_node)
 	}
       vlib_buffer_enqueue_to_next (vm, node, to_local, local_next_indices,
 				   n_local);
-      vlib_node_increment_counter (vm, node->node_index, GW_LOOKUP_ERROR_LOCAL,
-				   n_local);
+      vlib_node_increment_counter (vm, node->node_index,
+				   VCDP_LOOKUP_ERROR_LOCAL, n_local);
     }
 
   if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))
@@ -409,7 +410,7 @@ VLIB_NODE_FN (gw_lookup_node)
 	{
 	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
 	    {
-	      gw_lookup_trace_t *t =
+	      vcdp_lookup_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->sw_if_index = vnet_buffer (b[0])->sw_if_index[VLIB_RX];
 	      t->flow_id = b[0]->flow_id;
@@ -434,13 +435,13 @@ VLIB_NODE_FN (gw_lookup_node)
   return frame->n_vectors;
 }
 
-VLIB_NODE_FN (gw_handoff_node)
+VLIB_NODE_FN (vcdp_handoff_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  gw_main_t *fm = &gateway_main;
+  vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  gw_per_thread_data_t *ptd =
-    vec_elt_at_index (fm->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index (vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
@@ -455,8 +456,8 @@ VLIB_NODE_FN (gw_handoff_node)
     {
       u32 flow_index = b[0]->flow_id;
       u32 session_index = flow_index >> 1;
-      gw_session_t *session = gw_session_at_index (ptd, session_index);
-      u32 pbmp = session->bitmaps[gw_direction_from_flow_index (flow_index)];
+      vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
+      u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index (flow_index)];
       vcdp_buffer (b[0])->service_bitmap = pbmp;
       vcdp_next (b[0], current_next);
 
@@ -474,7 +475,7 @@ VLIB_NODE_FN (gw_handoff_node)
 	{
 	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
 	    {
-	      gw_handoff_trace_t *t =
+	      vcdp_handoff_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->flow_id = b[0]->flow_id;
 	      t->next_index = current_next[0];
@@ -489,14 +490,14 @@ VLIB_NODE_FN (gw_handoff_node)
 }
 
 static u8 *
-format_gw_lookup_trace (u8 *s, va_list *args)
+format_vcdp_lookup_trace (u8 *s, va_list *args)
 {
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
-  gw_lookup_trace_t *t = va_arg (*args, gw_lookup_trace_t *);
+  vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
 
   s = format (s,
-	      "gw-lookup: sw_if_index %d, next index %d hash 0x%x "
+	      "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
 	      "flow-id %u (session %u, %s)",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
 	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
@@ -504,14 +505,14 @@ format_gw_lookup_trace (u8 *s, va_list *args)
 }
 
 static u8 *
-format_gw_handoff_trace (u8 *s, va_list *args)
+format_vcdp_handoff_trace (u8 *s, va_list *args)
 {
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
-  gw_handoff_trace_t *t = va_arg (*args, gw_handoff_trace_t *);
+  vcdp_handoff_trace_t *t = va_arg (*args, vcdp_handoff_trace_t *);
 
   s = format (s,
-	      "gw-handoff: next index %d "
+	      "vcdp-handoff: next index %d "
 	      "flow-id %u (session %u, %s)",
 	      t->next_index, t->flow_id, t->flow_id >> 1,
 	      t->flow_id & 0x1 ? "backward" : "forward");
@@ -519,15 +520,15 @@ format_gw_handoff_trace (u8 *s, va_list *args)
 }
 
 /* *INDENT-OFF* */
-VLIB_REGISTER_NODE (gw_lookup_node) =
+VLIB_REGISTER_NODE (vcdp_lookup_node) =
 {
   .name = "vcdp-lookup",
   .vector_size = sizeof (u32),
-  .format_trace = format_gw_lookup_trace,
+  .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(gw_lookup_error_strings),
-  .error_strings = gw_lookup_error_strings,
+  .n_errors = ARRAY_LEN(vcdp_lookup_error_strings),
+  .error_strings = vcdp_lookup_error_strings,
 
   .n_next_nodes = VCDP_SERVICE_N,
 
@@ -539,14 +540,14 @@ VLIB_REGISTER_NODE (gw_lookup_node) =
   },
 };
 
-VLIB_REGISTER_NODE (gw_handoff_node) = {
+VLIB_REGISTER_NODE (vcdp_handoff_node) = {
   .name = "vcdp-handoff",
   .vector_size = sizeof (u32),
-  .format_trace = format_gw_handoff_trace,
+  .format_trace = format_vcdp_handoff_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN (gw_handoff_error_strings),
-  .error_strings = gw_handoff_error_strings,
+  .n_errors = ARRAY_LEN (vcdp_handoff_error_strings),
+  .error_strings = vcdp_handoff_error_strings,
 
   .sibling_of = "vcdp-lookup",
 

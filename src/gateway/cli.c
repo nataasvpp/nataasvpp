@@ -19,58 +19,32 @@
 
 /*
  * add CLI:
- * vcdp tenant <add/del> <tenant-id>
+ * set gateway geneve-output tenant <tenant-id> src <src ip> dst <dst ip>
+ *      src-port <src-port> dst-port <dst-port> <forward|backward>
  *
- * it creates entry in the tenant pool
+ * it sets the geneve output data in each direction
  */
 
 static clib_error_t *
-gateway_enable_disable_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				   vlib_cli_command_t *cmd)
+gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
+			       vlib_cli_command_t *cmd)
 {
-  vnet_main_t *vnm = vnet_get_main ();
-  gw_main_t *sm = &gateway_main;
-  u32 sw_if_index1 = ~0;
-  u32 sw_if_index2 = ~0;
-  int enable_disable = 1;
-  int rv;
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (input, "disable"))
-	enable_disable = 0;
-      else if (unformat (input, "%U %U", unformat_vnet_sw_interface, vnm,
-			 &sw_if_index1, unformat_vnet_sw_interface, vnm,
-			 &sw_if_index2))
-	;
-      else
-	break;
-    }
-
-  if (sw_if_index1 == ~0 || sw_if_index2 == ~0)
-    return clib_error_return (0, "Please specify an interface...");
-  rv = gateway_enable_disable (sm, sw_if_index1, sw_if_index2, enable_disable);
-  switch (rv)
-    {
-    case 0:
-      break;
-    case VNET_API_ERROR_INVALID_SW_IF_INDEX:
-      return clib_error_return (0, "Invalid interface");
-      break;
-    default:
-      return clib_error_return (0, "gateway_enable_disable returned %d", rv);
     }
   return 0;
 }
 
-/* *INDENT-OFF* */
-VLIB_CLI_COMMAND (gateway_enable_disable_command, static) = {
-  .path = "gateway",
-  .short_help = "gateway <interface-name> <interface-name> [disable]",
-  .function = gateway_enable_disable_command_fn,
+VLIB_CLI_COMMAND (gateway_set_output_command, static) = {
+  .path = "set gateway geneve-output",
+  .short_help = "set gateway geneve-output tenant <tenant-id> "
+		"src <src ip> dst <dst ip> "
+		"src-port <src-port> dst-port <dst-port> "
+		"<forward|backward>",
+  .function = gateway_set_output_command_fn,
 };
-/* *INDENT-ON* */
 
-static clib_error_t *
+/*static clib_error_t *
 show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
 			 vlib_cli_command_t *cmd)
 {
@@ -115,4 +89,4 @@ VLIB_CLI_COMMAND (show_flow_handoff, static) = {
   .path = "show vcdp gateway",
   .short_help = "show vcdp gateway",
   .function = show_gateway_command_fn,
-};
+}; */

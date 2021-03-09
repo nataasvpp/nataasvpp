@@ -21,7 +21,23 @@
 
 /*
  * Add CLI:
- *  vcdp geneve-input <enable/disable> [port <port>]
+ *  gateway geneve-input interface <ifname> <enable-disable>
  *
  *  calls udp_register_dst_port for vcdp-geneve-input node
  */
+
+static clib_error_t *
+gateway_enable_disable_command_fn (vlib_main_t *vm, unformat_input_t *input,
+				   vlib_cli_command_t *cmd)
+{
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+    }
+  return 0;
+}
+
+VLIB_CLI_COMMAND (gateway_geneve_input_enable_disable_command, static) = {
+  .path = "gateway geneve-input",
+  .short_help = "gateway geneve-input interface <ifname> <enable|disable>",
+  .function = gateway_enable_disable_command_fn,
+};

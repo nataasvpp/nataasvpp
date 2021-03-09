@@ -11,18 +11,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_directories(${CMAKE_SOURCE_DIR})
-
-add_vpp_plugin(gateway
+#include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+add_vpp_plugin(vcdp_gateway
   SOURCES
-  lookup/node.c
-  gateway.c
-  format.c
-  cli.c
-  geneve_input/node.c
-  geneve_input/cli.c
+  vcdp/lookup/node.c
+  vcdp/format.c
+  vcdp/vcdp.c
+
+  gateway/gateway.c
+  gateway/cli.c
+  gateway/geneve_input/node.c
+  gateway/geneve_input/cli.c
 
   MULTIARCH_SOURCES
-  lookup/node.c
-  geneve_input/node.c
+  vcdp/lookup/node.c
+  gateway/geneve_input/node.c
 )

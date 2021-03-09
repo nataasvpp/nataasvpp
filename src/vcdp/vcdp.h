@@ -12,8 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef __included_gateway_h__
-#define __included_gateway_h__
+#ifndef __included_vcdp_h__
+#define __included_vcdp_h__
 
 #include <vnet/vnet.h>
 #include <vnet/ip/ip.h>
@@ -28,16 +28,16 @@
 
 #include <vppinfra/bihash_template.h>
 
-#define GW_LOG2_SESSIONS_PER_THREAD 26
-#define GW_LOG2_TENANTS		    10
+#define VCDP_LOG2_SESSIONS_PER_THREAD 26
+#define VCDP_LOG2_TENANTS	      10
 
-#define BIHASH_IP4_NUM_BUCKETS (1 << (GW_LOG2_SESSIONS_PER_THREAD - 2))
+#define BIHASH_IP4_NUM_BUCKETS (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP4_MEM_SIZE    (2ULL << 30)
 
-#define BIHASH_IP6_NUM_BUCKETS (1 << (GW_LOG2_SESSIONS_PER_THREAD - 2))
+#define BIHASH_IP6_NUM_BUCKETS (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP6_MEM_SIZE    (2ULL << 30)
 
-#define BIHASH_TENANT_NUM_BUCKETS (1 << (GW_LOG2_TENANTS - 2))
+#define BIHASH_TENANT_NUM_BUCKETS (1 << (VCDP_LOG2_TENANTS - 2))
 #define BIHASH_TENANT_MEM_SIZE	  (1 << 15)
 
 /* Convention session_index is 31 bit
@@ -58,29 +58,29 @@
 
 typedef enum
 {
-  GW_SESSION_TYPE_IP4,
+  VCDP_SESSION_TYPE_IP4,
 
   /* last */
-  GW_SESSION_N_TYPES,
-} gw_session_type_t;
+  VCDP_SESSION_N_TYPES,
+} vcdp_session_type_t;
 
 enum
 {
-  GW_FLOW_FORWARD = 0,
-  GW_FLOW_BACKWARD = 1,
-  GW_FLOW_F_B_N = 2
+  VCDP_FLOW_FORWARD = 0,
+  VCDP_FLOW_BACKWARD = 1,
+  VCDP_FLOW_F_B_N = 2
 };
 
 enum
 {
-  GW_PACKET_ORIGINAL = 0,
-  GW_PACKET_NORMALISED = 1
+  VCDP_PACKET_ORIGINAL = 0,
+  VCDP_PACKET_NORMALISED = 1
 };
 
 typedef struct
 {
-  u32 bitmaps[GW_FLOW_F_B_N];
-  u8 type; /* see gw_session_type_t */
+  u32 bitmaps[VCDP_FLOW_F_B_N];
+  u8 type; /* see vcdp_session_type_t */
 
   /* Deprecated fields: */
   u32 ip_addr_hi;
@@ -88,12 +88,7 @@ typedef struct
   u16 port_hi;
   u16 port_lo;
   u8 proto;
-} gw_session_t;
-
-typedef struct
-{
-
-} gw_geneve_output_data_t;
+} vcdp_session_t;
 
 typedef union
 {
@@ -122,12 +117,12 @@ typedef union
   u8x16 as_u8x16;
   u32x4 as_u32x4;
   u64x2 as_u64x2;
-} __clib_packed gw_ip4_key_t;
-STATIC_ASSERT_SIZEOF (gw_ip4_key_t, 16);
+} __clib_packed vcdp_ip4_key_t;
+STATIC_ASSERT_SIZEOF (vcdp_ip4_key_t, 16);
 
 typedef struct
 {
-  gw_ip4_key_t ip4_key;
+  vcdp_ip4_key_t ip4_key;
 
   union
   {
@@ -138,33 +133,19 @@ typedef struct
     };
     u64 as_u64;
   };
-} __clib_packed gw_session_ip4_key_t;
-STATIC_ASSERT_SIZEOF (gw_session_ip4_key_t, 24);
+} __clib_packed vcdp_session_ip4_key_t;
+STATIC_ASSERT_SIZEOF (vcdp_session_ip4_key_t, 24);
 
 typedef struct
 {
-  /* Infra data */
-  gw_session_t *sessions; /* fixed pool */
-
-  /* Service nodes data */
-
-  /* geneve-input specific data */
-
-  /* geneve-output specific data */
-  gw_geneve_output_data_t *output; /* by flow_index */
-} gw_per_thread_data_t;
+  vcdp_session_t *sessions; /* fixed pool */
+} vcdp_per_thread_data_t;
 
 typedef struct
 {
   u32 tenant_id;
-  u32 bitmaps[GW_FLOW_F_B_N];
-  /* Geneve output spec for forward/backwards packets */
-  ip4_address_t geneve_src_ip[GW_FLOW_F_B_N];
-  ip4_address_t geneve_dst_ip[GW_FLOW_F_B_N];
-  u16 geneve_src_port[GW_FLOW_F_B_N];
-  u16 geneve_dst_port[GW_FLOW_F_B_N];
-
-} gw_tenant_t;
+  u32 bitmaps[VCDP_FLOW_F_B_N];
+} vcdp_tenant_t;
 
 typedef struct
 {
@@ -180,84 +161,78 @@ typedef struct
   u32 frame_queue_index;
 
   /* pool of tenants */
-  gw_tenant_t *tenants;
+  vcdp_tenant_t *tenants;
 
   /* per-thread data */
-  gw_per_thread_data_t *per_thread_data;
+  vcdp_per_thread_data_t *per_thread_data;
 
-} gw_main_t;
+} vcdp_main_t;
 
-extern gw_main_t gateway_main;
-extern vlib_node_registration_t gw_lookup_node;
-extern vlib_node_registration_t gw_handoff_node;
-extern vlib_node_registration_t gw_counter_node;
-extern vlib_node_registration_t gw_exporter_node;
+extern vcdp_main_t vcdp_main;
+extern vlib_node_registration_t vcdp_handoff_node;
 
-format_function_t format_gw_session;
+format_function_t format_vcdp_session;
 
 static_always_inline u32
-gw_session_index_from_lookup (u64 val)
+vcdp_session_index_from_lookup (u64 val)
 {
   return (val >> 1) & (~(u32) 0);
 }
 
 static_always_inline u32
-gw_thread_index_from_lookup (u64 val)
+vcdp_thread_index_from_lookup (u64 val)
 {
   return val >> 32;
 }
 
 static_always_inline u32
-gw_packet_dir_from_lookup (u64 val)
+vcdp_packet_dir_from_lookup (u64 val)
 {
   return val & 0x1;
 }
 
 static_always_inline u32
-gw_pseudo_flow_index_from_lookup (u64 val)
+vcdp_pseudo_flow_index_from_lookup (u64 val)
 {
   return val & (~(u32) 0);
 }
 
 static_always_inline u64
-gw_session_mk_table_value (u32 thread_index, u32 pseudo_flow_index)
+vcdp_session_mk_table_value (u32 thread_index, u32 pseudo_flow_index)
 {
   return ((u64) thread_index << 32) | pseudo_flow_index;
 }
 
-static_always_inline gw_session_t *
-gw_session_at_index (gw_per_thread_data_t *ptd, u32 idx)
+static_always_inline vcdp_session_t *
+vcdp_session_at_index (vcdp_per_thread_data_t *ptd, u32 idx)
 {
   return pool_elt_at_index (ptd->sessions, idx);
 }
 
 static_always_inline u32
-gw_mk_flow_index (u32 session_index, u8 dir)
+vcdp_mk_flow_index (u32 session_index, u8 dir)
 {
-  return (session_index << 1) | !(dir == GW_FLOW_FORWARD);
+  return (session_index << 1) | !(dir == VCDP_FLOW_FORWARD);
 }
 
 static_always_inline u32
-gw_session_from_flow_index (u32 flow_index)
+vcdp_session_from_flow_index (u32 flow_index)
 {
   return flow_index >> 1;
 }
 
 static_always_inline u32
-gw_direction_from_flow_index (u32 flow_index)
+vcdp_direction_from_flow_index (u32 flow_index)
 {
   return (flow_index & 0x1);
 }
 
-static_always_inline gw_tenant_t *
-gw_tenant_at_index (gw_main_t *gm, u32 idx)
+static_always_inline vcdp_tenant_t *
+vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
 {
-  return pool_elt_at_index (gm->tenants, idx);
+  return pool_elt_at_index (vcdpm->tenants, idx);
 }
-
-int gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
-			    int enable_disable);
 
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
-#endif /* __included_gateway_h__ */
+#endif /* __included_vcdp_h__ */

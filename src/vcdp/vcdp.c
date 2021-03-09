@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2020 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#define _GNU_SOURCE
+#include <sys/mman.h>
+
+#include <vcdp/vcdp.h>
+
+#include <vnet/plugin/plugin.h>
+#include <vnet/vnet.h>
+
+#include <vlibapi/api.h>
+#include <vlibmemory/api.h>
+
+vcdp_main_t vcdp_main;
+
+__clib_unused static void
+vcdp_init_main_if_needed (vcdp_main_t *vcdp)
+{
+  static u32 done = 0;
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
+  if (done)
+    return;
+
+  /* initialize per-thrad pools */
+  vec_validate (vcdp->per_thread_data, tm->n_vlib_mains - 1);
+  for (int i = 0; i < tm->n_vlib_mains; i++)
+    {
+      vcdp_per_thread_data_t *ptd =
+	vec_elt_at_index (vcdp->per_thread_data, i);
+      pool_init_fixed (ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
+    }
+
+  pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
+  clib_bihash_init_24_8 (&vcdp->table4, "vcdp ipv4 session table",
+			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
+  clib_bihash_init_8_8 (&vcdp->tenant_idx_by_id, "vcdp tenant table",
+			BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
+
+  vcdp->frame_queue_index =
+    vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
+  done = 1;
+}
+
+static clib_error_t *
+vcdp_init (vlib_main_t *vm)
+{
+  return 0;
+}
+
+VLIB_INIT_FUNCTION (vcdp_init);
+
+VLIB_PLUGIN_REGISTER () = {
+  .version = VCDP_GW_PLUGIN_BUILD_VER,
+  .description = "vCDP Gateway Plugin",
+};

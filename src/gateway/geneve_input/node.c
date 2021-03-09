@@ -74,7 +74,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
    * store tenant_id into opaque1
    * advance current data to beginning of IP packet
    */
-  gw_main_t *gm = &gateway_main;
+  vcdp_main_t *vcdp = &vcdp_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
@@ -110,7 +110,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       /* Extract VNI */
       tenant_id = clib_net_to_host_u32 (gnv[1]) >> 8;
       kv.key = (u64) tenant_id;
-      if (clib_bihash_search_inline_8_8 (&gm->tenant_idx_by_id, &kv))
+      if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
 	{
 	  /* Not found */
 	  vnet_feature_next_u16 (current_next, b[0]);
