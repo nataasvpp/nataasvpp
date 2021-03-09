@@ -26,6 +26,35 @@
 
 gw_main_t gateway_main;
 
+__clib_unused static void
+gateway_init_main_if_needed (gw_main_t *gm)
+{
+  static u32 done = 0;
+  vlib_thread_main_t *tm = vlib_get_thread_main ();
+  if (done)
+    return;
+
+  /* initialize per-thrad pools */
+
+  vec_validate (gm->per_thread_data, tm->n_vlib_mains - 1);
+  for (int i = 0; i < tm->n_vlib_mains; i++)
+    {
+      gw_per_thread_data_t *ptd = vec_elt_at_index (gm->per_thread_data, i);
+      pool_init_fixed (ptd->sessions, 1ULL << GW_LOG2_SESSIONS_PER_THREAD);
+      pool_init_fixed (ptd->output, 1ULL << (GW_LOG2_SESSIONS_PER_THREAD + 1));
+    }
+
+  pool_init_fixed (gm->tenants, 1ULL << GW_LOG2_TENANTS);
+  clib_bihash_init_24_8 (&gm->table4, "vcdp ipv4 session table",
+			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
+  clib_bihash_init_8_8 (&gm->tenant_idx_by_id, "vcdp tenant table",
+			BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
+
+  gm->frame_queue_index =
+    vlib_frame_queue_main_init (gw_handoff_node.index, 0);
+  done = 1;
+}
+
 static void
 gateway_enable_one (vlib_main_t *vm, vnet_main_t *vnm, gw_main_t *gm,
 		    u32 rx_sw_if_index, u32 tx_sw_if_index)
@@ -52,28 +81,8 @@ gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,
   if (!vnet_sw_interface_is_valid (vnm, sw_if_index2))
     return VNET_API_ERROR_INVALID_SW_IF_INDEX;
 
-  if (gm->per_thread_data == 0)
-    {
-      /* initialize per-thrad pools */
-      vlib_thread_main_t *tm = vlib_get_thread_main ();
-      vec_validate (gm->per_thread_data, tm->n_vlib_mains - 1);
-      for (int i = 0; i < tm->n_vlib_mains; i++)
-	{
-	  gw_per_thread_data_t *ptd =
-	    vec_elt_at_index (gm->per_thread_data, i);
-	  pool_init_fixed (ptd->sessions, 1ULL << GW_LOG2_SESSIONS_PER_THREAD);
-	}
-
-      gm->frame_queue_index =
-	vlib_frame_queue_main_init (gw_handoff_node.index, 0);
-    }
-
   if (enable_disable)
     {
-      if (gm->table4.nbuckets == 0)
-	clib_bihash_init_24_8 (&gm->table4, "gateway ipv4",
-			       BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
-
       gateway_enable_one (vm, vnm, gm, sw_if_index1, sw_if_index2);
       gateway_enable_one (vm, vnm, gm, sw_if_index2, sw_if_index1);
     }

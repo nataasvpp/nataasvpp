@@ -29,12 +29,16 @@
 #include <vppinfra/bihash_template.h>
 
 #define GW_LOG2_SESSIONS_PER_THREAD 26
+#define GW_LOG2_TENANTS		    10
 
 #define BIHASH_IP4_NUM_BUCKETS (1 << (GW_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP4_MEM_SIZE    (2ULL << 30)
 
 #define BIHASH_IP6_NUM_BUCKETS (1 << (GW_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP6_MEM_SIZE    (2ULL << 30)
+
+#define BIHASH_TENANT_NUM_BUCKETS (1 << (GW_LOG2_TENANTS - 2))
+#define BIHASH_TENANT_MEM_SIZE	  (1 << 15)
 
 /* Convention session_index is 31 bit
  * Flow_index (embedded in vlib_buffer_t as "flow_id")
