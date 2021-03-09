@@ -153,6 +153,13 @@ typedef struct
 typedef struct
 {
   u32 tenant_id;
+  u32 bitmaps[GW_FLOW_F_B_N];
+  /* Geneve output spec for forward/backwards packets */
+  ip4_address_t geneve_src_ip[GW_FLOW_F_B_N];
+  ip4_address_t geneve_dst_ip[GW_FLOW_F_B_N];
+  u16 geneve_src_port[GW_FLOW_F_B_N];
+  u16 geneve_dst_port[GW_FLOW_F_B_N];
+
 } gw_tenant_t;
 
 typedef struct
@@ -236,6 +243,12 @@ static_always_inline u32
 gw_direction_from_flow_index (u32 flow_index)
 {
   return (flow_index & 0x1);
+}
+
+static_always_inline gw_tenant_t *
+gw_tenant_at_index (gw_main_t *gm, u32 idx)
+{
+  return pool_elt_at_index (gm->tenants, idx);
 }
 
 int gateway_enable_disable (gw_main_t *gm, u32 sw_if_index1, u32 sw_if_index2,

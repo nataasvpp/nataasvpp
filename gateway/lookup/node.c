@@ -148,7 +148,8 @@ gw_calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
 }
 
 static_always_inline int
-gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
+gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd,
+		   gw_tenant_t *tenant, u32 thread_index,
 		   gw_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
@@ -168,8 +169,8 @@ gw_create_session (gw_main_t *fm, gw_per_thread_data_t *ptd, u32 thread_index,
       return 1;
     }
   session->type = GW_SESSION_TYPE_IP4;
-  session->bitmaps[GW_FLOW_FORWARD] = 0x1;  /* TODO: inherit from tenant */
-  session->bitmaps[GW_FLOW_BACKWARD] = 0x1; /* TODO: inherit from tenant */
+  clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
+		    sizeof (session->bitmaps));
   /*TODO: timer wheel start*/
   lookup_val[0] ^= kv.value;
   return 0;
@@ -219,12 +220,13 @@ gw_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
 VLIB_NODE_FN (gw_lookup_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  gw_main_t *fm = &gateway_main;
+  gw_main_t *gm = &gateway_main;
   u32 thread_index = vm->thread_index;
   gw_per_thread_data_t *ptd =
-    vec_elt_at_index (fm->per_thread_data, thread_index);
+    vec_elt_at_index (gm->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   clib_bihash_kv_24_8_t kv = {};
+  gw_tenant_t *tenant;
   u32 *bi, *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
@@ -248,7 +250,7 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   while (n_left >= 8)
     {
-      gw_lookup_four (&fm->table4, b, k, lv, h, 4);
+      gw_lookup_four (&gm->table4, b, k, lv, h, 4);
 
       b += 4;
       k += 4;
@@ -261,7 +263,7 @@ VLIB_NODE_FN (gw_lookup_node)
    * prefetch previous 4 buckets */
   if (n_left >= 4)
     {
-      gw_lookup_four (&fm->table4, b, k, lv, h, 0);
+      gw_lookup_four (&gm->table4, b, k, lv, h, 0);
 
       b += 4;
       k += 4;
@@ -289,16 +291,17 @@ VLIB_NODE_FN (gw_lookup_node)
   while (n_left)
     {
       if (PREDICT_TRUE (n_left > 8))
-	clib_bihash_prefetch_bucket_24_8 (&fm->table4, h[8]);
+	clib_bihash_prefetch_bucket_24_8 (&gm->table4, h[8]);
 
       if (PREDICT_TRUE (n_left > 1))
 	vlib_prefetch_buffer_header (b[1], STORE);
 
       clib_memcpy_fast (&kv.key, k, 24);
-      if (clib_bihash_search_inline_with_hash_24_8 (&fm->table4, h[0], &kv))
+      if (clib_bihash_search_inline_with_hash_24_8 (&gm->table4, h[0], &kv))
 	{
+	  tenant = gw_tenant_at_index (gm, vcdp_buffer (b[0])->tenant_index);
 	  /* if there is colision, we just reiterate */
-	  if (gw_create_session (fm, ptd, thread_index, k, h, lv))
+	  if (gw_create_session (gm, ptd, tenant, thread_index, k, h, lv))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   GW_LOOKUP_ERROR_COLLISION, 1);
@@ -355,7 +358,7 @@ VLIB_NODE_FN (gw_lookup_node)
     {
       u32 n_remote_enq;
       n_remote_enq = vlib_buffer_enqueue_to_thread (
-	vm, fm->frame_queue_index, to_remote, thread_indices, n_remote, 1);
+	vm, gm->frame_queue_index, to_remote, thread_indices, n_remote, 1);
       vlib_node_increment_counter (vm, node->node_index,
 				   GW_LOOKUP_ERROR_REMOTE, n_remote_enq);
       vlib_node_increment_counter (vm, node->node_index,
