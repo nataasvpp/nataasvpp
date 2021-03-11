@@ -16,7 +16,7 @@
 #include <gateway/gateway.h>
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
-
+#include <vcdp/service.h>
 /*
  * add CLI:
  * vcdp tenant <add/del> <tenant-id>
@@ -37,20 +37,77 @@ static clib_error_t *
 vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
 				vlib_cli_command_t *cmd)
 {
-  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+  unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u8 is_del = 0;
+  u32 tenant_id = ~0;
+
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
+      if (unformat (line_input, "add tenant %d", &tenant_id))
+	is_del = 0;
+      else if (unformat (line_input, "del tenant %d", &tenant_id))
+	is_del = 1;
+      else
+	{
+	  err = unformat_parse_error (line_input);
+	  goto done;
+	}
     }
-  return 0;
+  if (tenant_id == ~0)
+    {
+      err = clib_error_return (0, "missing tenant id");
+      goto done;
+    }
+  err = vcdp_tenant_add_del (vcdp, tenant_id, is_del);
+done:
+  unformat_free (line_input);
+  return err;
 }
 
 static clib_error_t *
 vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
 			      vlib_cli_command_t *cmd)
 {
-  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+  unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 tenant_id = ~0;
+  u32 bitmap = 0;
+  u8 direction = ~0;
+
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
+      if (unformat (line_input, "tenant %d", &tenant_id))
+	;
+#define _(n, s, idx) else if (unformat (line_input, (s))) bitmap |= 1 << (idx);
+
+      foreach_vcdp_service
+#undef _
+	else if (unformat (line_input, "forward")) direction =
+	  VCDP_FLOW_FORWARD;
+      else if (unformat (line_input, "backwards")) direction =
+	VCDP_FLOW_BACKWARD;
     }
-  return 0;
+  if (tenant_id == ~0)
+    {
+      err = clib_error_return (0, "missing tenant id");
+      goto done;
+    }
+  if (direction == (u8) ~0)
+    {
+      err = clib_error_return (0, "missing direction");
+      goto done;
+    }
+  vcdp_set_services (vcdp, tenant_id, bitmap, direction);
+done:
+  unformat_free (line_input);
+  return err;
 }
 
 VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
@@ -66,50 +123,7 @@ VLIB_CLI_COMMAND (vcdp_set_services_command, static) = {
   .function = vcdp_set_services_command_fn,
 };
 
-/*static clib_error_t *
-gateway_enable_disable_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				   vlib_cli_command_t *cmd)
-{
-  vnet_main_t *vnm = vnet_get_main ();
-  gw_main_t *sm = &gateway_main;
-  u32 sw_if_index1 = ~0;
-  u32 sw_if_index2 = ~0;
-  int enable_disable = 1;
-  int rv;
-  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (input, "disable"))
-	enable_disable = 0;
-      else if (unformat (input, "%U %U", unformat_vnet_sw_interface, vnm,
-			 &sw_if_index1, unformat_vnet_sw_interface, vnm,
-			 &sw_if_index2))
-	;
-      else
-	break;
-    }
-
-  if (sw_if_index1 == ~0 || sw_if_index2 == ~0)
-    return clib_error_return (0, "Please specify an interface...");
-  rv = gateway_enable_disable (sm, sw_if_index1, sw_if_index2, enable_disable);
-  switch (rv)
-    {
-    case 0:
-      break;
-    case VNET_API_ERROR_INVALID_SW_IF_INDEX:
-      return clib_error_return (0, "Invalid interface");
-      break;
-    default:
-      return clib_error_return (0, "gateway_enable_disable returned %d", rv);
-    }
-  return 0;
-}
-
-VLIB_CLI_COMMAND (gateway_enable_disable_command, static) = {
-  .path = "gateway",
-  .short_help = "gateway <interface-name> <interface-name> [disable]",
-  .function = gateway_enable_disable_command_fn,
-};
-
+/*
 static clib_error_t *
 show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
 			 vlib_cli_command_t *cmd)

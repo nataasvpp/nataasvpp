@@ -40,6 +40,8 @@
 #define BIHASH_TENANT_NUM_BUCKETS (1 << (VCDP_LOG2_TENANTS - 2))
 #define BIHASH_TENANT_MEM_SIZE	  (1 << 15)
 
+#define VCDP_DEFAULT_BITMAP (0x1)
+
 /* Convention session_index is 31 bit
  * Flow_index (embedded in vlib_buffer_t as "flow_id")
  * Flow_index = (session_index << 1) + !(is_forward)
@@ -233,6 +235,10 @@ vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
   return pool_elt_at_index (vcdpm->tenants, idx);
 }
 
+clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
+				   u8 is_del);
+clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
+				 u8 direction);
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

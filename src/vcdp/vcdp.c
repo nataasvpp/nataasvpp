@@ -60,6 +60,68 @@ vcdp_init (vlib_main_t *vm)
   return 0;
 }
 
+clib_error_t *
+vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
+{
+  vcdp_init_main_if_needed (vcdp);
+  clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
+  clib_error_t *err = 0;
+  vcdp_tenant_t *tenant;
+  u32 tenant_idx;
+  if (!is_del)
+    {
+      if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+	{
+	  pool_get (vcdp->tenants, tenant);
+	  tenant_idx = tenant - vcdp->tenants;
+	  tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
+	  tenant->bitmaps[VCDP_FLOW_BACKWARD] = VCDP_DEFAULT_BITMAP;
+	  tenant->tenant_id = tenant_id;
+	  kv.key = tenant_id;
+	  kv.value = tenant_idx;
+	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 1);
+	}
+      else
+	{
+	  err = clib_error_return (0,
+				   "Can't create tenant with id %d"
+				   " (already exists with index %d)",
+				   tenant_id, kv.value);
+	}
+    }
+  else
+    {
+      if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+	{
+	  err = clib_error_return (0,
+				   "Can't delete tenant with id %d"
+				   " (not found)",
+				   tenant_id);
+	}
+      else
+	{
+	  pool_put_index (vcdp->tenants, kv.value);
+	  /* TODO: Notify other users of "tenants" (like gw)?
+	   * maybe cb list? */
+	}
+    }
+  return err;
+}
+clib_error_t *
+vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
+{
+  vcdp_init_main_if_needed (vcdp);
+  clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
+  vcdp_tenant_t *tenant;
+  if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+    return clib_error_return (
+      0, "Can't assign service map: tenant id %d not found", tenant_id);
+
+  tenant = vcdp_tenant_at_index (vcdp, kv.value);
+  tenant->bitmaps[direction] = bitmap;
+  return 0;
+}
+
 VLIB_INIT_FUNCTION (vcdp_init);
 
 VLIB_PLUGIN_REGISTER () = {

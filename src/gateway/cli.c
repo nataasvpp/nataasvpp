@@ -29,10 +29,55 @@ static clib_error_t *
 gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
 			       vlib_cli_command_t *cmd)
 {
-  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+  unformat_input_t line_input_, *line_input = &line_input_;
+  gw_set_geneve_output_args_t args = { .tenant_id = ~0,
+				       .src_addr = { .as_u32 = ~0 },
+				       .dst_addr = { .as_u32 = ~0 },
+				       .src_port = ~0,
+				       .dst_port = ~0,
+				       .direction = ~0 };
+  clib_error_t *err = 0;
+  u32 tmp;
+
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
+      if (unformat (line_input, "tenant %d", &args.tenant_id))
+	;
+      else if (unformat (line_input, "src %U", unformat_ip4_address,
+			 args.src_addr))
+	;
+      else if (unformat (line_input, "dst %U", unformat_ip4_address,
+			 args.src_addr))
+	;
+      else if (unformat (line_input, "src-port %d", &tmp))
+	args.src_port = clib_host_to_net_u16 (tmp);
+      else if (unformat (line_input, "dst-port %d", &tmp))
+	args.dst_port = clib_host_to_net_u16 (tmp);
+      else if (unformat (line_input, "forward"))
+	args.direction = VCDP_FLOW_FORWARD;
+      else if (unformat (line_input, "backwards"))
+	args.direction = VCDP_FLOW_BACKWARD;
+      else
+	{
+	  err = unformat_parse_error (line_input);
+	  goto done;
+	}
     }
-  return 0;
+  if (args.tenant_id == ~0 || args.src_addr.as_u32 == ~0 ||
+      args.dst_addr.as_u32 == ~0 || args.src_port == (u16) ~0 ||
+      args.dst_port == (u16) ~0 || args.direction == (u8) ~0)
+    {
+      err = clib_error_return (0, "missing geneve output parameters");
+      goto done;
+    }
+  gw_set_geneve_output (&args);
+  err = args.err;
+done:
+  unformat_free (line_input);
+  return err;
 }
 
 VLIB_CLI_COMMAND (gateway_set_output_command, static) = {

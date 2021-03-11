@@ -61,12 +61,36 @@ typedef struct
   gw_per_thread_data_t *per_thread_data;
 } gw_main_t;
 
+typedef struct
+{
+  int rv;
+  clib_error_t *err;
+  u32 sw_if_index;
+  u8 enable_disable;
+} gw_enable_disable_geneve_input_args_t;
+
+typedef struct
+{
+  int rv;
+  clib_error_t *err;
+  u32 tenant_id;
+  ip4_address_t src_addr;
+  ip4_address_t dst_addr;
+  u16 src_port; /*network order*/
+  u16 dst_port; /*network order*/
+  u8 direction; /* 0 is forward, 1 is backwards */
+} gw_set_geneve_output_args_t;
+
 extern gw_main_t gateway_main;
 
 static_always_inline gw_tenant_t *
 gw_tenant_at_index (gw_main_t *gm, u32 idx)
 {
-  return pool_elt_at_index (gm->tenants, idx);
+  return vec_elt_at_index (gm->tenants, idx);
 }
+
+void
+gw_enable_disable_geneve_input (gw_enable_disable_geneve_input_args_t *args);
+void gw_set_geneve_output (gw_set_geneve_output_args_t *args);
 
 #endif /* __included_gateway_h__ */
