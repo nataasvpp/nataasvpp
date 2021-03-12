@@ -24,6 +24,7 @@ add_vpp_plugin(vcdp_gateway
   gateway/cli.c
   gateway/geneve_input/node.c
   gateway/geneve_input/cli.c
+  gateway/geneve_output/node.c
 
   MULTIARCH_SOURCES
   vcdp/lookup/node.c

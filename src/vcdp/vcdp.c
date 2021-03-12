@@ -41,6 +41,7 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
       vcdp_per_thread_data_t *ptd =
 	vec_elt_at_index (vcdp->per_thread_data, i);
       pool_init_fixed (ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
+      /* fixed pools are already zeroed (mmap) */
     }
 
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);

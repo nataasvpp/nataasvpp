@@ -30,10 +30,23 @@
 
 #include <vcdp/vcdp.h>
 
+#define foreach_gw_tenant_flag _ (OUTPUT_DATA_SET, "output-data-set", 0)
+
+typedef enum
+{
+#define _(a, b, c) GW_TENANT_F_##a = (1 << (c))
+  foreach_gw_tenant_flag
+#undef _
+} gw_tenant_flags_t;
+
 typedef struct
 {
   /* Here goes the geneve rewrite */
+  session_version_t session_version;
+  u16 encap_size;
+  u8 encap_data[60];
 } gw_geneve_output_data_t;
+STATIC_ASSERT (sizeof (gw_geneve_output_data_t) == 64, "");
 
 typedef struct
 {
@@ -43,6 +56,7 @@ typedef struct
 typedef struct
 {
   u32 tenant_id;
+  u32 flags;
 
   /* Geneve output spec for forward/backwards packets */
   ip4_address_t geneve_src_ip[VCDP_FLOW_F_B_N];

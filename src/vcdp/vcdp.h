@@ -66,6 +66,8 @@ typedef enum
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
 
+typedef u16 session_version_t;
+
 enum
 {
   VCDP_FLOW_FORWARD = 0,
@@ -82,6 +84,7 @@ enum
 typedef struct
 {
   u32 bitmaps[VCDP_FLOW_F_B_N];
+  session_version_t session_version;
   u8 type; /* see vcdp_session_type_t */
 
   /* Deprecated fields: */

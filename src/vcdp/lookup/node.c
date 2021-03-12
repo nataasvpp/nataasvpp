@@ -156,7 +156,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   vcdp_session_t *session;
   u32 session_idx;
   u32 pseudo_flow_idx;
-  pool_get_zero (ptd->sessions, session);
+  pool_get (ptd->sessions, session);
   session_idx = session - ptd->sessions;
   clib_memcpy_fast (&kv.key, k, 24);
   pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
@@ -169,6 +169,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
       return 1;
     }
   session->type = VCDP_SESSION_TYPE_IP4;
+  session->session_version += 1;
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
   /*TODO: timer wheel start*/
