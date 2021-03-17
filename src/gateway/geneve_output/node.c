@@ -166,6 +166,7 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 	}
       to_next++;
       b++;
+      n_left--;
     }
 
   vlib_buffer_enqueue_to_next (vm, node, from, next_indices, frame->n_vectors);

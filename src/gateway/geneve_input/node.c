@@ -127,6 +127,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
     end_of_packet:
       b += 1;
       current_next += 1;
+      n_left -= 1;
     }
   vlib_buffer_enqueue_to_next (vm, node, from, next_indices, frame->n_vectors);
   return frame->n_vectors;
