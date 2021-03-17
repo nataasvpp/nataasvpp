@@ -27,6 +27,9 @@
 #include <vppinfra/bihash_8_8.h>
 
 #include <vppinfra/bihash_template.h>
+#include <vppinfra/tw_timer_2t_1w_2048sl.h>
+
+#include <vcdp/timer.h>
 
 #define VCDP_LOG2_SESSIONS_PER_THREAD 26
 #define VCDP_LOG2_TENANTS	      10
@@ -81,20 +84,6 @@ enum
   VCDP_PACKET_NORMALISED = 1
 };
 
-typedef struct
-{
-  u32 bitmaps[VCDP_FLOW_F_B_N];
-  session_version_t session_version;
-  u8 type; /* see vcdp_session_type_t */
-
-  /* Deprecated fields: */
-  u32 ip_addr_hi;
-  u32 ip_addr_lo;
-  u16 port_hi;
-  u16 port_lo;
-  u8 proto;
-} vcdp_session_t;
-
 typedef union
 {
   struct
@@ -143,7 +132,19 @@ STATIC_ASSERT_SIZEOF (vcdp_session_ip4_key_t, 24);
 
 typedef struct
 {
+  u32 bitmaps[VCDP_FLOW_F_B_N];
+  session_version_t session_version;
+  u32 timer_handle;
+  vcdp_session_ip4_key_t key;
+  u8 pseudo_dir;
+  u8 type; /* see vcdp_session_type_t */
+} vcdp_session_t;
+
+typedef struct
+{
   vcdp_session_t *sessions; /* fixed pool */
+  vcdp_tw_t wheel;
+  u32 *expired_sessions;
 } vcdp_per_thread_data_t;
 
 typedef struct

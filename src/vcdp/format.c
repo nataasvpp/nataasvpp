@@ -21,9 +21,10 @@ u8 *
 format_vcdp_session (u8 *s, va_list *args)
 {
   vcdp_session_t *f = va_arg (*args, vcdp_session_t *);
-  s = format (s, "%U:%u <-> %U:%u", format_ip4_address, &f->ip_addr_lo,
-	      clib_net_to_host_u16 (f->port_lo), format_ip4_address,
-	      &f->ip_addr_hi, clib_net_to_host_u16 (f->port_hi));
+  s = format (
+    s, "%U:%u <-> %U:%u", format_ip4_address, &f->key.ip4_key.ip_addr_lo,
+    clib_net_to_host_u16 (f->key.ip4_key.port_lo), format_ip4_address,
+    &f->key.ip4_key.ip_addr_hi, clib_net_to_host_u16 (f->key.ip4_key.port_hi));
   return s;
 }
 
@@ -34,15 +35,19 @@ format_vcdp_session_with_dir (u8 *s, va_list *args)
   u32 dir = va_arg (*args, u32);
 
   if (dir)
-    s =
-      format (s, "%15U %15u %15U %15u %7u", format_ip4_address, &f->ip_addr_hi,
-	      clib_net_to_host_u16 (f->port_hi), format_ip4_address,
-	      &f->ip_addr_lo, clib_net_to_host_u16 (f->port_lo), f->proto);
+    s = format (s, "%15U %15u %15U %15u %7u", format_ip4_address,
+		&f->key.ip4_key.ip_addr_hi,
+		clib_net_to_host_u16 (f->key.ip4_key.port_hi),
+		format_ip4_address, &f->key.ip4_key.ip_addr_lo,
+		clib_net_to_host_u16 (f->key.ip4_key.port_lo),
+		f->key.ip4_key.proto);
   else
-    s =
-      format (s, "%15U %15u %15U %15u %7u", format_ip4_address, &f->ip_addr_lo,
-	      clib_net_to_host_u16 (f->port_lo), format_ip4_address,
-	      &f->ip_addr_hi, clib_net_to_host_u16 (f->port_hi), f->proto);
+    s = format (s, "%15U %15u %15U %15u %7u", format_ip4_address,
+		&f->key.ip4_key.ip_addr_lo,
+		clib_net_to_host_u16 (f->key.ip4_key.port_lo),
+		format_ip4_address, &f->key.ip4_key.ip_addr_hi,
+		clib_net_to_host_u16 (f->key.ip4_key.port_hi),
+		f->key.ip4_key.proto);
 
   return s;
 }

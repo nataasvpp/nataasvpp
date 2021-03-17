@@ -172,7 +172,10 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session->session_version += 1;
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
-  /*TODO: timer wheel start*/
+  clib_memcpy_fast (&session->key, k, 24);
+  session->pseudo_dir = lookup_val[0] & 0x1;
+  session->timer_handle = vcdp_timer_start (&ptd->wheel, session_idx, 0,
+					    VCDP_TIMER_EMBRYONIC_TIMEOUT);
   lookup_val[0] ^= kv.value;
   return 0;
 }
@@ -228,6 +231,8 @@ VLIB_NODE_FN (vcdp_lookup_node)
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   clib_bihash_kv_24_8_t kv = {};
   vcdp_tenant_t *tenant;
+  vcdp_session_t *session;
+  u32 session_index;
   u32 *bi, *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
@@ -246,6 +251,14 @@ VLIB_NODE_FN (vcdp_lookup_node)
 
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
+
+  vcdp_session_index_iterate_expired (ptd, session_index)
+  {
+    session = vcdp_session_at_index (ptd, session_index);
+    pool_put_index (ptd->sessions, session_index);
+    clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
+    clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+  }
 
   /* main loop - prefetch next 4 buffers,
    * prefetch previous 4 buckets */
@@ -379,8 +392,8 @@ VLIB_NODE_FN (vcdp_lookup_node)
       /* TODO: prefetch session and buffer + 4 loop */
       while (n_left)
 	{
-	  u32 session_index = local_flow_index[0] >> 1;
-	  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
+	  session_index = local_flow_index[0] >> 1;
+	  session = vcdp_session_at_index (ptd, session_index);
 	  u32 pbmp =
 	    session
 	      ->bitmaps[vcdp_direction_from_flow_index (local_flow_index[0])];

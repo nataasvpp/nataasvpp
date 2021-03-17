@@ -26,7 +26,22 @@
 
 vcdp_main_t vcdp_main;
 
-__clib_unused static void
+static void
+vcdp_timer_expired (u32 *expired)
+{
+  u32 *e;
+  uword thread_index = vlib_get_thread_index ();
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index (vcdp->per_thread_data, thread_index);
+  vec_foreach (e, expired)
+    {
+      u32 session_idx = e[0] & VCDP_TIMER_SI_MASK;
+      vec_add1 (ptd->expired_sessions, session_idx);
+    }
+}
+
+static void
 vcdp_init_main_if_needed (vcdp_main_t *vcdp)
 {
   static u32 done = 0;
@@ -42,6 +57,7 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
 	vec_elt_at_index (vcdp->per_thread_data, i);
       pool_init_fixed (ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
       /* fixed pools are already zeroed (mmap) */
+      vcdp_tw_init (&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
     }
 
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
