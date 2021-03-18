@@ -47,10 +47,10 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
       if (unformat (line_input, "tenant %d", &args.tenant_id))
 	;
       else if (unformat (line_input, "src %U", unformat_ip4_address,
-			 args.src_addr))
+			 &args.src_addr))
 	;
       else if (unformat (line_input, "dst %U", unformat_ip4_address,
-			 args.src_addr))
+			 &args.dst_addr))
 	;
       else if (unformat (line_input, "src-port %d", &tmp))
 	args.src_port = clib_host_to_net_u16 (tmp);

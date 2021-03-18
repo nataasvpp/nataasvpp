@@ -103,7 +103,7 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   gnv[1] = clib_host_to_net_u32 (tenant->tenant_id << 8);
   geneve_out->encap_size += 8;
   eth = (void *) (geneve_out->encap_data + geneve_out->encap_size);
-  clib_memcpy_fast (&eth, b->data + b->current_data - sizeof (*eth),
+  clib_memcpy_fast (eth, b->data + b->current_data - sizeof (*eth),
 		    sizeof (*eth));
   geneve_out->encap_size += sizeof (*eth);
   ASSERT (geneve_out->encap_size < sizeof (geneve_out->encap_data));
@@ -151,16 +151,23 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 	  udp_header_t *udp;
 	  u8 *data;
 	  u16 orig_len = b[0]->current_length;
-	  b[0]->flags |= VNET_BUFFER_F_OFFLOAD;
-	  vnet_buffer2 (b[0])->oflags |= VNET_BUFFER_OFFLOAD_F_UDP_CKSUM;
+	  b[0]->flags |=
+	    (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID |
+	     VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
+	  vnet_buffer2 (b[0])->oflags |=
+	    VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
 	  vlib_buffer_advance (b[0], -geneve_out->encap_size);
 	  data = vlib_buffer_get_current (b[0]);
+	  vnet_buffer (b[0])->l3_hdr_offset = b[0]->current_data;
+	  vnet_buffer (b[0])->l4_hdr_offset =
+	    b[0]->current_data + sizeof (ip4_header_t);
 	  clib_memcpy_fast (data, geneve_out->encap_data,
 			    geneve_out->encap_size);
 	  /* fixup */
 	  ip = (void *) data;
 	  ip->length = clib_net_to_host_u16 (ip->length + orig_len);
-	  udp = (void *) (data + sizeof (udp_header_t));
+	  ip->checksum = ip4_header_checksum (ip);
+	  udp = (void *) (data + sizeof (ip4_header_t));
 	  udp->length = clib_net_to_host_u16 (udp->length + orig_len);
 	  to_next[0] = VCDP_GENEVE_OUTPUT_NEXT_IP4_LOOKUP;
 	}

@@ -98,8 +98,8 @@ static const u8x16 dst_ip_byteswap_x2 = { 15, 14, 13, 12, -1, -1, -1, -1,
 					  15, 14, 13, 12, -1, -1, -1, -1 };
 
 static_always_inline void
-calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
-	  vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
+calc_key (vlib_buffer_t *b, u32 tenant_id, vcdp_session_ip4_key_t *skey,
+	  u64 *lookup_val, u64 *h)
 {
   u8 pr;
   i64x2 norm, zero = {};
@@ -107,7 +107,7 @@ calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
   u32 l4_hdr;
   void *next_header;
 
-  ip4_header_t *ip = vlib_buffer_get_current (b) + off;
+  ip4_header_t *ip = vlib_buffer_get_current (b);
 
   /* load last 16 bytes of ip header into 128-bit register */
   k = *(u8x16u *) ((u8 *) ip + 4);
@@ -142,7 +142,8 @@ calc_key (vlib_buffer_t *b, int off, u32 tenant_id,
 
   /* store key */
   skey->ip4_key.as_u8x16 = k;
-
+  skey->tenant_id = tenant_id;
+  clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
   h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));
 }
@@ -185,7 +186,6 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
 		  vcdp_session_ip4_key_t *k, u64 *lookup_val, u64 *h,
 		  int prefetch_buffer_stride)
 {
-  u8 off = sizeof (ethernet_header_t);
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
 
   if (prefetch_buffer_stride)
@@ -194,7 +194,7 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[0]->data);
     }
 
-  calc_key (b[0], off, b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
+  calc_key (b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
 
   if (prefetch_buffer_stride)
     {
@@ -202,7 +202,7 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[1]->data);
     }
 
-  calc_key (b[1], off, b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
+  calc_key (b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
 
   if (prefetch_buffer_stride)
     {
@@ -210,7 +210,7 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[2]->data);
     }
 
-  calc_key (b[2], off, b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
+  calc_key (b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
 
   if (prefetch_buffer_stride)
     {
@@ -218,7 +218,7 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[3]->data);
     }
 
-  calc_key (b[3], off, b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
+  calc_key (b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
 }
 
 VLIB_NODE_FN (vcdp_lookup_node)
@@ -252,6 +252,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
 
+  vcdp_expire_timers (&ptd->wheel, vlib_time_now (vm));
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
     session = vcdp_session_at_index (ptd, session_index);
@@ -288,8 +289,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
 
   while (n_left > 0)
     {
-      u8 off = sizeof (ethernet_header_t);
-      calc_key (b[0], off, b[0]->flow_id, k + 0, lv + 0, h + 0);
+      calc_key (b[0], b[0]->flow_id, k + 0, lv + 0, h + 0);
 
       b += 1;
       k += 1;
@@ -299,6 +299,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
     }
 
   n_left = frame->n_vectors;
+  b = bufs;
   h = hashes;
   k = keys;
   lv = lookup_vals;
@@ -330,6 +331,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
 	}
 
       b[0]->flow_id = lv[0] & (~(u32) 0);
+      b += 1;
       n_left -= 1;
       k += 1;
       h += 1;

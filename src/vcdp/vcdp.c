@@ -118,6 +118,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
       else
 	{
 	  pool_put_index (vcdp->tenants, kv.value);
+	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 0);
 	  /* TODO: Notify other users of "tenants" (like gw)?
 	   * maybe cb list? */
 	}

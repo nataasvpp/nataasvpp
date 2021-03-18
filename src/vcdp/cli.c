@@ -47,9 +47,9 @@ vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
     return 0;
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (line_input, "add tenant %d", &tenant_id))
+      if (unformat (line_input, "add %d", &tenant_id))
 	is_del = 0;
-      else if (unformat (line_input, "del tenant %d", &tenant_id))
+      else if (unformat (line_input, "del %d", &tenant_id))
 	is_del = 1;
       else
 	{

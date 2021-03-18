@@ -64,6 +64,7 @@ gateway_geneve_enable_disable_command_fn (vlib_main_t *vm,
       err = clib_error_return (0, "valid interface name required");
       goto done;
     }
+  args.enable_disable = enable_disable;
   gw_enable_disable_geneve_input (&args);
   err = args.err;
 

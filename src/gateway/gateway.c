@@ -94,7 +94,7 @@ gw_set_geneve_output (gw_set_geneve_output_args_t *args)
   gt->tenant_id = vt->tenant_id;
   gt->flags |= GW_TENANT_F_OUTPUT_DATA_SET;
   gt->geneve_src_ip[dir] = args->src_addr;
-  gt->geneve_dst_ip[dir] = args->src_addr;
+  gt->geneve_dst_ip[dir] = args->dst_addr;
   gt->geneve_src_port[dir] = args->src_port;
   gt->geneve_dst_port[dir] = args->dst_port;
 
