@@ -20,7 +20,7 @@
 /* clang-format off */
 #define foreach_vcdp_service                         \
   _(DROP, "vcdp-drop", 0)                       \
-  _(TCP_CHECK, "vcdp-tcp-checks", 1)            \
+  _(TCP_CHECK, "vcdp-tcp-check", 1)            \
   _(GENEVE_OUTPUT, "vcdp-geneve-output", 2)
 /* clang-format on */
 enum

@@ -17,8 +17,10 @@ add_vpp_plugin(vcdp_gateway
   SOURCES
   vcdp/lookup/node.c
   vcdp/drop/node.c
+  vcdp/tcp-check/node.c
   vcdp/format.c
   vcdp/vcdp.c
+  vcdp/cli.c
 
   gateway/gateway.c
   gateway/cli.c
@@ -28,5 +30,8 @@ add_vpp_plugin(vcdp_gateway
 
   MULTIARCH_SOURCES
   vcdp/lookup/node.c
+  vcdp/drop/node.c
+  vcdp/tcp-check/node.c
   gateway/geneve_input/node.c
+  gateway/geneve_output/node.c
 )
