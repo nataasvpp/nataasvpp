@@ -77,6 +77,22 @@ vcdp_init (vlib_main_t *vm)
   return 0;
 }
 
+static void
+vcdp_enable_disable_timer_expire_node (u8 is_disable)
+{
+  vlib_main_t *vm;
+  u32 n_vms = vlib_num_workers () + 1;
+  for (int i = 1; i < n_vms; i++)
+    {
+      vm = vlib_mains[i];
+      vlib_node_t *node =
+	vlib_get_node_by_name (vm, (u8 *) "vcdp-timer-expire");
+      vlib_node_set_state (vm, node->index,
+			   is_disable ? VLIB_NODE_STATE_DISABLED :
+					VLIB_NODE_STATE_POLLING);
+    }
+}
+
 clib_error_t *
 vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 {
@@ -85,6 +101,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
   clib_error_t *err = 0;
   vcdp_tenant_t *tenant;
   u32 tenant_idx;
+  u32 n_tenants = pool_elts (vcdp->tenants);
   if (!is_del)
     {
       if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
@@ -123,8 +140,11 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	   * maybe cb list? */
 	}
     }
+  if (!err && ((n_tenants == 1 && is_del) || (n_tenants == 0 && !is_del)))
+    vcdp_enable_disable_timer_expire_node (is_del);
   return err;
 }
+
 clib_error_t *
 vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
 {

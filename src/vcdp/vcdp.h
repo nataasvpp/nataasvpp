@@ -29,7 +29,7 @@
 #include <vppinfra/bihash_template.h>
 #include <vppinfra/tw_timer_2t_1w_2048sl.h>
 
-#include <vcdp/timer.h>
+#include <vcdp/timer/timer.h>
 
 #define VCDP_LOG2_SESSIONS_PER_THREAD 20
 #define VCDP_LOG2_TENANTS	      10
