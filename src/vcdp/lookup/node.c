@@ -150,7 +150,7 @@ calc_key (vlib_buffer_t *b, u32 tenant_id, vcdp_session_ip4_key_t *skey,
 
 static_always_inline int
 vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-		     vcdp_tenant_t *tenant, u32 thread_index,
+		     vcdp_tenant_t *tenant, u32 thread_index, f64 time_now,
 		     vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
@@ -177,6 +177,8 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session->pseudo_dir = lookup_val[0] & 0x1;
   session->timer_handle = vcdp_timer_start (&ptd->wheel, session_idx, 0,
 					    VCDP_TIMER_EMBRYONIC_TIMEOUT);
+  session->next_expiration =
+    time_now + VCDP_TIMER_EMBRYONIC_TIMEOUT * VCDP_TIMER_INTERVAL;
   lookup_val[0] ^= kv.value;
   return 0;
 }
@@ -243,6 +245,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   u32 local_flow_indices[VLIB_FRAME_SIZE];
   vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
+  f64 time_now = vlib_time_now (vm);
   /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
    * flow_index */
   u64 __attribute__ ((aligned (32))) lookup_vals[VLIB_FRAME_SIZE],
@@ -252,7 +255,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
 
-  vcdp_expire_timers (&ptd->wheel, vlib_time_now (vm));
+  vcdp_expire_timers (&ptd->wheel, time_now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
     session = vcdp_session_at_index (ptd, session_index);
@@ -317,7 +320,8 @@ VLIB_NODE_FN (vcdp_lookup_node)
 	  tenant =
 	    vcdp_tenant_at_index (vcdp, vcdp_buffer (b[0])->tenant_index);
 	  /* if there is colision, we just reiterate */
-	  if (vcdp_create_session (vcdp, ptd, tenant, thread_index, k, h, lv))
+	  if (vcdp_create_session (vcdp, ptd, tenant, thread_index, time_now,
+				   k, h, lv))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   VCDP_LOOKUP_ERROR_COLLISION, 1);

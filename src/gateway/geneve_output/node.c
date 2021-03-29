@@ -15,6 +15,7 @@
 
 #include <vlib/vlib.h>
 #include <gateway/gateway.h>
+#include <vcdp/common.h>
 #define foreach_vcdp_geneve_output_error _ (NO_OUTPUT, "no output data")
 
 typedef enum
@@ -66,7 +67,8 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
 			      vcdp_session_t *session, vlib_buffer_t *b,
 			      u32 session_idx)
 {
-  gw_tenant_t *tenant = gw_tenant_at_index (gm, session_idx);
+  u32 tenant_idx = vcdp_buffer (b)->tenant_index;
+  gw_tenant_t *tenant = gw_tenant_at_index (gm, tenant_idx);
   u8 direction = b->flow_id & 0x1;
   ip4_header_t *ip4 = (void *) geneve_out->encap_data;
   udp_header_t *udp;

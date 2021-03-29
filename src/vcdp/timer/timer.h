@@ -22,7 +22,7 @@ typedef tw_timer_wheel_2t_1w_2048sl_t vcdp_tw_t;
 #define vcdp_timer_stop		     tw_timer_stop_2t_1w_2048sl
 #define vcdp_expire_timers	     tw_timer_expire_timers_2t_1w_2048sl
 #define VCDP_TIMER_SI_MASK	     (0x7fffffff)
-#define VCDP_TIMER_INTERVAL	     (1.0f) /*in seconds*/
+#define VCDP_TIMER_INTERVAL	     ((f64) 1.0) /*in seconds*/
 #define VCDP_TIMER_EMBRYONIC_TIMEOUT (5)
 
 static_always_inline uword

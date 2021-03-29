@@ -18,36 +18,44 @@
 #include <vcdp/vcdp.h>
 
 u8 *
-format_vcdp_session (u8 *s, va_list *args)
+format_vcdp_session_type (u8 *s, va_list *args)
 {
-  vcdp_session_t *f = va_arg (*args, vcdp_session_t *);
-  s = format (
-    s, "%U:%u <-> %U:%u", format_ip4_address, &f->key.ip4_key.ip_addr_lo,
-    clib_net_to_host_u16 (f->key.ip4_key.port_lo), format_ip4_address,
-    &f->key.ip4_key.ip_addr_hi, clib_net_to_host_u16 (f->key.ip4_key.port_hi));
+  u32 session_type = va_arg (*args, u32);
+  if (session_type == VCDP_SESSION_TYPE_IP4)
+    s = format (s, "ipv4");
   return s;
 }
 
+/* Tenant Session_index Session_Type Protocol Ingress -> Egress TTL(seconds) */
 u8 *
-format_vcdp_session_with_dir (u8 *s, va_list *args)
+format_vcdp_session (u8 *s, va_list *args)
 {
-  vcdp_session_t *f = va_arg (*args, vcdp_session_t *);
-  u32 dir = va_arg (*args, u32);
-
-  if (dir)
-    s = format (s, "%15U %15u %15U %15u %7u", format_ip4_address,
-		&f->key.ip4_key.ip_addr_hi,
-		clib_net_to_host_u16 (f->key.ip4_key.port_hi),
-		format_ip4_address, &f->key.ip4_key.ip_addr_lo,
-		clib_net_to_host_u16 (f->key.ip4_key.port_lo),
-		f->key.ip4_key.proto);
+  u32 session_index = va_arg (*args, u32);
+  vcdp_session_t *session = va_arg (*args, vcdp_session_t *);
+  f64 now = va_arg (*args, f64);
+  f64 remaining_time = session->next_expiration - now;
+  u32 ingress_ip4, egress_ip4;
+  u16 ingress_port, egress_port;
+  if ((session->key.ip4_key.proto == IP_PROTOCOL_UDP ||
+       session->key.ip4_key.proto == IP_PROTOCOL_TCP) &&
+      session->pseudo_dir)
+    {
+      ingress_ip4 = session->key.ip4_key.ip_addr_hi;
+      egress_ip4 = session->key.ip4_key.ip_addr_lo;
+      ingress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
+      egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_lo);
+    }
   else
-    s = format (s, "%15U %15u %15U %15u %7u", format_ip4_address,
-		&f->key.ip4_key.ip_addr_lo,
-		clib_net_to_host_u16 (f->key.ip4_key.port_lo),
-		format_ip4_address, &f->key.ip4_key.ip_addr_hi,
-		clib_net_to_host_u16 (f->key.ip4_key.port_hi),
-		f->key.ip4_key.proto);
-
+    {
+      ingress_ip4 = session->key.ip4_key.ip_addr_lo;
+      egress_ip4 = session->key.ip4_key.ip_addr_hi;
+      ingress_port = clib_net_to_host_u16 (session->key.ip4_key.port_lo);
+      egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
+    }
+  s = format (s, "%d %d %U %U %U:%u -> %U:%u %f", session->key.tenant_id,
+	      session_index, format_vcdp_session_type, session->type,
+	      format_ip_protocol, session->key.ip4_key.proto,
+	      format_ip4_address, &ingress_ip4, ingress_port,
+	      format_ip4_address, &egress_ip4, egress_port, remaining_time);
   return s;
 }

@@ -136,6 +136,7 @@ typedef struct
   session_version_t session_version;
   u32 timer_handle;
   vcdp_session_ip4_key_t key;
+  f64 next_expiration;
   u8 pseudo_dir;
   u8 type; /* see vcdp_session_type_t */
 } vcdp_session_t;
