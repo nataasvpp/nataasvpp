@@ -17,12 +17,12 @@
 #include <vlib/vlib.h>
 #include <vcdp/common.h>
 
-/* clang-format off */
-#define foreach_vcdp_service                         \
-  _(DROP, "vcdp-drop", 0)                       \
-  _(TCP_CHECK, "vcdp-tcp-check", 1)            \
-  _(GENEVE_OUTPUT, "vcdp-geneve-output", 2)
-/* clang-format on */
+#define foreach_vcdp_service                                                  \
+  _ (DROP, "vcdp-drop", 0)                                                    \
+  _ (L4_LIFECYCLE, "vcdp-l4-lifecycle", 1)                                    \
+  _ (TCP_CHECK, "vcdp-tcp-check", 2)                                          \
+  _ (GENEVE_OUTPUT, "vcdp-geneve-output", 3)
+
 enum
 {
 #define _(x, y, z) VCDP_SERVICE_##x = z,

@@ -43,7 +43,9 @@ VLIB_NODE_FN (vcdp_timer_expire_node)
   vcdp_session_t *session;
   clib_bihash_kv_24_8_t kv = { 0 };
   u32 count = 0;
-  vcdp_expire_timers (&ptd->wheel, vlib_time_now (vm));
+  f64 now = vlib_time_now (vm);
+  ptd->current_time = now;
+  vcdp_expire_timers (&ptd->wheel, now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
     session = vcdp_session_at_index (ptd, session_index);

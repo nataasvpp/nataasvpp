@@ -19,6 +19,7 @@ add_vpp_plugin(vcdp_gateway
   vcdp/drop/node.c
   vcdp/tcp-check/node.c
   vcdp/timer/node.c
+  vcdp/l4-lifecycle/node.c
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/cli.c
@@ -33,6 +34,7 @@ add_vpp_plugin(vcdp_gateway
   vcdp/lookup/node.c
   vcdp/drop/node.c
   vcdp/tcp-check/node.c
+  vcdp/l4-lifecycle/node.c
   gateway/geneve_input/node.c
   gateway/geneve_output/node.c
 )

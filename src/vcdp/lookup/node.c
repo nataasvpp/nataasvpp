@@ -254,7 +254,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
 
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
-
+  ptd->current_time = time_now;
   vcdp_expire_timers (&ptd->wheel, time_now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {

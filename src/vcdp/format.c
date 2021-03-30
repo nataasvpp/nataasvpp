@@ -18,6 +18,18 @@
 #include <vcdp/vcdp.h>
 
 u8 *
+format_vcdp_session_state (u8 *s, va_list *args)
+{
+  u8 session_state = va_arg (*args, u32);
+#define _(n, str)                                                             \
+  if (session_state == VCDP_SESSION_STATE_##n)                                \
+    format (s, "%s", (str));
+  foreach_vcdp_session_state
+#undef _
+    return s;
+}
+
+u8 *
 format_vcdp_session_type (u8 *s, va_list *args)
 {
   u32 session_type = va_arg (*args, u32);
@@ -26,7 +38,8 @@ format_vcdp_session_type (u8 *s, va_list *args)
   return s;
 }
 
-/* Tenant Session_index Session_Type Protocol Ingress -> Egress TTL(seconds) */
+/* Tenant Session_index Session_Type Protocol Ingress -> Egress State
+ * TTL(seconds) */
 u8 *
 format_vcdp_session (u8 *s, va_list *args)
 {
@@ -52,10 +65,11 @@ format_vcdp_session (u8 *s, va_list *args)
       ingress_port = clib_net_to_host_u16 (session->key.ip4_key.port_lo);
       egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
     }
-  s = format (s, "%d %d %U %U %U:%u -> %U:%u %f", session->key.tenant_id,
+  s = format (s, "%d %d %U %U %U:%u -> %U:%u %U %f", session->key.tenant_id,
 	      session_index, format_vcdp_session_type, session->type,
 	      format_ip_protocol, session->key.ip4_key.proto,
 	      format_ip4_address, &ingress_ip4, ingress_port,
-	      format_ip4_address, &egress_ip4, egress_port, remaining_time);
+	      format_ip4_address, &egress_ip4, egress_port,
+	      format_vcdp_session_state, session->state, remaining_time);
   return s;
 }

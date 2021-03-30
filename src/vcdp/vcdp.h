@@ -69,6 +69,18 @@ typedef enum
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
 
+#define foreach_vcdp_session_state                                            \
+  _ (FSOL, "embryonic")                                                       \
+  _ (ESTABLISHED, "established")                                              \
+  _ (TIME_WAIT, "time-wait")
+
+typedef enum
+{
+#define _(val, str) VCDP_SESSION_STATE_##val,
+  foreach_vcdp_session_state
+#undef _
+    VCDP_SESSION_N_STATE
+} vcdp_session_state_t;
 typedef u16 session_version_t;
 
 enum
@@ -138,13 +150,15 @@ typedef struct
   vcdp_session_ip4_key_t key;
   f64 next_expiration;
   u8 pseudo_dir;
-  u8 type; /* see vcdp_session_type_t */
-} vcdp_session_t;
+  u8 type;	  /* see vcdp_session_type_t */
+  u8 state;	  /* see vcdp_session_state_t */
+} vcdp_session_t; /* TODO: optimise mem layout, this is bad */
 
 typedef struct
 {
   vcdp_session_t *sessions; /* fixed pool */
   vcdp_tw_t wheel;
+  f64 current_time;
   u32 *expired_sessions;
 } vcdp_per_thread_data_t;
 
@@ -179,6 +193,7 @@ extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 
 format_function_t format_vcdp_session;
+format_function_t format_vcdp_session_state;
 
 static_always_inline u32
 vcdp_session_index_from_lookup (u64 val)
