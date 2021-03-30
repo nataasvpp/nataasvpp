@@ -147,8 +147,9 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	  {
 	    if (tenant_id != ~0 && tenant_id != session->key.tenant_id)
 	      continue;
-	    if (first--)
+	    if (first)
 	      {
+                first = 0;
 		vlib_cli_output (vm, "Thread #%d:", thread_index);
 		vlib_cli_output (
 		  vm, "Tenant Session_index Session_Type "
