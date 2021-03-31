@@ -177,6 +177,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session->pseudo_dir = lookup_val[0] & 0x1;
   session->timer_handle = vcdp_timer_start (&ptd->wheel, session_idx, 0,
 					    VCDP_TIMER_EMBRYONIC_TIMEOUT);
+  /*TODO: must be configurable per tenant*/
   session->next_expiration =
     time_now + VCDP_TIMER_EMBRYONIC_TIMEOUT * VCDP_TIMER_INTERVAL;
   lookup_val[0] ^= kv.value;

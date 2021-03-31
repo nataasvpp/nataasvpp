@@ -44,9 +44,9 @@ typedef struct
   /* Here goes the geneve rewrite */
   session_version_t session_version;
   u16 encap_size;
-  u8 encap_data[60];
+  u8 encap_data[124];
 } gw_geneve_output_data_t;
-STATIC_ASSERT (sizeof (gw_geneve_output_data_t) == 64, "");
+STATIC_ASSERT (sizeof (gw_geneve_output_data_t) == 128, "");
 
 typedef struct
 {

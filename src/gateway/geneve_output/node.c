@@ -16,6 +16,17 @@
 #include <vlib/vlib.h>
 #include <gateway/gateway.h>
 #include <vcdp/common.h>
+
+#define VCDP_GENEVE_OPTION_CLASS	   ((u16) 0xDEAD)
+#define VCDP_GENEVE_OPTION_TYPE_SESSION_ID ((u8) 0xBE)
+#define VCDP_GENEVE_OPTION_SESSION_ID_SIZE ((u8) 0x2)
+#define VCDP_GENEVE_OPTION_SESSION_ID_FIRST_WORD                              \
+  (VCDP_GENEVE_OPTION_CLASS << 16) |                                          \
+    (VCDP_GENEVE_OPTION_TYPE_SESSION_ID << 8) |                               \
+    (VCDP_GENEVE_OPTION_SESSION_ID_SIZE << 0)
+#define VCDP_GENEVE_OPTION_LEN (12)
+#define VCDP_GENEVE_TOTAL_LEN  (8 + VCDP_GENEVE_OPTION_LEN)
+
 #define foreach_vcdp_geneve_output_error _ (NO_OUTPUT, "no output data")
 
 typedef enum
@@ -47,6 +58,8 @@ typedef enum
 typedef struct
 {
   u32 flow_id;
+  u16 encap_size;
+  u8 encap_data[124];
 } vcdp_geneve_output_trace_t;
 
 static u8 *
@@ -55,9 +68,13 @@ format_vcdp_geneve_output_trace (u8 *s, va_list *args)
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_geneve_output_trace_t *t = va_arg (*args, vcdp_geneve_output_trace_t *);
-
-  s = format (s, "vcdp-geneve_output: flow-id %u (session %u, %s)", t->flow_id,
-	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+  u32 indent = format_get_indent (s);
+  s =
+    format (s, "vcdp-geneve_output: flow-id %u (session %u, %s)\n", t->flow_id,
+	    t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+  s = format (s, "%U", format_white_space, indent);
+  s = format (s, "encap-data: %U", format_hex_bytes, t->encap_data,
+	      t->encap_size);
   return s;
 }
 
@@ -90,7 +107,7 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   ip4->checksum = ip4_header_checksum (ip4);
   ip4->length = /* stored in host byte order, incremented and swapped
 		   later */
-    sizeof (ip4_header_t) + sizeof (udp_header_t) + 8 /*(geneve)*/ +
+    sizeof (ip4_header_t) + sizeof (udp_header_t) + VCDP_GENEVE_TOTAL_LEN +
     sizeof (ethernet_header_t);
   geneve_out->encap_size += sizeof (*ip4);
   udp = (void *) (geneve_out->encap_data + geneve_out->encap_size);
@@ -99,13 +116,22 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   udp->checksum = 0;
   udp->length = /* stored in host byte order, incremented and swapped
 		   later */
-    sizeof (udp_header_t) + 8 /*(geneve)*/ + sizeof (ethernet_header_t);
+    sizeof (udp_header_t) + VCDP_GENEVE_TOTAL_LEN + sizeof (ethernet_header_t);
   geneve_out->encap_size += sizeof (*udp);
   gnv = (void *) (geneve_out->encap_data + geneve_out->encap_size);
-  gnv[0] = clib_host_to_net_u32 (0x6558); /*no option geneve version 0*/
+  gnv[0] =
+    // Not sure if 0x0C or 0x03 (number of bytes or of 4B-words???)
+    clib_host_to_net_u32 (0x0C006558); /*3 words of option geneve version 0*/
   gnv[1] = clib_host_to_net_u32 (tenant->tenant_id << 8);
-  geneve_out->encap_size += 8;
+  gnv[2] = clib_host_to_net_u32 (VCDP_GENEVE_OPTION_SESSION_ID_FIRST_WORD);
+  /* TODO: proper session id generation !!! (upon creation) */
+  gnv[3] =
+    clib_host_to_net_u32 (session->session_version); /* session id low  */
+  gnv[4] = clib_host_to_net_u32 (session_idx);	     /* session id high */
+  geneve_out->encap_size += VCDP_GENEVE_TOTAL_LEN;
   eth = (void *) (geneve_out->encap_data + geneve_out->encap_size);
+  /* TODO: fix mac to something decent (right now,
+   we take old mac src/dst and behave as "bump in the wire") */
   clib_memcpy_fast (eth, b->data + b->current_data - sizeof (*eth),
 		    sizeof (*eth));
   geneve_out->encap_size += sizeof (*eth);
@@ -133,7 +159,7 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
       udp_header_t *udp;
       ip_csum_t csum;
       u8 *data;
-      u16 orig_len = b[0]->current_length;
+      u16 orig_len = vlib_buffer_length_in_chain (vm, b[0]);
       b[0]->flags |=
 	(VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID |
 	 VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
@@ -199,10 +225,10 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 	  si3 = vcdp_session_from_flow_index (b[3]->flow_id);
 	  CLIB_PREFETCH (vptd->sessions + si2, CLIB_CACHE_LINE_BYTES, LOAD);
 	  CLIB_PREFETCH (vptd->sessions + si3, CLIB_CACHE_LINE_BYTES, LOAD);
-	  CLIB_PREFETCH (gptd->output + b[2]->flow_id, CLIB_CACHE_LINE_BYTES,
-			 LOAD);
-	  CLIB_PREFETCH (gptd->output + b[3]->flow_id, CLIB_CACHE_LINE_BYTES,
-			 LOAD);
+	  CLIB_PREFETCH (gptd->output + b[2]->flow_id,
+			 2 * CLIB_CACHE_LINE_BYTES, LOAD);
+	  CLIB_PREFETCH (gptd->output + b[3]->flow_id,
+			 2 * CLIB_CACHE_LINE_BYTES, LOAD);
 	}
       si0 = vcdp_session_from_flow_index (b[0]->flow_id);
       si1 = vcdp_session_from_flow_index (b[1]->flow_id);
@@ -249,6 +275,10 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 	      vcdp_geneve_output_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->flow_id = b[0]->flow_id;
+	      t->encap_size = gptd->output[b[0]->flow_id].encap_size;
+	      clib_memcpy_fast (t->encap_data,
+				gptd->output[b[0]->flow_id].encap_data,
+				gptd->output[b[0]->flow_id].encap_size);
 	      b++;
 	    }
 	  else
