@@ -207,44 +207,45 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 
   /* Pipeline load buffer data -> load session_data + geneve_output_data
    * ->process */
-  while (n_left >= 2)
+#define VCDP_PREFETCH_SIZE 2
+  while (n_left >= VCDP_PREFETCH_SIZE)
     {
-      u32 si0, si1, si2, si3;
-      vcdp_session_t *session0, *session1;
-      gw_geneve_output_data_t *geneve_out0, *geneve_out1;
-      if (n_left >= 6)
+      u32 si[VCDP_PREFETCH_SIZE * 2];
+      vcdp_session_t *session[VCDP_PREFETCH_SIZE];
+      gw_geneve_output_data_t *geneve_out[VCDP_PREFETCH_SIZE];
+      if (n_left >= VCDP_PREFETCH_SIZE * 3)
 	{
-	  vlib_prefetch_buffer_header (b[4], STORE);
-	  vlib_prefetch_buffer_header (b[5], STORE);
-	  vlib_prefetch_buffer_data_with_offset (b[4], STORE, -64);
-	  vlib_prefetch_buffer_data_with_offset (b[5], STORE, -64);
+	  for (int i = 0; i < VCDP_PREFETCH_SIZE; i++)
+	    {
+	      vlib_prefetch_buffer_header (b[2 * VCDP_PREFETCH_SIZE + i],
+					   STORE);
+	      vlib_prefetch_buffer_data_with_offset (
+		b[2 * VCDP_PREFETCH_SIZE + i], STORE, -64);
+	    }
 	}
-      if (n_left >= 4)
+      if (n_left >= VCDP_PREFETCH_SIZE * 2)
 	{
-	  si2 = vcdp_session_from_flow_index (b[2]->flow_id);
-	  si3 = vcdp_session_from_flow_index (b[3]->flow_id);
-	  CLIB_PREFETCH (vptd->sessions + si2, CLIB_CACHE_LINE_BYTES, LOAD);
-	  CLIB_PREFETCH (vptd->sessions + si3, CLIB_CACHE_LINE_BYTES, LOAD);
-	  CLIB_PREFETCH (gptd->output + b[2]->flow_id,
-			 2 * CLIB_CACHE_LINE_BYTES, LOAD);
-	  CLIB_PREFETCH (gptd->output + b[3]->flow_id,
-			 2 * CLIB_CACHE_LINE_BYTES, LOAD);
+	  for (int i = 0; i < VCDP_PREFETCH_SIZE; i++)
+	    {
+	      si[VCDP_PREFETCH_SIZE + i] = vcdp_session_from_flow_index (
+		b[VCDP_PREFETCH_SIZE + i]->flow_id);
+	      CLIB_PREFETCH (vptd->sessions + si[VCDP_PREFETCH_SIZE + i],
+			     CLIB_CACHE_LINE_BYTES, LOAD);
+	      CLIB_PREFETCH (gptd->output + b[VCDP_PREFETCH_SIZE + i]->flow_id,
+			     2 * CLIB_CACHE_LINE_BYTES, LOAD);
+	    }
 	}
-      si0 = vcdp_session_from_flow_index (b[0]->flow_id);
-      si1 = vcdp_session_from_flow_index (b[1]->flow_id);
-      session0 = vcdp_session_at_index (vptd, si0);
-      session1 = vcdp_session_at_index (vptd, si1);
-      geneve_out0 = vec_elt_at_index (gptd->output, b[0]->flow_id);
-      geneve_out1 = vec_elt_at_index (gptd->output, b[1]->flow_id);
-
-      geneve_output_rewrite_one (vm, node, gm, geneve_out0, session0, si0,
-				 to_next, b);
-      geneve_output_rewrite_one (vm, node, gm, geneve_out1, session1, si1,
-				 to_next + 1, b + 1);
-
-      to_next += 2;
-      b += 2;
-      n_left -= 2;
+      for (int i = 0; i < VCDP_PREFETCH_SIZE; i++)
+	{
+	  si[i] = vcdp_session_from_flow_index (b[i]->flow_id);
+	  session[i] = vcdp_session_at_index (vptd, si[i]);
+	  geneve_out[i] = vec_elt_at_index (gptd->output, b[i]->flow_id);
+	  geneve_output_rewrite_one (vm, node, gm, geneve_out[i], session[i],
+				     si[i], to_next + i, b + i);
+	}
+      to_next += VCDP_PREFETCH_SIZE;
+      b += VCDP_PREFETCH_SIZE;
+      n_left -= VCDP_PREFETCH_SIZE;
     }
 
   while (n_left)
