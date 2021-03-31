@@ -91,7 +91,8 @@ gw_set_geneve_output (gw_set_geneve_output_args_t *args)
   gt = gw_tenant_at_index (gm, kv.value);
 
   /* Caching tenant id in gt */
-  gt->tenant_id = vt->tenant_id;
+  gt->output_tenant_id =
+    args->output_tenant_id == ~0 ? vt->tenant_id : args->output_tenant_id;
   gt->flags |= GW_TENANT_F_OUTPUT_DATA_SET;
   gt->geneve_src_ip[dir] = args->src_addr;
   gt->geneve_dst_ip[dir] = args->dst_addr;

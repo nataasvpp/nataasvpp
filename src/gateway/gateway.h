@@ -55,7 +55,7 @@ typedef struct
 
 typedef struct
 {
-  u32 tenant_id;
+  u32 output_tenant_id;
   u32 flags;
 
   /* Geneve output spec for forward/backwards packets */
@@ -90,9 +90,10 @@ typedef struct
   u32 tenant_id;
   ip4_address_t src_addr;
   ip4_address_t dst_addr;
-  u16 src_port; /*network order*/
-  u16 dst_port; /*network order*/
-  u8 direction; /* 0 is forward, 1 is backwards */
+  u16 src_port;		/*network order*/
+  u16 dst_port;		/*network order*/
+  u8 direction;		/* 0 is forward, 1 is backwards */
+  u32 output_tenant_id; /* ~0 means output on the same tenant as input */
 } gw_set_geneve_output_args_t;
 
 extern gw_main_t gateway_main;

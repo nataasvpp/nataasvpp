@@ -35,7 +35,8 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
 				       .dst_addr = { .as_u32 = ~0 },
 				       .src_port = ~0,
 				       .dst_port = ~0,
-				       .direction = ~0 };
+				       .direction = ~0,
+				       .output_tenant_id = ~0 };
   clib_error_t *err = 0;
   u32 tmp;
 
@@ -45,6 +46,9 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (line_input, "tenant %d", &args.tenant_id))
+	;
+      else if (unformat (line_input, "output-tenant %d",
+			 &args.output_tenant_id))
 	;
       else if (unformat (line_input, "src %U", unformat_ip4_address,
 			 &args.src_addr))
@@ -85,6 +89,7 @@ VLIB_CLI_COMMAND (gateway_set_output_command, static) = {
   .short_help = "set gateway geneve-output tenant <tenant-id> "
 		"src <src ip> dst <dst ip> "
 		"src-port <src-port> dst-port <dst-port> "
+		"[output-tenant <tenant-id>] "
 		"<forward|backward>",
   .function = gateway_set_output_command_fn,
 };
