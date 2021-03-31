@@ -149,7 +149,7 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	      continue;
 	    if (first)
 	      {
-                first = 0;
+		first = 0;
 		vlib_cli_output (vm, "Thread #%d:", thread_index);
 		vlib_cli_output (
 		  vm, "Tenant Session_index Session_Type "

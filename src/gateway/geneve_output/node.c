@@ -86,11 +86,12 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   ip4->tos = IP_DSCP_CS0;
   ip4->ttl = 0xff;
   ip4->flags_and_fragment_offset = 0;
+  ip4->length = 0;
+  ip4->checksum = ip4_header_checksum (ip4);
   ip4->length = /* stored in host byte order, incremented and swapped
 		   later */
     sizeof (ip4_header_t) + sizeof (udp_header_t) + 8 /*(geneve)*/ +
     sizeof (ethernet_header_t);
-  ip4->checksum = ip4_header_checksum (ip4);
   geneve_out->encap_size += sizeof (*ip4);
   udp = (void *) (geneve_out->encap_data + geneve_out->encap_size);
   udp->src_port = tenant->geneve_src_port[direction];
@@ -130,6 +131,7 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
     {
       ip4_header_t *ip;
       udp_header_t *udp;
+      ip_csum_t csum;
       u8 *data;
       u16 orig_len = b[0]->current_length;
       b[0]->flags |=
@@ -146,7 +148,9 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
       /* fixup */
       ip = (void *) data;
       ip->length = clib_net_to_host_u16 (ip->length + orig_len);
-      ip->checksum = ip4_header_checksum (ip);
+      csum = ip->checksum;
+      csum = ip_csum_update (csum, 0, ip->length, ip4_header_t, length);
+      ip->checksum = ip_csum_fold (csum);
       udp = (void *) (data + sizeof (ip4_header_t));
       udp->length = clib_net_to_host_u16 (udp->length + orig_len);
       to_next[0] = VCDP_GENEVE_OUTPUT_NEXT_IP4_LOOKUP;
@@ -184,8 +188,8 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
       gw_geneve_output_data_t *geneve_out0, *geneve_out1;
       if (n_left >= 6)
 	{
-	  vlib_prefetch_buffer_header (b[4], LOAD);
-	  vlib_prefetch_buffer_header (b[5], LOAD);
+	  vlib_prefetch_buffer_header (b[4], STORE);
+	  vlib_prefetch_buffer_header (b[5], STORE);
 	  vlib_prefetch_buffer_data_with_offset (b[4], STORE, -64);
 	  vlib_prefetch_buffer_data_with_offset (b[5], STORE, -64);
 	}
