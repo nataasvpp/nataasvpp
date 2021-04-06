@@ -21,7 +21,8 @@
   _ (DROP, "vcdp-drop", 0)                                                    \
   _ (L4_LIFECYCLE, "vcdp-l4-lifecycle", 1)                                    \
   _ (TCP_CHECK, "vcdp-tcp-check", 2)                                          \
-  _ (GENEVE_OUTPUT, "vcdp-geneve-output", 3)
+  _ (GENEVE_OUTPUT, "vcdp-geneve-output", 3)                                  \
+  _ (DUMMY_DOT1Q_OUTPUT, "vcdp-dummy-dot1q-output", 4)
 
 enum
 {

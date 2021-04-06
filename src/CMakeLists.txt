@@ -23,6 +23,7 @@ add_vpp_plugin(vcdp_gateway
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/cli.c
+  dummy/dot1q.c
 
   gateway/gateway.c
   gateway/cli.c
@@ -37,4 +38,5 @@ add_vpp_plugin(vcdp_gateway
   vcdp/l4-lifecycle/node.c
   gateway/geneve_input/node.c
   gateway/geneve_output/node.c
+  dummy/dot1q.c
 )

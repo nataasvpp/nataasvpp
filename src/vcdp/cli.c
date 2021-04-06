@@ -93,6 +93,11 @@ vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	  VCDP_FLOW_FORWARD;
       else if (unformat (line_input, "backwards")) direction =
 	VCDP_FLOW_BACKWARD;
+      else
+      {
+	err = unformat_parse_error (line_input);
+	goto done;
+      }
     }
   if (tenant_id == ~0)
     {
