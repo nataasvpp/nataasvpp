@@ -124,10 +124,9 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
     clib_host_to_net_u32 (0x0C006558); /*3 words of option geneve version 0*/
   gnv[1] = clib_host_to_net_u32 (tenant->output_tenant_id << 8);
   gnv[2] = clib_host_to_net_u32 (VCDP_GENEVE_OPTION_SESSION_ID_FIRST_WORD);
-  /* TODO: proper session id generation !!! (upon creation) */
   gnv[3] =
-    clib_host_to_net_u32 (session->session_version); /* session id low  */
-  gnv[4] = clib_host_to_net_u32 (session_idx);	     /* session id high */
+    clib_host_to_net_u32 (session->session_id >> 32);  /* session id high  */
+  gnv[4] = clib_host_to_net_u32 (session->session_id); /* session id low */
   geneve_out->encap_size += VCDP_GENEVE_TOTAL_LEN;
   eth = (void *) (geneve_out->encap_data + geneve_out->encap_size);
   /* TODO: fix mac to something decent (right now,

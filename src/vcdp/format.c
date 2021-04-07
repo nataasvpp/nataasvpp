@@ -23,7 +23,7 @@ format_vcdp_session_state (u8 *s, va_list *args)
   u8 session_state = va_arg (*args, u32);
 #define _(n, str)                                                             \
   if (session_state == VCDP_SESSION_STATE_##n)                                \
-    format (s, "%s", (str));
+    s = format (s, "%s", (str));
   foreach_vcdp_session_state
 #undef _
     return s;
@@ -49,6 +49,7 @@ format_vcdp_session (u8 *s, va_list *args)
   f64 remaining_time = session->next_expiration - now;
   u32 ingress_ip4, egress_ip4;
   u16 ingress_port, egress_port;
+  u64 session_net = clib_host_to_net_u64 (session->session_id);
   if ((session->key.ip4_key.proto == IP_PROTOCOL_UDP ||
        session->key.ip4_key.proto == IP_PROTOCOL_TCP) &&
       session->pseudo_dir)
@@ -65,9 +66,10 @@ format_vcdp_session (u8 *s, va_list *args)
       ingress_port = clib_net_to_host_u16 (session->key.ip4_key.port_lo);
       egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
     }
-  s = format (s, "%d %d %U %U %U:%u -> %U:%u %U %f", session->key.tenant_id,
-	      session_index, format_vcdp_session_type, session->type,
-	      format_ip_protocol, session->key.ip4_key.proto,
+  s = format (s, "0x%U\t%d\t%d\t%U\t%U\t%U:%u\t-> %U:%u\t%U\t%f",
+	      format_hex_bytes, &session_net, sizeof (u64),
+	      session->key.tenant_id, session_index, format_vcdp_session_type,
+	      session->type, format_ip_protocol, session->key.ip4_key.proto,
 	      format_ip4_address, &ingress_ip4, ingress_port,
 	      format_ip4_address, &egress_ip4, egress_port,
 	      format_vcdp_session_state, session->state, remaining_time);

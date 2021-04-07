@@ -75,7 +75,7 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
       u8 direction = vcdp_direction_from_flow_index (b[0]->flow_id);
       /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
        */
-      if (session->type == VCDP_SESSION_STATE_FSOL &&
+      if (session->state == VCDP_SESSION_STATE_FSOL &&
 	  direction == VCDP_FLOW_BACKWARD)
 	/*Establish the session*/
 	session->state = VCDP_SESSION_STATE_ESTABLISHED;

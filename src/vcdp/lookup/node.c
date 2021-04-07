@@ -154,9 +154,11 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 		     vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
+  clib_bihash_kv_8_8_t kv2;
   vcdp_session_t *session;
   u32 session_idx;
   u32 pseudo_flow_idx;
+  u64 session_id;
   pool_get (ptd->sessions, session);
   session_idx = session - ptd->sessions;
   clib_memcpy_fast (&kv.key, k, 24);
@@ -171,6 +173,12 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     }
   session->type = VCDP_SESSION_TYPE_IP4;
   session->session_version += 1;
+  session_id = ((ptd->session_id_ctr++) & (vcdp->session_id_ctr_mask)) |
+	       ptd->session_id_template;
+  session->session_id = session_id;
+  kv2.key = session_id;
+  kv2.value = session_idx;
+  clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 1);
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
   clib_memcpy_fast (&session->key, k, 24);
@@ -259,10 +267,13 @@ VLIB_NODE_FN (vcdp_lookup_node)
   vcdp_expire_timers (&ptd->wheel, time_now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
+    clib_bihash_kv_8_8_t kv2;
     session = vcdp_session_at_index (ptd, session_index);
+    kv2.key = session->session_id;
     pool_put_index (ptd->sessions, session_index);
     clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
     clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+    clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
   }
 
   /* main loop - prefetch next 4 buffers,

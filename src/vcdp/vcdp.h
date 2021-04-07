@@ -33,9 +33,10 @@
 
 #define VCDP_LOG2_SESSIONS_PER_THREAD 19
 #define VCDP_LOG2_TENANTS	      10
-
-#define BIHASH_IP4_NUM_BUCKETS (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
-#define BIHASH_IP4_MEM_SIZE    (2ULL << 30)
+#define VCDP_SESSION_ID_TOTAL_BITS    64
+#define VCDP_SESSION_ID_EPOCH_N_BITS  16
+#define BIHASH_IP4_NUM_BUCKETS	      (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
+#define BIHASH_IP4_MEM_SIZE	      (2ULL << 30)
 
 #define BIHASH_IP6_NUM_BUCKETS (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
 #define BIHASH_IP6_MEM_SIZE    (2ULL << 30)
@@ -144,21 +145,29 @@ STATIC_ASSERT_SIZEOF (vcdp_session_ip4_key_t, 24);
 
 typedef struct
 {
+  CLIB_CACHE_LINE_ALIGN_MARK (cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N];
-  session_version_t session_version;
-  u32 timer_handle;
-  vcdp_session_ip4_key_t key;
+  u64 session_id;
   f64 next_expiration;
+  u32 timer_handle;
+  session_version_t session_version;
+  u8 state; /* see vcdp_session_state_t */
+  u8 unused0[31];
+  CLIB_CACHE_LINE_ALIGN_MARK (cache1);
+  vcdp_session_ip4_key_t key;
   u8 pseudo_dir;
-  u8 type;	  /* see vcdp_session_type_t */
-  u8 state;	  /* see vcdp_session_state_t */
+  u8 type; /* see vcdp_session_type_t */
+  u8 unused1[36];
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
+STATIC_ASSERT_SIZEOF (vcdp_session_t, 128);
 
 typedef struct
 {
   vcdp_session_t *sessions; /* fixed pool */
   vcdp_tw_t wheel;
   f64 current_time;
+  u64 session_id_ctr;
+  u64 session_id_template;
   u32 *expired_sessions;
 } vcdp_per_thread_data_t;
 
@@ -170,17 +179,15 @@ typedef struct
 
 typedef struct
 {
-  u32 *next_index_by_rx_sw_if_index;
-  u32 *tx_sw_if_index_by_rx_sw_if_index;
-
   /* key = (u64) tenant_id; val= (u64) tenant_idx; */
   clib_bihash_8_8_t tenant_idx_by_id;
 
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_24_8_t table4;
+  clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
-
+  u64 session_id_ctr_mask;
   /* pool of tenants */
   vcdp_tenant_t *tenants;
 

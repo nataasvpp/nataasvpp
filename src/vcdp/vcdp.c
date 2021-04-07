@@ -48,8 +48,12 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
   vlib_thread_main_t *tm = vlib_get_thread_main ();
   if (done)
     return;
-
-  /* initialize per-thrad pools */
+  time_t epoch = time (NULL);
+  uword log_n_thread = max_log2 (tm->n_vlib_mains);
+  uword template_shift =
+    VCDP_SESSION_ID_TOTAL_BITS - VCDP_SESSION_ID_EPOCH_N_BITS - log_n_thread;
+  vcdp->session_id_ctr_mask = (((u64) 1 << template_shift) - 1);
+  /* initialize per-thread data */
   vec_validate (vcdp->per_thread_data, tm->n_vlib_mains - 1);
   for (int i = 0; i < tm->n_vlib_mains; i++)
     {
@@ -58,6 +62,9 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
       pool_init_fixed (ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
       /* fixed pools are already zeroed (mmap) */
       vcdp_tw_init (&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
+      ptd->session_id_template = (u64) epoch
+				 << (template_shift + log_n_thread);
+      ptd->session_id_template |= (u64) i << template_shift;
     }
 
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
@@ -65,6 +72,8 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
 			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
   clib_bihash_init_8_8 (&vcdp->tenant_idx_by_id, "vcdp tenant table",
 			BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
+  clib_bihash_init_8_8 (&vcdp->session_index_by_id, "session idx by id",
+			BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
 
   vcdp->frame_queue_index =
     vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);

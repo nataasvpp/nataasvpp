@@ -157,8 +157,8 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 		first = 0;
 		vlib_cli_output (vm, "Thread #%d:", thread_index);
 		vlib_cli_output (
-		  vm, "Tenant Session_index Session_Type "
-		      "Protocol Ingress -> Egress State TTL(seconds)");
+		  vm, "id\t\t\ttenant\tindex\ttype\t"
+		      "prot\tingress\t\t\t-> egress\t\tstate\t\tTTL(s)");
 	      }
 	    vlib_cli_output (vm, "%U", format_vcdp_session,
 			     session - ptd->sessions, session, now);

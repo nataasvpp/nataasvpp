@@ -48,10 +48,13 @@ VLIB_NODE_FN (vcdp_timer_expire_node)
   vcdp_expire_timers (&ptd->wheel, now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
+    clib_bihash_kv_8_8_t kv2;
     session = vcdp_session_at_index (ptd, session_index);
+    kv2.key = session->session_id;
     pool_put_index (ptd->sessions, session_index);
     clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
     clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+    clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
     count += 1;
   }
   if (PREDICT_FALSE (count))
