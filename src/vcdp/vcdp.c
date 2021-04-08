@@ -65,8 +65,21 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
       ptd->session_id_template = (u64) epoch
 				 << (template_shift + log_n_thread);
       ptd->session_id_template |= (u64) i << template_shift;
-    }
 
+      /* Initialise all counters */
+#define _(x, y)                                                               \
+  u8 *name = format (0, y "_%d", i);                                          \
+  u8 *stat_seg_name = format (0, "/vcdp/per_flow_counters/" y "/%d", i);      \
+  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].name = (char *) name;           \
+  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].stat_segment_name =             \
+    (char *) stat_seg_name;                                                   \
+  vlib_validate_combined_counter (                                            \
+    &ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x],                             \
+    1ULL << (1 + VCDP_LOG2_SESSIONS_PER_THREAD));
+
+      foreach_vcdp_flow_counter
+#undef _
+    }
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
   clib_bihash_init_24_8 (&vcdp->table4, "vcdp ipv4 session table",
 			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
@@ -93,7 +106,7 @@ vcdp_enable_disable_timer_expire_node (u8 is_disable)
   u32 n_vms = vlib_num_workers () + 1;
   for (int i = 1; i < n_vms; i++)
     {
-      vm = vlib_mains[i];
+      vm = vlib_get_main_by_index (i);
       vlib_node_t *node =
 	vlib_get_node_by_name (vm, (u8 *) "vcdp-timer-expire");
       vlib_node_set_state (vm, node->index,

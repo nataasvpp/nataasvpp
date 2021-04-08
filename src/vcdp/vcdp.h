@@ -82,6 +82,17 @@ typedef enum
 #undef _
     VCDP_SESSION_N_STATE
 } vcdp_session_state_t;
+
+#define foreach_vcdp_flow_counter _ (LOOKUP, "lookup")
+
+typedef enum
+{
+#define _(x, y) VCDP_FLOW_COUNTER_##x,
+  foreach_vcdp_flow_counter
+#undef _
+    VCDP_FLOW_N_COUNTER
+} vcdp_flow_counter_index_t;
+
 typedef u16 session_version_t;
 
 enum
@@ -169,6 +180,7 @@ typedef struct
   u64 session_id_ctr;
   u64 session_id_template;
   u32 *expired_sessions;
+  vlib_combined_counter_main_t per_session_ctr[VCDP_FLOW_N_COUNTER];
 } vcdp_per_thread_data_t;
 
 typedef struct

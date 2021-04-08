@@ -177,7 +177,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 	       ptd->session_id_template;
   session->session_id = session_id;
   kv2.key = session_id;
-  kv2.value = session_idx;
+  kv2.value = kv.value;
   clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 1);
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
@@ -189,6 +189,8 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session->next_expiration =
     time_now + VCDP_TIMER_EMBRYONIC_TIMEOUT * VCDP_TIMER_INTERVAL;
   lookup_val[0] ^= kv.value;
+  vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
+			      lookup_val[0]);
   return 0;
 }
 
@@ -254,6 +256,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   u32 local_flow_indices[VLIB_FRAME_SIZE];
   vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
+  u32 lengths[VLIB_FRAME_SIZE], *len = lengths;
   f64 time_now = vlib_time_now (vm);
   /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
    * flow_index */
@@ -347,23 +350,29 @@ VLIB_NODE_FN (vcdp_lookup_node)
 	}
 
       b[0]->flow_id = lv[0] & (~(u32) 0);
+      len[0] = vlib_buffer_length_in_chain (vm, b[0]);
       b += 1;
       n_left -= 1;
       k += 1;
       h += 1;
       lv += 1;
+      len += 1;
     }
 
   n_left = frame->n_vectors;
   lv = lookup_vals;
   b = bufs;
   bi = from;
-
+  len = lengths;
   while (n_left)
     {
       u32 flow_thread_index = vcdp_thread_index_from_lookup (lv[0]);
       u32 flow_index = lv[0] & (~(u32) 0);
-
+      vlib_combined_counter_main_t *vcm =
+	&vcdp->per_thread_data[flow_thread_index]
+	   .per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP];
+      vlib_increment_combined_counter (vcm, thread_index, flow_index, 1,
+				       len[0]);
       if (flow_thread_index == thread_index)
 	{
 	  /* known flow which belongs to this thread */
@@ -384,6 +393,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
       lv += 1;
       b += 1;
       bi += 1;
+      len += 1;
     }
 
   /* handover buffers to remote node */
