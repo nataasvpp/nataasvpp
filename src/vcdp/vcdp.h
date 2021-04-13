@@ -212,12 +212,13 @@ extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 
 format_function_t format_vcdp_session;
+format_function_t format_vcdp_session_detail;
 format_function_t format_vcdp_session_state;
 
 static_always_inline u32
 vcdp_session_index_from_lookup (u64 val)
 {
-  return (val >> 1) & (~(u32) 0);
+  return (val & (~(u32) 0)) >> 1;
 }
 
 static_always_inline u32

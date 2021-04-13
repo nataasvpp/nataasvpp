@@ -168,6 +168,49 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
   return err;
 }
 
+static clib_error_t *
+vcdp_show_session_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
+				     vlib_cli_command_t *cmd)
+{
+  unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd;
+  clib_bihash_kv_8_8_t kv = { 0 };
+  u32 thread_index;
+  f64 now = vlib_time_now (vm);
+  u32 session_index;
+  u64 session_id;
+  if (unformat_user (input, unformat_line_input, line_input))
+    {
+      if (unformat_check_input (line_input) == UNFORMAT_END_OF_INPUT ||
+	  unformat (line_input, "0x%X", sizeof (session_id), &session_id) == 0)
+	err = unformat_parse_error (line_input);
+      unformat_free (line_input);
+    }
+  else
+    err = unformat_parse_error (line_input);
+
+  if (!err)
+    {
+      kv.key = session_id;
+      if (!clib_bihash_search_inline_8_8 (&vcdp->session_index_by_id, &kv))
+	{
+	  thread_index = vcdp_thread_index_from_lookup (kv.value);
+	  session_index = vcdp_session_index_from_lookup (kv.value);
+	  ptd = vec_elt_at_index (vcdp->per_thread_data, thread_index);
+	  vlib_cli_output (vm, "%U", format_vcdp_session_detail, ptd,
+			   session_index, now);
+	}
+      else
+	{
+	  err =
+	    clib_error_return (0, "Session id 0x%llx not found", session_id);
+	}
+    }
+  return err;
+}
+
 VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
   .path = "vcdp tenant",
   .short_help = "vcdp tenant <add|del> <tenant-id>",
@@ -182,7 +225,13 @@ VLIB_CLI_COMMAND (vcdp_set_services_command, static) = {
 };
 
 VLIB_CLI_COMMAND (show_vcdp_sessions, static) = {
-  .path = "show vcdp sessions",
-  .short_help = "show vcdp sessions [tenant <tenant-id>]",
+  .path = "show vcdp session-table",
+  .short_help = "show vcdp session-table [tenant <tenant-id>]",
   .function = vcdp_show_sessions_command_fn,
+};
+
+VLIB_CLI_COMMAND (show_vcdp_detail, static) = {
+  .path = "show vcdp session-detail",
+  .short_help = "show vcdp session-detail 0x<session-id>",
+  .function = vcdp_show_session_detail_command_fn,
 };
