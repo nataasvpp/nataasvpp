@@ -542,7 +542,7 @@ format_vcdp_lookup_trace (u8 *s, va_list *args)
 	      "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
 	      "flow-id %u (session %u, %s)",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
-	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 
@@ -557,7 +557,7 @@ format_vcdp_handoff_trace (u8 *s, va_list *args)
 	      "vcdp-handoff: next index %d "
 	      "flow-id %u (session %u, %s)",
 	      t->next_index, t->flow_id, t->flow_id >> 1,
-	      t->flow_id & 0x1 ? "backward" : "forward");
+	      t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 

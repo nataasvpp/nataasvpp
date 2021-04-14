@@ -71,7 +71,7 @@ format_vcdp_geneve_output_trace (u8 *s, va_list *args)
   u32 indent = format_get_indent (s);
   s =
     format (s, "vcdp-geneve_output: flow-id %u (session %u, %s)\n", t->flow_id,
-	    t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+	    t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   s = format (s, "%U", format_white_space, indent);
   s = format (s, "encap-data: %U", format_hex_bytes, t->encap_data,
 	      t->encap_size);

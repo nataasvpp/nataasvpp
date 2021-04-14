@@ -20,7 +20,7 @@
 /*
  * add CLI:
  * set gateway geneve-output tenant <tenant-id> src <src ip> dst <dst ip>
- *      src-port <src-port> dst-port <dst-port> <forward|backward>
+ *      src-port <src-port> dst-port <dst-port> <forward|reverse>
  *
  * it sets the geneve output data in each direction
  */
@@ -62,8 +62,8 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	args.dst_port = clib_host_to_net_u16 (tmp);
       else if (unformat (line_input, "forward"))
 	args.direction = VCDP_FLOW_FORWARD;
-      else if (unformat (line_input, "backwards"))
-	args.direction = VCDP_FLOW_BACKWARD;
+      else if (unformat (line_input, "reverse"))
+	args.direction = VCDP_FLOW_REVERSE;
       else
 	{
 	  err = unformat_parse_error (line_input);
@@ -85,58 +85,11 @@ done:
 }
 
 VLIB_CLI_COMMAND (gateway_set_output_command, static) = {
-  .path = "set gateway geneve-output",
-  .short_help = "set gateway geneve-output tenant <tenant-id> "
+  .path = "set vcdp gateway geneve-output",
+  .short_help = "set vcdp gateway geneve-output tenant <tenant-id> "
 		"src <src ip> dst <dst ip> "
 		"src-port <src-port> dst-port <dst-port> "
 		"[output-tenant <tenant-id>] "
-		"<forward|backward>",
+		"<forward|reverse>",
   .function = gateway_set_output_command_fn,
 };
-
-/*static clib_error_t *
-show_gateway_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			 vlib_cli_command_t *cmd)
-{
-  unformat_input_t _line_input, *line_input = &_line_input;
-  gw_main_t *gm = &gateway_main;
-  gw_per_thread_data_t *ptd;
-  int verbose = 0, i;
-
-  if (unformat_user (input, unformat_line_input, line_input))
-    {
-      clib_error_t *err = 0;
-      while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-	if (unformat (line_input, "verbose"))
-	  verbose = 1;
-	else
-	  {
-	    err = clib_error_return (0, "invalid params");
-	    break;
-	  }
-      unformat_free (line_input);
-      if (err)
-	return err;
-    }
-
-  vlib_cli_output (vm, "%U", format_bihash_24_8, &gm->table4, 0);
-  vec_foreach (ptd, gm->per_thread_data)
-    {
-      vlib_cli_output (vm, "Thread %u: %u sessions\n",
-		       ptd - gm->per_thread_data, pool_elts (ptd->sessions));
-      if (verbose)
-	pool_foreach_index (i, ptd->sessions)
-	  {
-	    gw_session_t *session = pool_elt_at_index (ptd->sessions, i);
-	    vlib_cli_output (vm, "%7u: %U\n", i, format_gw_session, session);
-	  }
-    }
-
-  return 0;
-}
-
-VLIB_CLI_COMMAND (show_flow_handoff, static) = {
-  .path = "show vcdp gateway",
-  .short_help = "show vcdp gateway",
-  .function = show_gateway_command_fn,
-}; */

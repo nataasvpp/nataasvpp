@@ -47,7 +47,7 @@ format_vcdp_l4_lifecycle_trace (u8 *s, va_list *args)
 
   s = format (
     s, "vcdp-l4-lifecycle: flow-id %u (session %u, %s) new_state: %U",
-    t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward",
+    t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
     format_vcdp_session_state, t->new_state);
   return s;
 }
@@ -76,7 +76,7 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
       /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
        */
       if (session->state == VCDP_SESSION_STATE_FSOL &&
-	  direction == VCDP_FLOW_BACKWARD)
+	  direction == VCDP_FLOW_REVERSE)
 	/*Establish the session*/
 	session->state = VCDP_SESSION_STATE_ESTABLISHED;
 

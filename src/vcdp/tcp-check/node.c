@@ -54,7 +54,7 @@ format_vcdp_tcp_check_trace (u8 *s, va_list *args)
   vcdp_tcp_check_trace_t *t = va_arg (*args, vcdp_tcp_check_trace_t *);
 
   s = format (s, "vcdp-tcp-check: flow-id %u (session %u, %s)", t->flow_id,
-	      t->flow_id >> 1, t->flow_id & 0x1 ? "backward" : "forward");
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 

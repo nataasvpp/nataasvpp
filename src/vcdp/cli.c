@@ -26,10 +26,10 @@
  *
  *
  * add CLI:
- * set vcdp services tenant <tenant-id> (SERVICE_NAME)+ <forward|backwards>
+ * set vcdp services tenant <tenant-id> (SERVICE_NAME)+ <forward|reverse>
  *
  * configure tenant with a service chain for a given direction (forward or
- * backwards)
+ * reverse)
  *
  */
 
@@ -91,8 +91,7 @@ vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
 #undef _
 	else if (unformat (line_input, "forward")) direction =
 	  VCDP_FLOW_FORWARD;
-      else if (unformat (line_input, "backwards")) direction =
-	VCDP_FLOW_BACKWARD;
+      else if (unformat (line_input, "reverse")) direction = VCDP_FLOW_REVERSE;
       else
       {
 	err = unformat_parse_error (line_input);
@@ -220,7 +219,7 @@ VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
 VLIB_CLI_COMMAND (vcdp_set_services_command, static) = {
   .path = "set vcdp services",
   .short_help = "set vcdp services tenant <tenant-id>"
-		" [SERVICE_NAME]+ <forward|backwards>",
+		" [SERVICE_NAME]+ <forward|reverse>",
   .function = vcdp_set_services_command_fn,
 };
 

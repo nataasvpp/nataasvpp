@@ -98,7 +98,7 @@ typedef u16 session_version_t;
 enum
 {
   VCDP_FLOW_FORWARD = 0,
-  VCDP_FLOW_BACKWARD = 1,
+  VCDP_FLOW_REVERSE = 1,
   VCDP_FLOW_F_B_N = 2
 };
 

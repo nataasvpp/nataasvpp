@@ -133,13 +133,13 @@ format_vcdp_session_detail (u8 *s, va_list *args)
   s = format (s, "  expires after: %fs\n", remaining_time);
   s = format (s, "  forward service chain: %U\n", format_vcdp_bitmap,
 	      session->bitmaps[VCDP_FLOW_FORWARD]);
-  s = format (s, "  backward service chain: %U\n", format_vcdp_bitmap,
-	      session->bitmaps[VCDP_FLOW_BACKWARD]);
+  s = format (s, "  reverse service chain: %U\n", format_vcdp_bitmap,
+	      session->bitmaps[VCDP_FLOW_REVERSE]);
   s = format (s, "  counters:\n");
   s = format (s, "    forward flow:\n");
   s = format (s, "      bytes: %llu\n", fctr.bytes);
   s = format (s, "      packets: %llu\n", fctr.packets);
-  s = format (s, "    backward flow:\n");
+  s = format (s, "    reverse flow:\n");
   s = format (s, "      bytes: %llu\n", bctr.bytes);
   s = format (s, "      packets: %llu\n", bctr.packets);
   return s;

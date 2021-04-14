@@ -58,7 +58,7 @@ typedef struct
   u32 output_tenant_id;
   u32 flags;
 
-  /* Geneve output spec for forward/backwards packets */
+  /* Geneve output spec for forward/reverse packets */
   ip4_address_t geneve_src_ip[VCDP_FLOW_F_B_N];
   ip4_address_t geneve_dst_ip[VCDP_FLOW_F_B_N];
   u16 geneve_src_port[VCDP_FLOW_F_B_N];
@@ -92,7 +92,7 @@ typedef struct
   ip4_address_t dst_addr;
   u16 src_port;		/*network order*/
   u16 dst_port;		/*network order*/
-  u8 direction;		/* 0 is forward, 1 is backwards */
+  u8 direction;		/* 0 is forward, 1 is reverse */
   u32 output_tenant_id; /* ~0 means output on the same tenant as input */
 } gw_set_geneve_output_args_t;
 

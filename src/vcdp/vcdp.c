@@ -131,7 +131,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	  pool_get (vcdp->tenants, tenant);
 	  tenant_idx = tenant - vcdp->tenants;
 	  tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
-	  tenant->bitmaps[VCDP_FLOW_BACKWARD] = VCDP_DEFAULT_BITMAP;
+	  tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
 	  tenant->tenant_id = tenant_id;
 	  kv.key = tenant_id;
 	  kv.value = tenant_idx;
