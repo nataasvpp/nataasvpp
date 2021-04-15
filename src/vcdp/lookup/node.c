@@ -191,6 +191,9 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   lookup_val[0] ^= kv.value;
   vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			      lookup_val[0]);
+  vlib_increment_simple_counter (
+    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
+    thread_index, tenant - vcdp->tenants, 1);
   return 0;
 }
 

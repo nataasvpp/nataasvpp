@@ -93,6 +93,30 @@ typedef enum
     VCDP_FLOW_N_COUNTER
 } vcdp_flow_counter_index_t;
 
+#define foreach_vcdp_tenant_session_counter                                   \
+  _ (CREATED, "created")                                                      \
+  _ (REMOVED, "removed")
+
+#define foreach_vcdp_tenant_data_counter                                      \
+  _ (INCOMING, "incoming")                                                    \
+  _ (OUTGOING, "outgoing")
+
+typedef enum
+{
+#define _(x, y) VCDP_TENANT_SESSION_COUNTER_##x,
+  foreach_vcdp_tenant_session_counter
+#undef _
+    VCDP_TENANT_SESSION_N_COUNTER
+} vcdp_tenant_session_counter_index_t;
+
+typedef enum
+{
+#define _(x, y) VCDP_TENANT_DATA_COUNTER_##x,
+  foreach_vcdp_tenant_data_counter
+#undef _
+    VCDP_TENANT_DATA_N_COUNTER
+} vcdp_tenant_data_counter_index_t;
+
 typedef u16 session_version_t;
 
 enum
@@ -200,6 +224,9 @@ typedef struct
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
   u64 session_id_ctr_mask;
+  vlib_simple_counter_main_t tenant_session_ctr[VCDP_TENANT_SESSION_N_COUNTER];
+  vlib_combined_counter_main_t tenant_data_ctr[VCDP_TENANT_DATA_N_COUNTER];
+
   /* pool of tenants */
   vcdp_tenant_t *tenants;
 

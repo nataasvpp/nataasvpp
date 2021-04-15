@@ -42,6 +42,48 @@ vcdp_timer_expired (u32 *expired)
 }
 
 static void
+vcdp_init_ptd_counters (vcdp_per_thread_data_t *ptd, uword i)
+{
+#define _(x, y)                                                               \
+  u8 *name = format (0, y "_%d", i);                                          \
+  u8 *stat_seg_name = format (0, "/vcdp/per_flow_counters/" y "/%d", i);      \
+  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].name = (char *) name;           \
+  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].stat_segment_name =             \
+    (char *) stat_seg_name;                                                   \
+  vlib_validate_combined_counter (                                            \
+    &ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x],                             \
+    1ULL << (1 + VCDP_LOG2_SESSIONS_PER_THREAD));
+
+  foreach_vcdp_flow_counter
+#undef _
+}
+
+static void
+vcdp_init_tenant_counters (vcdp_main_t *vcdp)
+{
+#define _(x, y)                                                               \
+  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;         \
+  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x]                   \
+    .stat_segment_name = "/vcdp/per_tenant_counters/" y;                      \
+  vlib_validate_simple_counter (                                              \
+    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x],               \
+    1ULL << (1 + VCDP_LOG2_TENANTS));
+
+  foreach_vcdp_tenant_session_counter
+#undef _
+#define _(x, y)                                                               \
+  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;               \
+  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name =     \
+    "/vcdp/per_tenant_counters/" y;                                           \
+  vlib_validate_combined_counter (                                            \
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x],                     \
+    1ULL << (1 + VCDP_LOG2_TENANTS));
+
+    foreach_vcdp_tenant_data_counter
+#undef _
+}
+
+static void
 vcdp_init_main_if_needed (vcdp_main_t *vcdp)
 {
   static u32 done = 0;
@@ -60,27 +102,14 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
       vcdp_per_thread_data_t *ptd =
 	vec_elt_at_index (vcdp->per_thread_data, i);
       pool_init_fixed (ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
-      /* fixed pools are already zeroed (mmap) */
       vcdp_tw_init (&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
       ptd->session_id_template = (u64) epoch
 				 << (template_shift + log_n_thread);
       ptd->session_id_template |= (u64) i << template_shift;
-
-      /* Initialise all counters */
-#define _(x, y)                                                               \
-  u8 *name = format (0, y "_%d", i);                                          \
-  u8 *stat_seg_name = format (0, "/vcdp/per_flow_counters/" y "/%d", i);      \
-  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].name = (char *) name;           \
-  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].stat_segment_name =             \
-    (char *) stat_seg_name;                                                   \
-  vlib_validate_combined_counter (                                            \
-    &ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x],                             \
-    1ULL << (1 + VCDP_LOG2_SESSIONS_PER_THREAD));
-
-      foreach_vcdp_flow_counter
-#undef _
+      vcdp_init_ptd_counters (ptd, i);
     }
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
+  vcdp_init_tenant_counters (vcdp);
   clib_bihash_init_24_8 (&vcdp->table4, "vcdp ipv4 session table",
 			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
   clib_bihash_init_8_8 (&vcdp->tenant_idx_by_id, "vcdp tenant table",
@@ -115,6 +144,29 @@ vcdp_enable_disable_timer_expire_node (u8 is_disable)
     }
 }
 
+void
+vcdp_tenant_clear_counters (vcdp_main_t *vcdp, u32 tenant_idx)
+{
+#define _(x, y)                                                               \
+  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;         \
+  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x]                   \
+    .stat_segment_name = "/vcdp/per_tenant_counters/" y;                      \
+  vlib_zero_simple_counter (                                                  \
+    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], tenant_idx);
+
+  foreach_vcdp_tenant_session_counter
+#undef _
+#define _(x, y)                                                               \
+  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;               \
+  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name =     \
+    "/vcdp/per_tenant_counters/" y;                                           \
+  vlib_zero_combined_counter (                                                \
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], tenant_idx);
+
+    foreach_vcdp_tenant_data_counter
+#undef _
+}
+
 clib_error_t *
 vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 {
@@ -136,6 +188,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	  kv.key = tenant_id;
 	  kv.value = tenant_idx;
 	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 1);
+	  vcdp_tenant_clear_counters (vcdp, tenant_idx);
 	}
       else
 	{
@@ -156,6 +209,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	}
       else
 	{
+	  vcdp_tenant_clear_counters (vcdp, kv.value);
 	  pool_put_index (vcdp->tenants, kv.value);
 	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 0);
 	  /* TODO: Notify other users of "tenants" (like gw)?
