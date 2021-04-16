@@ -150,8 +150,9 @@ calc_key (vlib_buffer_t *b, u32 tenant_id, vcdp_session_ip4_key_t *skey,
 
 static_always_inline int
 vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-		     vcdp_tenant_t *tenant, u32 thread_index, f64 time_now,
-		     vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
+		     vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
+		     f64 time_now, vcdp_session_ip4_key_t *k, u64 *h,
+		     u64 *lookup_val)
 {
   clib_bihash_kv_24_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
@@ -176,6 +177,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session_id = ((ptd->session_id_ctr++) & (vcdp->session_id_ctr_mask)) |
 	       ptd->session_id_template;
   session->session_id = session_id;
+  session->tenant_idx = tenant_idx;
   kv2.key = session_id;
   kv2.value = kv.value;
   clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 1);
@@ -193,7 +195,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 			      lookup_val[0]);
   vlib_increment_simple_counter (
     &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
-    thread_index, tenant - vcdp->tenants, 1);
+    thread_index, tenant_idx, 1);
   return 0;
 }
 
@@ -272,15 +274,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   ptd->current_time = time_now;
   vcdp_expire_timers (&ptd->wheel, time_now);
   vcdp_session_index_iterate_expired (ptd, session_index)
-  {
-    clib_bihash_kv_8_8_t kv2;
-    session = vcdp_session_at_index (ptd, session_index);
-    kv2.key = session->session_id;
-    pool_put_index (ptd->sessions, session_index);
-    clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
-    clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
-    clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
-  }
+    vcdp_session_remove (vcdp, ptd, thread_index, session_index);
 
   /* main loop - prefetch next 4 buffers,
    * prefetch previous 4 buckets */
@@ -335,11 +329,11 @@ VLIB_NODE_FN (vcdp_lookup_node)
       clib_memcpy_fast (&kv.key, k, 24);
       if (clib_bihash_search_inline_with_hash_24_8 (&vcdp->table4, h[0], &kv))
 	{
-	  tenant =
-	    vcdp_tenant_at_index (vcdp, vcdp_buffer (b[0])->tenant_index);
+	  u16 tenant_idx = vcdp_buffer (b[0])->tenant_index;
+	  tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
 	  /* if there is colision, we just reiterate */
-	  if (vcdp_create_session (vcdp, ptd, tenant, thread_index, time_now,
-				   k, h, lv))
+	  if (vcdp_create_session (vcdp, ptd, tenant, tenant_idx, thread_index,
+				   time_now, k, h, lv))
 	    {
 	      vlib_node_increment_counter (vm, node->node_index,
 					   VCDP_LOOKUP_ERROR_COLLISION, 1);

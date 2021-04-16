@@ -192,6 +192,7 @@ typedef struct
   vcdp_session_ip4_key_t key;
   u8 pseudo_dir;
   u8 type; /* see vcdp_session_type_t */
+  u16 tenant_idx;
   u8 unused1[36];
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
 STATIC_ASSERT_SIZEOF (vcdp_session_t, 128);
@@ -300,6 +301,23 @@ static_always_inline vcdp_tenant_t *
 vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
 {
   return pool_elt_at_index (vcdpm->tenants, idx);
+}
+
+static_always_inline void
+vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
+		     u32 thread_index, u32 session_index)
+{
+  clib_bihash_kv_8_8_t kv2 = { 0 };
+  clib_bihash_kv_24_8_t kv = { 0 };
+  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
+  kv2.key = session->session_id;
+  pool_put_index (ptd->sessions, session_index);
+  clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
+  clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+  clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
+  vlib_increment_simple_counter (
+    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED],
+    thread_index, session->tenant_idx, 1);
 }
 
 clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,

@@ -112,14 +112,18 @@ typedef enum
 } vcdp_dummy_dot1q_output_next_t;
 
 static_always_inline void
-process_one_pkt (vcdp_main_t *vcdp, vlib_buffer_t **b, u16 *current_next)
+process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
+		 vlib_combined_counter_main_t *cm, u32 thread_index,
+		 vlib_buffer_t **b, u16 *current_next)
 {
   clib_bihash_kv_8_8_t kv = { 0 };
   u8 *data = vlib_buffer_get_current (b[0]);
+  u32 orig_len = vlib_buffer_length_in_chain (vm, b[0]);
   ethernet_header_t *eth = (void *) data;
   u32 tenant_id = 0;
   u32 off = sizeof (eth[0]);
   u16 type = clib_net_to_host_u16 (eth->type);
+  u16 tenant_idx;
   if (type == ETHERNET_TYPE_VLAN)
     {
       ethernet_vlan_header_t *vlan = (void *) (data + sizeof (eth[0]));
@@ -141,12 +145,15 @@ process_one_pkt (vcdp_main_t *vcdp, vlib_buffer_t **b, u16 *current_next)
       return;
     }
   b[0]->flow_id = tenant_id;
-  vcdp_buffer (b[0])->tenant_index = kv.value;
+  tenant_idx = kv.value;
+  vcdp_buffer (b[0])->tenant_index = tenant_idx;
   vnet_buffer (b[0])->l2_hdr_offset = b[0]->current_data;
   vnet_buffer (b[0])->l3_hdr_offset = b[0]->current_data + off;
   b[0]->flags |=
     VNET_BUFFER_F_L2_HDR_OFFSET_VALID | VNET_BUFFER_F_L3_HDR_OFFSET_VALID;
   current_next[0] = VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP;
+  vlib_increment_combined_counter (cm, thread_index, tenant_idx, 1,
+				   orig_len - off);
   vlib_buffer_advance (b[0], off);
 }
 
@@ -166,14 +173,16 @@ vcdp_dummy_dot1q_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
-
+  u32 thread_index = vlib_get_thread_index ();
+  vlib_combined_counter_main_t *cm =
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_INCOMING];
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
   current_next = next_indices;
 
   while (n_left)
     {
-      process_one_pkt (vcdp, b, current_next);
+      process_one_pkt (vm, vcdp, cm, thread_index, b, current_next);
       b += 1;
       current_next += 1;
       n_left -= 1;
@@ -211,6 +220,12 @@ VNET_FEATURE_INIT (vcdp_dummy_dot1q_input_feat, static) = {
 VLIB_NODE_FN (vcdp_dummy_dot1q_output_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
+  vcdp_main_t *vcdp = &vcdp_main;
+  vlib_combined_counter_main_t *cm =
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_OUTGOING];
+  u32 thread_index = vlib_get_thread_index ();
+  u16 tenant_idx[VCDP_PREFETCH_SIZE];
+  u32 orig_len[VCDP_PREFETCH_SIZE];
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
 
@@ -228,6 +243,10 @@ VLIB_NODE_FN (vcdp_dummy_dot1q_output_node)
 
       for (int i = 0; i < VCDP_PREFETCH_SIZE; i++)
 	{
+	  orig_len[i] = vlib_buffer_length_in_chain (vm, b[i]);
+	  tenant_idx[i] = vcdp_buffer (b[i])->tenant_index;
+	  vlib_increment_combined_counter (cm, thread_index, tenant_idx[i], 1,
+					   orig_len[i]);
 	  l2_len[i] = vnet_buffer (b[i])->l3_hdr_offset;
 	  l2_len[i] -= vnet_buffer (b[i])->l2_hdr_offset;
 	  vlib_buffer_advance (b[i], -l2_len[i]);
@@ -240,13 +259,16 @@ VLIB_NODE_FN (vcdp_dummy_dot1q_output_node)
     }
   while (n_left)
     {
-      word l2_len = vnet_buffer (b[0])->l3_hdr_offset;
+      word l2_len;
+      u32 orig_len = vlib_buffer_length_in_chain (vm, b[0]);
+      u16 tenant_idx = vcdp_buffer (b[0])->tenant_index;
+      vlib_increment_combined_counter (cm, thread_index, tenant_idx, 1,
+				       orig_len);
+      l2_len = vnet_buffer (b[0])->l3_hdr_offset;
       l2_len -= vnet_buffer (b[0])->l2_hdr_offset;
       vlib_buffer_advance (b[0], -l2_len);
-
       vnet_feature_next_u16 (to_next, b[0]);
 
-      /*Dumb no need to edit anything in the packet...*/
       b += 1;
       to_next += 1;
       n_left -= 1;

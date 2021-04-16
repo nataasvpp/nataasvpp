@@ -140,9 +140,10 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
 
 static_always_inline void
 geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
-			   gw_main_t *gm, gw_geneve_output_data_t *geneve_out,
-			   vcdp_session_t *session, u32 session_idx,
-			   u16 *to_next, vlib_buffer_t **b)
+			   gw_main_t *gm, vlib_combined_counter_main_t *cm,
+			   gw_geneve_output_data_t *geneve_out,
+			   vcdp_session_t *session, u32 thread_index,
+			   u32 session_idx, u16 *to_next, vlib_buffer_t **b)
 {
   if (PREDICT_FALSE (geneve_out->session_version != session->session_version &&
 		     vcdp_geneve_output_load_data (gm, geneve_out, session,
@@ -179,6 +180,8 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
       udp = (void *) (data + sizeof (ip4_header_t));
       udp->length = clib_net_to_host_u16 (udp->length + orig_len);
       to_next[0] = VCDP_GENEVE_OUTPUT_NEXT_IP4_LOOKUP;
+      vlib_increment_combined_counter (cm, thread_index, session->tenant_idx,
+				       1, orig_len);
     }
 }
 
@@ -191,7 +194,8 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   gw_main_t *gm = &gateway_main;
   vcdp_main_t *vcdp = &vcdp_main;
-
+  vlib_combined_counter_main_t *cm =
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_OUTGOING];
   u32 thread_index = vm->thread_index;
   gw_per_thread_data_t *gptd =
     vec_elt_at_index (gm->per_thread_data, thread_index);
@@ -239,8 +243,9 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
 	  si[i] = vcdp_session_from_flow_index (b[i]->flow_id);
 	  session[i] = vcdp_session_at_index (vptd, si[i]);
 	  geneve_out[i] = vec_elt_at_index (gptd->output, b[i]->flow_id);
-	  geneve_output_rewrite_one (vm, node, gm, geneve_out[i], session[i],
-				     si[i], to_next + i, b + i);
+	  geneve_output_rewrite_one (vm, node, gm, cm, geneve_out[i],
+				     session[i], thread_index, si[i],
+				     to_next + i, b + i);
 	}
       to_next += VCDP_PREFETCH_SIZE;
       b += VCDP_PREFETCH_SIZE;
@@ -254,8 +259,8 @@ VLIB_NODE_FN (vcdp_geneve_output_node)
       gw_geneve_output_data_t *geneve_out =
 	vec_elt_at_index (gptd->output, b[0]->flow_id);
 
-      geneve_output_rewrite_one (vm, node, gm, geneve_out, session,
-				 session_idx, to_next, b);
+      geneve_output_rewrite_one (vm, node, gm, cm, geneve_out, session,
+				 thread_index, session_idx, to_next, b);
       to_next++;
       b++;
       n_left--;

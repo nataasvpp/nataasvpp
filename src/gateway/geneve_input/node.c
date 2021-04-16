@@ -76,6 +76,9 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
    */
   vcdp_main_t *vcdp = &vcdp_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
+  vlib_combined_counter_main_t *cm =
+    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_INCOMING];
+
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
@@ -90,8 +93,11 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       udp_header_t *udp;
       u32 *gnv;
       u32 tenant_id;
+      u16 tenant_idx;
       clib_bihash_kv_8_8_t kv = {};
       u16 off = 0;
+      u32 thread_index = vlib_get_thread_index ();
+      u32 len = vlib_buffer_length_in_chain (vm, b[0]);
       if (ip4->protocol != IP_PROTOCOL_UDP)
 	{
 	  vnet_feature_next_u16 (current_next, b[0]);
@@ -119,11 +125,14 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 
       /* Store tenant_id as flow_id (to simplify the future lookup) */
       b[0]->flow_id = tenant_id;
-      vcdp_buffer (b[0])->tenant_index = kv.value;
+      tenant_idx = kv.value;
+      vcdp_buffer (b[0])->tenant_index = tenant_idx;
       current_next[0] = VCDP_GENEVE_INPUT_NEXT_LOOKUP;
       off +=
 	8 /* geneve header no options */ + 14 /* ethernet header, no tag*/;
       vlib_buffer_advance (b[0], off);
+      vlib_increment_combined_counter (cm, thread_index, tenant_idx, 1,
+				       len - off);
     end_of_packet:
       b += 1;
       current_next += 1;
