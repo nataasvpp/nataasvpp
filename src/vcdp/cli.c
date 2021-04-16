@@ -188,7 +188,7 @@ vcdp_show_session_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
       unformat_free (line_input);
     }
   else
-    err = unformat_parse_error (line_input);
+    err = clib_error_return (0, "No session id provided");
 
   if (!err)
     {
@@ -210,6 +210,54 @@ vcdp_show_session_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
   return err;
 }
 
+static clib_error_t *
+vcdp_show_tenant_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
+				    vlib_cli_command_t *cmd)
+{
+  unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_tenant_t *tenant;
+  u32 tenant_id = ~0;
+  u16 tenant_idx;
+  u8 detail = 0;
+  if (unformat_user (input, unformat_line_input, line_input))
+    {
+      while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+	{
+	  if (unformat (line_input, "%d detail", &tenant_id))
+	    detail = 1;
+	  else if (unformat (line_input, "%d", &tenant_id))
+	    ;
+	  else
+	    {
+	      err = unformat_parse_error (line_input);
+	      break;
+	    }
+	}
+      unformat_free (line_input);
+    }
+  if (err)
+    return err;
+
+  pool_foreach_index (tenant_idx, vcdp->tenants)
+    {
+      tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+
+      if (tenant_id != ~0 && tenant->tenant_id != tenant_id)
+	continue;
+
+      vlib_cli_output (vm, "Tenant %d", tenant_id);
+      vlib_cli_output (vm, "  %U", format_vcdp_tenant, vcdp, tenant_idx,
+		       tenant);
+      if (detail)
+	vlib_cli_output (vm, "  %U", format_vcdp_tenant_extra, vcdp,
+			 tenant_idx, tenant);
+    }
+
+  return err;
+}
+
 VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
   .path = "vcdp tenant",
   .short_help = "vcdp tenant <add|del> <tenant-id>",
@@ -223,14 +271,20 @@ VLIB_CLI_COMMAND (vcdp_set_services_command, static) = {
   .function = vcdp_set_services_command_fn,
 };
 
-VLIB_CLI_COMMAND (show_vcdp_sessions, static) = {
+VLIB_CLI_COMMAND (show_vcdp_sessions_command, static) = {
   .path = "show vcdp session-table",
   .short_help = "show vcdp session-table [tenant <tenant-id>]",
   .function = vcdp_show_sessions_command_fn,
 };
 
-VLIB_CLI_COMMAND (show_vcdp_detail, static) = {
+VLIB_CLI_COMMAND (show_vcdp_detail_command, static) = {
   .path = "show vcdp session-detail",
   .short_help = "show vcdp session-detail 0x<session-id>",
   .function = vcdp_show_session_detail_command_fn,
+};
+
+VLIB_CLI_COMMAND (show_vcdp_tenant, static) = {
+  .path = "show vcdp tenant",
+  .short_help = "show vcdp tenant [<tenant-id> [detail]]",
+  .function = vcdp_show_tenant_detail_command_fn,
 };

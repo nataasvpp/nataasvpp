@@ -61,7 +61,7 @@ vcdp_init_ptd_counters (vcdp_per_thread_data_t *ptd, uword i)
 static void
 vcdp_init_tenant_counters (vcdp_main_t *vcdp)
 {
-#define _(x, y)                                                               \
+#define _(x, y, z)                                                            \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;         \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x]                   \
     .stat_segment_name = "/vcdp/per_tenant_counters/" y;                      \
@@ -71,7 +71,7 @@ vcdp_init_tenant_counters (vcdp_main_t *vcdp)
 
   foreach_vcdp_tenant_session_counter
 #undef _
-#define _(x, y)                                                               \
+#define _(x, y, z)                                                            \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;               \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name =     \
     "/vcdp/per_tenant_counters/" y;                                           \
@@ -147,7 +147,7 @@ vcdp_enable_disable_timer_expire_node (u8 is_disable)
 void
 vcdp_tenant_clear_counters (vcdp_main_t *vcdp, u32 tenant_idx)
 {
-#define _(x, y)                                                               \
+#define _(x, y, z)                                                            \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;         \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x]                   \
     .stat_segment_name = "/vcdp/per_tenant_counters/" y;                      \
@@ -156,7 +156,7 @@ vcdp_tenant_clear_counters (vcdp_main_t *vcdp, u32 tenant_idx)
 
   foreach_vcdp_tenant_session_counter
 #undef _
-#define _(x, y)                                                               \
+#define _(x, y, z)                                                            \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;               \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name =     \
     "/vcdp/per_tenant_counters/" y;                                           \

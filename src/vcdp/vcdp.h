@@ -94,16 +94,16 @@ typedef enum
 } vcdp_flow_counter_index_t;
 
 #define foreach_vcdp_tenant_session_counter                                   \
-  _ (CREATED, "created")                                                      \
-  _ (REMOVED, "removed")
+  _ (CREATED, "created", "created sessions")                                  \
+  _ (REMOVED, "removed", "removed sessions")
 
 #define foreach_vcdp_tenant_data_counter                                      \
-  _ (INCOMING, "incoming")                                                    \
-  _ (OUTGOING, "outgoing")
+  _ (INCOMING, "incoming", "incoming data into tenant")                       \
+  _ (OUTGOING, "outgoing", "outgoing data out of tenant")
 
 typedef enum
 {
-#define _(x, y) VCDP_TENANT_SESSION_COUNTER_##x,
+#define _(x, y, z) VCDP_TENANT_SESSION_COUNTER_##x,
   foreach_vcdp_tenant_session_counter
 #undef _
     VCDP_TENANT_SESSION_N_COUNTER
@@ -111,7 +111,7 @@ typedef enum
 
 typedef enum
 {
-#define _(x, y) VCDP_TENANT_DATA_COUNTER_##x,
+#define _(x, y, z) VCDP_TENANT_DATA_COUNTER_##x,
   foreach_vcdp_tenant_data_counter
 #undef _
     VCDP_TENANT_DATA_N_COUNTER
@@ -242,6 +242,8 @@ extern vlib_node_registration_t vcdp_handoff_node;
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
 format_function_t format_vcdp_session_state;
+format_function_t format_vcdp_tenant;
+format_function_t format_vcdp_tenant_extra;
 
 static_always_inline u32
 vcdp_session_index_from_lookup (u64 val)
