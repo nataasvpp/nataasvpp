@@ -75,21 +75,31 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
       u8 direction = vcdp_direction_from_flow_index (b[0]->flow_id);
       /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
        */
-      if (session->state == VCDP_SESSION_STATE_FSOL &&
-	  direction == VCDP_FLOW_REVERSE)
-	/*Establish the session*/
-	session->state = VCDP_SESSION_STATE_ESTABLISHED;
-
-      if (session->state == VCDP_SESSION_STATE_ESTABLISHED)
+      if (session->key.ip4_key.proto == IP_PROTOCOL_TCP)
 	{
-	  vcdp_timer_update (&ptd->wheel, session->timer_handle,
-			     VCDP_TIMER_ESTABLISHED_TIMEOUT);
-	  /* TODO: must be configurable per tenant */
-	  session->next_expiration =
-	    ptd->current_time +
-	    VCDP_TIMER_ESTABLISHED_TIMEOUT * VCDP_TIMER_INTERVAL;
+#define L4_LIFECYCLE_TO_TCP_CHECK                                             \
+  ((1 << VCDP_SERVICE_L4_LIFECYCLE) | (1 << VCDP_SERVICE_TCP_CHECK))
+	  session->bitmaps[VCDP_FLOW_FORWARD] ^= L4_LIFECYCLE_TO_TCP_CHECK;
+	  session->bitmaps[VCDP_FLOW_REVERSE] ^= L4_LIFECYCLE_TO_TCP_CHECK;
+	  vcdp_buffer (b[0])->service_bitmap ^= L4_LIFECYCLE_TO_TCP_CHECK;
 	}
+      else
+	{
+	  if (session->state == VCDP_SESSION_STATE_FSOL &&
+	      direction == VCDP_FLOW_REVERSE)
+	    /*Establish the session*/
+	    session->state = VCDP_SESSION_STATE_ESTABLISHED;
 
+	  if (session->state == VCDP_SESSION_STATE_ESTABLISHED)
+	    {
+	      vcdp_timer_update (&ptd->wheel, session->timer_handle,
+				 VCDP_TIMER_ESTABLISHED_TIMEOUT);
+	      /* TODO: must be configurable per tenant */
+	      session->next_expiration =
+		ptd->current_time +
+		VCDP_TIMER_ESTABLISHED_TIMEOUT * VCDP_TIMER_INTERVAL;
+	    }
+	}
       vcdp_next (b[0], to_next);
 
       b++;

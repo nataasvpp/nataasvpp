@@ -14,7 +14,8 @@
  */
 
 #include <vlib/vlib.h>
-
+#include <vcdp/tcp-check/tcp_check.h>
+#include <vcdp/service.h>
 #define foreach_vcdp_tcp_check_error _ (DROP, "drop")
 
 typedef enum
@@ -30,16 +31,6 @@ static char *vcdp_tcp_check_error_strings[] = {
   foreach_vcdp_tcp_check_error
 #undef _
 };
-
-#define foreach_vcdp_tcp_check_next _ (DROP, "error-drop")
-
-typedef enum
-{
-#define _(n, x) VCDP_TCP_CHECK_NEXT_##n,
-  foreach_vcdp_tcp_check_next
-#undef _
-    VCDP_TCP_CHECK_N_NEXT
-} vcdp_tcp_check_next_t;
 
 typedef struct
 {
@@ -58,21 +49,191 @@ format_vcdp_tcp_check_trace (u8 *s, va_list *args)
   return s;
 }
 
+static_always_inline void
+update_state_one_pkt (vcdp_tw_t *tw,
+		      vcdp_tcp_check_session_state_t *tcp_session,
+		      vcdp_session_t *session, u8 dir, u16 *to_next,
+		      vlib_buffer_t **b)
+{
+  /* Parse the packet */
+  /* TODO: !!! Broken with IP options !!! */
+  u8 *data = vlib_buffer_get_current (b[0]);
+  tcp_header_t *tcph = (void *) (data + sizeof (ip4_header_t));
+  u8 flags = tcph->flags & VCDP_TCP_CHECK_TCP_FLAGS_MASK;
+  u32 acknum = clib_net_to_host_u32 (tcph->ack_number);
+  u32 seqnum = clib_net_to_host_u32 (tcph->seq_number);
+  u32 state_flags;
+  u32 new_state_flags;
+  u32 next_timeout = 0;
+  u8 remove_session = 0;
+  if (PREDICT_FALSE (tcp_session->version != session->session_version))
+    {
+      if (flags != VCDP_TCP_CHECK_TCP_FLAGS_SYN)
+	{
+	  /* Abnormal, block the session and drop the packet */
+	  session->bitmaps[VCDP_FLOW_FORWARD] = 0x1;
+	  session->bitmaps[VCDP_FLOW_REVERSE] = 0x1;
+	  vcdp_buffer (b[0])->service_bitmap = 0x1;
+	  next_timeout = VCDP_TIMER_SECURITY_TIMER;
+	  goto out2;
+	}
+      tcp_session->version = session->session_version;
+      tcp_session->flags = 0;
+      tcp_session->as_u64_0 = 0;
+    }
+  new_state_flags = (state_flags = tcp_session->flags);
+  if (dir == VCDP_FLOW_FORWARD)
+    {
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
+	{
+	  /* New session, must be a SYN otherwise bad */
+	  if (state_flags == 0)
+	    new_state_flags =
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
+	  else
+	    {
+	      remove_session = 1;
+	      goto out;
+	    }
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_ACK)
+	{
+	  /* Either ACK to SYN */
+	  if (state_flags &
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN)
+	    new_state_flags &=
+	      ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
+	  /* Or ACK to FIN */
+	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP &&
+	      acknum == tcp_session->fin_num[VCDP_FLOW_REVERSE])
+	    new_state_flags ^=
+	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP |
+	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
+	  /* Or regular ACK */
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
+	{
+	  /*If we were up, we are not anymore */
+	  new_state_flags &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+	  /*Seen our FIN, wait for the other FIN and for an ACK*/
+	  tcp_session->fin_num[VCDP_FLOW_FORWARD] = seqnum + 1;
+	  new_state_flags |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT;
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_RST)
+	{
+	  /* Reason to kill the connection */
+	  remove_session = 1;
+	  goto out;
+	}
+    }
+  if (dir == VCDP_FLOW_REVERSE)
+    {
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
+	{
+	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN)
+	    new_state_flags ^=
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_ACK)
+	{
+	  /* Either ACK to SYN */
+	  if (state_flags &
+	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN)
+	    new_state_flags &=
+	      ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
+	  /* Or ACK to FIN */
+	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT &&
+	      acknum == tcp_session->fin_num[VCDP_FLOW_FORWARD])
+	    new_state_flags ^=
+	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT |
+	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
+	  /* Or regular ACK */
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
+	{
+	  /*If we were up, we are not anymore */
+	  new_state_flags &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+	  /*Seen our FIN, wait for the other FIN and for an ACK*/
+	  tcp_session->fin_num[VCDP_FLOW_REVERSE] = seqnum + 1;
+	  new_state_flags |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP;
+	}
+      if (flags & VCDP_TCP_CHECK_TCP_FLAGS_RST)
+	{
+	  /* Reason to kill the connection */
+	  remove_session = 1;
+	  goto out;
+	}
+    }
+  /* If all flags are cleared connection is established! */
+  if (new_state_flags == 0)
+    {
+      new_state_flags = VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+      session->state = VCDP_SESSION_STATE_ESTABLISHED;
+    }
+
+  /* If all FINs are ACKED, game over */
+  if (new_state_flags & (VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT |
+			 VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP))
+    {
+      new_state_flags = VCDP_TCP_CHECK_SESSION_FLAG_TIME_WAIT;
+      remove_session = 1;
+    }
+out:
+  tcp_session->flags = new_state_flags;
+  if (remove_session)
+    next_timeout = 0;
+  else if (new_state_flags & VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED)
+    next_timeout = VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT;
+  else
+    next_timeout = VCDP_TIMER_EMBRYONIC_TIMEOUT;
+out2:
+  vcdp_timer_update (tw, session->timer_handle, next_timeout);
+  vcdp_next (b[0], to_next);
+  return;
+}
+
 VLIB_NODE_FN (vcdp_tcp_check_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
+
+  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_tcp_check_main_t *vtcm = &vcdp_tcp;
+  u32 thread_index = vlib_get_thread_index ();
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index (vcdp->per_thread_data, thread_index);
+  vcdp_tcp_check_per_thread_data_t *tptd =
+    vec_elt_at_index (vtcm->ptd, thread_index);
+  vcdp_session_t *session;
+  u32 session_idx;
+  vcdp_tcp_check_session_state_t *tcp_session;
+  vcdp_tw_t *tw = &ptd->wheel;
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
+  u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
 
-  vlib_buffer_enqueue_to_single_next (vm, node, from, VCDP_TCP_CHECK_NEXT_DROP,
-				      n_left);
-  vlib_node_increment_counter (vm, node->node_index, VCDP_TCP_CHECK_ERROR_DROP,
-			       n_left);
+  vlib_get_buffers (vm, from, bufs, n_left);
+  while (n_left > 0)
+    {
+      session_idx = vcdp_session_from_flow_index (b[0]->flow_id);
+      session = vcdp_session_at_index (ptd, session_idx);
+      tcp_session = vec_elt_at_index (tptd->state, session_idx);
+      if (vcdp_direction_from_flow_index (b[0]->flow_id) == VCDP_FLOW_FORWARD)
+	update_state_one_pkt (tw, tcp_session, session, VCDP_FLOW_FORWARD,
+			      to_next, b);
+      else
+	update_state_one_pkt (tw, tcp_session, session, VCDP_FLOW_REVERSE,
+			      to_next, b);
+      n_left -= 1;
+      b += 1;
+      to_next += 1;
+    }
+  vlib_buffer_enqueue_to_next (vm, node, from, next_indices, frame->n_vectors);
   if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))
     {
       int i;
-      vlib_get_buffers (vm, from, bufs, n_left);
       b = bufs;
       for (i = 0; i < n_left; i++)
 	{
@@ -98,12 +259,6 @@ VLIB_REGISTER_NODE (vcdp_tcp_check_node) = {
 
   .n_errors = ARRAY_LEN (vcdp_tcp_check_error_strings),
   .error_strings = vcdp_tcp_check_error_strings,
-
-  .n_next_nodes = VCDP_TCP_CHECK_N_NEXT,
-  .next_nodes = {
-#define _(n, x) [VCDP_TCP_CHECK_NEXT_##n] = x,
-          foreach_vcdp_tcp_check_next
-#undef _
-  }
+  .sibling_of = "vcdp-lookup"
 
 };
