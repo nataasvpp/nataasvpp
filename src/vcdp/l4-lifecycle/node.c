@@ -77,11 +77,13 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
        */
       if (session->key.ip4_key.proto == IP_PROTOCOL_TCP)
 	{
-#define L4_LIFECYCLE_TO_TCP_CHECK                                             \
-  ((1 << VCDP_SERVICE_L4_LIFECYCLE) | (1 << VCDP_SERVICE_TCP_CHECK))
-	  session->bitmaps[VCDP_FLOW_FORWARD] ^= L4_LIFECYCLE_TO_TCP_CHECK;
-	  session->bitmaps[VCDP_FLOW_REVERSE] ^= L4_LIFECYCLE_TO_TCP_CHECK;
-	  vcdp_buffer (b[0])->service_bitmap ^= L4_LIFECYCLE_TO_TCP_CHECK;
+	  session->bitmaps[VCDP_FLOW_FORWARD] &=
+	    ~(1 << VCDP_SERVICE_L4_LIFECYCLE);
+	  session->bitmaps[VCDP_FLOW_REVERSE] &=
+	    ~(1 << VCDP_SERVICE_L4_LIFECYCLE);
+	  vcdp_buffer (b[0])->service_bitmap |= (1 << VCDP_SERVICE_TCP_CHECK);
+	  session->bitmaps[VCDP_FLOW_FORWARD] |= (1 << VCDP_SERVICE_TCP_CHECK);
+	  session->bitmaps[VCDP_FLOW_REVERSE] |= (1 << VCDP_SERVICE_TCP_CHECK);
 	}
       else
 	{
