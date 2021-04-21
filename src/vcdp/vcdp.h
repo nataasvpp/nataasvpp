@@ -242,6 +242,7 @@ extern vlib_node_registration_t vcdp_handoff_node;
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
 format_function_t format_vcdp_session_state;
+format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
 

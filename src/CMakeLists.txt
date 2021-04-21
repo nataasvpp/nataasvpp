@@ -19,6 +19,8 @@ add_vpp_plugin(vcdp_gateway
   vcdp/drop/node.c
   vcdp/tcp-check/node.c
   vcdp/tcp-check/tcp_check.c
+  vcdp/tcp-check/format.c
+  vcdp/tcp-check/cli.c
   vcdp/timer/node.c
   vcdp/l4-lifecycle/node.c
   vcdp/format.c

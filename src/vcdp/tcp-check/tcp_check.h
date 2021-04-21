@@ -72,4 +72,7 @@ typedef struct
 } vcdp_tcp_check_main_t;
 
 extern vcdp_tcp_check_main_t vcdp_tcp;
+
+format_function_t format_vcdp_tcp_check_session_flags;
+format_function_t format_vcdp_tcp_check_session;
 #endif /* __included_vcdp_tcp_check_h__ */
