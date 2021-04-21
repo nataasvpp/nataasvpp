@@ -109,8 +109,7 @@ update_state_one_pkt (vcdp_tw_t *tw,
 	  /* Or ACK to FIN */
 	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP &&
 	      acknum == tcp_session->fin_num[VCDP_FLOW_REVERSE])
-	    nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP |
-		      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
+	    nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
 	  /* Or regular ACK */
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
@@ -144,8 +143,7 @@ update_state_one_pkt (vcdp_tw_t *tw,
 	  /* Or ACK to FIN */
 	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT &&
 	      acknum == tcp_session->fin_num[VCDP_FLOW_FORWARD])
-	    nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT |
-		      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
+	    nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
 	  /* Or regular ACK */
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
