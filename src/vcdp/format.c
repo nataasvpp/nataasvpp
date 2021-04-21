@@ -46,7 +46,7 @@ format_vcdp_session (u8 *s, va_list *args)
   u32 session_index = va_arg (*args, u32);
   vcdp_session_t *session = va_arg (*args, vcdp_session_t *);
   f64 now = va_arg (*args, f64);
-  f64 remaining_time = session->next_expiration - now;
+  f64 remaining_time = session->timer.next_expiration - now;
   u32 ingress_ip4, egress_ip4;
   u16 ingress_port, egress_port;
   u64 session_net = clib_host_to_net_u64 (session->session_id);
@@ -96,7 +96,7 @@ format_vcdp_session_detail (u8 *s, va_list *args)
   f64 now = va_arg (*args, f64);
   vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
 
-  f64 remaining_time = session->next_expiration - now;
+  f64 remaining_time = session->timer.next_expiration - now;
   u32 ingress_ip4, egress_ip4;
   u16 ingress_port, egress_port;
   u64 session_net = clib_host_to_net_u64 (session->session_id);

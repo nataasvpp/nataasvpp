@@ -185,11 +185,11 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 		    sizeof (session->bitmaps));
   clib_memcpy_fast (&session->key, k, 24);
   session->pseudo_dir = lookup_val[0] & 0x1;
-  session->timer_handle = vcdp_timer_start (&ptd->wheel, session_idx, 0,
-					    VCDP_TIMER_EMBRYONIC_TIMEOUT);
+
   /*TODO: must be configurable per tenant*/
-  session->next_expiration =
-    time_now + VCDP_TIMER_EMBRYONIC_TIMEOUT * VCDP_TIMER_INTERVAL;
+  vcdp_session_timer_start (&ptd->wheel, &session->timer, session_idx,
+			    time_now, VCDP_TIMER_EMBRYONIC_TIMEOUT);
+
   lookup_val[0] ^= kv.value;
   vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			      lookup_val[0]);
@@ -274,7 +274,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   ptd->current_time = time_now;
   vcdp_expire_timers (&ptd->wheel, time_now);
   vcdp_session_index_iterate_expired (ptd, session_index)
-    vcdp_session_remove (vcdp, ptd, thread_index, session_index);
+    vcdp_session_remove_or_rearm (vcdp, ptd, thread_index, session_index);
 
   /* main loop - prefetch next 4 buffers,
    * prefetch previous 4 buckets */
@@ -485,6 +485,9 @@ VLIB_NODE_FN (vcdp_handoff_node)
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
+  f64 time_now = vlib_time_now (vm);
+
+  ptd->current_time = time_now;
 
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;

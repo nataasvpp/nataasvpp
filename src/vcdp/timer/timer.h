@@ -17,10 +17,15 @@
 #include <vppinfra/tw_timer_2t_1w_2048sl.h>
 #include <vppinfra/vec.h>
 typedef tw_timer_wheel_2t_1w_2048sl_t vcdp_tw_t;
-#define vcdp_tw_init			   tw_timer_wheel_init_2t_1w_2048sl
-#define vcdp_timer_start		   tw_timer_start_2t_1w_2048sl
-#define vcdp_timer_stop			   tw_timer_stop_2t_1w_2048sl
-#define vcdp_timer_update		   tw_timer_update_2t_1w_2048sl
+
+typedef struct
+{
+  f64 next_expiration;
+  u32 handle;
+} vcdp_session_timer_t;
+#define vcdp_timer_start_internal	   tw_timer_start_2t_1w_2048sl
+#define vcdp_timer_stop_internal	   tw_timer_stop_2t_1w_2048sl
+#define vcdp_timer_update_internal	   tw_timer_update_2t_1w_2048sl
 #define vcdp_expire_timers		   tw_timer_expire_timers_2t_1w_2048sl
 #define VCDP_TIMER_SI_MASK		   (0x7fffffff)
 #define VCDP_TIMER_INTERVAL		   ((f64) 1.0) /*in seconds*/
@@ -28,6 +33,45 @@ typedef tw_timer_wheel_2t_1w_2048sl_t vcdp_tw_t;
 #define VCDP_TIMER_ESTABLISHED_TIMEOUT	   (120)
 #define VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT (3600)
 #define VCDP_TIMER_SECURITY_TIMER	   (30)
+
+static_always_inline void
+vcdp_tw_init (vcdp_tw_t *tw, void *expired_timer_callback, f64 timer_interval,
+	      u32 max_expirations)
+{
+  tw_timer_wheel_init_2t_1w_2048sl (tw, expired_timer_callback, timer_interval,
+				    max_expirations);
+}
+
+static_always_inline void
+vcdp_session_timer_start (vcdp_tw_t *tw, vcdp_session_timer_t *timer,
+			  u32 session_index, f64 now, u32 ticks)
+{
+  timer->handle = vcdp_timer_start_internal (tw, session_index, 0, ticks);
+  timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
+}
+
+static_always_inline void
+vcdp_session_timer_stop (vcdp_tw_t *tw, vcdp_session_timer_t *timer)
+{
+  vcdp_timer_stop_internal (tw, timer->handle);
+}
+
+static_always_inline void
+vcdp_session_timer_update (vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now,
+			   u32 ticks)
+{
+  timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
+}
+
+static_always_inline void
+vcdp_session_timer_update_maybe_past (vcdp_tw_t *tw,
+				      vcdp_session_timer_t *timer, f64 now,
+				      u32 ticks)
+{
+  if (timer->next_expiration > now + (ticks * VCDP_TIMER_INTERVAL))
+    vcdp_timer_update_internal (tw, timer->handle, ticks);
+  timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
+}
 
 static_always_inline uword
 vec_reset_len_return (u32 *v)

@@ -46,7 +46,7 @@ VLIB_NODE_FN (vcdp_timer_expire_node)
   vcdp_expire_timers (&ptd->wheel, now);
   vcdp_session_index_iterate_expired (ptd, session_index)
   {
-    vcdp_session_remove (vcdp, ptd, thread_index, session_index);
+    vcdp_session_remove_or_rearm (vcdp, ptd, thread_index, session_index);
     count += 1;
   }
   if (PREDICT_FALSE (count))

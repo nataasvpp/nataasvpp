@@ -94,12 +94,10 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
 
 	  if (session->state == VCDP_SESSION_STATE_ESTABLISHED)
 	    {
-	      vcdp_timer_update (&ptd->wheel, session->timer_handle,
-				 VCDP_TIMER_ESTABLISHED_TIMEOUT);
 	      /* TODO: must be configurable per tenant */
-	      session->next_expiration =
-		ptd->current_time +
-		VCDP_TIMER_ESTABLISHED_TIMEOUT * VCDP_TIMER_INTERVAL;
+	      vcdp_session_timer_update (&ptd->wheel, &session->timer,
+					 ptd->current_time,
+					 VCDP_TIMER_ESTABLISHED_TIMEOUT);
 	    }
 	}
       vcdp_next (b[0], to_next);

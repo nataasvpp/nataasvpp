@@ -183,11 +183,10 @@ typedef struct
   CLIB_CACHE_LINE_ALIGN_MARK (cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u64 session_id;
-  f64 next_expiration;
-  u32 timer_handle;
+  vcdp_session_timer_t timer;
   session_version_t session_version;
   u8 state; /* see vcdp_session_state_t */
-  u8 unused0[31];
+  u8 unused0[29];
   CLIB_CACHE_LINE_ALIGN_MARK (cache1);
   vcdp_session_ip4_key_t key;
   u8 pseudo_dir;
@@ -308,11 +307,11 @@ vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
 
 static_always_inline void
 vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-		     u32 thread_index, u32 session_index)
+		     vcdp_session_t *session, u32 thread_index,
+		     u32 session_index)
 {
   clib_bihash_kv_8_8_t kv2 = { 0 };
   clib_bihash_kv_24_8_t kv = { 0 };
-  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
   kv2.key = session->session_id;
   pool_put_index (ptd->sessions, session_index);
   clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
@@ -321,6 +320,22 @@ vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   vlib_increment_simple_counter (
     &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED],
     thread_index, session->tenant_idx, 1);
+}
+
+static_always_inline void
+vcdp_session_remove_or_rearm (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
+			      u32 thread_index, u32 session_index)
+{
+  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
+  f64 diff = (session->timer.next_expiration -
+	      (ptd->current_time + VCDP_TIMER_INTERVAL)) /
+	     VCDP_TIMER_INTERVAL;
+  if (diff > (f64) 1.)
+    /* Rearm the timer accordingly */
+    vcdp_session_timer_start (&ptd->wheel, &session->timer, session_index,
+			      ptd->current_time, diff);
+  else
+    vcdp_session_remove (vcdp, ptd, session, thread_index, session_index);
 }
 
 clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
