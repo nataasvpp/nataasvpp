@@ -35,6 +35,8 @@ static char *vcdp_tcp_check_error_strings[] = {
 typedef struct
 {
   u32 flow_id;
+  u32 old_state_flags;
+  u32 new_state_flags;
 } vcdp_tcp_check_trace_t;
 
 static u8 *
@@ -43,9 +45,14 @@ format_vcdp_tcp_check_trace (u8 *s, va_list *args)
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_tcp_check_trace_t *t = va_arg (*args, vcdp_tcp_check_trace_t *);
-
-  s = format (s, "vcdp-tcp-check: flow-id %u (session %u, %s)", t->flow_id,
+  u32 indent = format_get_indent (s);
+  indent += 2;
+  s = format (s, "vcdp-tcp-check: flow-id %u (session %u, %s)\n", t->flow_id,
 	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format (s, "%Uold session flags: %U\n", format_white_space, indent,
+	      format_vcdp_tcp_check_session_flags, t->old_state_flags);
+  s = format (s, "%Unew session flags: %U\n", format_white_space, indent,
+	      format_vcdp_tcp_check_session_flags, t->new_state_flags);
   return s;
 }
 
@@ -53,7 +60,7 @@ static_always_inline void
 update_state_one_pkt (vcdp_tw_t *tw,
 		      vcdp_tcp_check_session_state_t *tcp_session,
 		      vcdp_session_t *session, u8 dir, u16 *to_next,
-		      vlib_buffer_t **b)
+		      vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
   /* Parse the packet */
   /* TODO: !!! Broken with IP options !!! */
@@ -62,8 +69,6 @@ update_state_one_pkt (vcdp_tw_t *tw,
   u8 flags = tcph->flags & VCDP_TCP_CHECK_TCP_FLAGS_MASK;
   u32 acknum = clib_net_to_host_u32 (tcph->ack_number);
   u32 seqnum = clib_net_to_host_u32 (tcph->seq_number);
-  u32 state_flags;
-  u32 new_state_flags;
   u32 next_timeout = 0;
   u8 remove_session = 0;
   if (PREDICT_FALSE (tcp_session->version != session->session_version))
@@ -81,16 +86,15 @@ update_state_one_pkt (vcdp_tw_t *tw,
       tcp_session->flags = 0;
       tcp_session->as_u64_0 = 0;
     }
-  new_state_flags = (state_flags = tcp_session->flags);
+  nsf[0] = (sf[0] = tcp_session->flags);
   if (dir == VCDP_FLOW_FORWARD)
     {
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
 	{
 	  /* New session, must be a SYN otherwise bad */
-	  if (state_flags == 0)
-	    new_state_flags =
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
+	  if (sf[0] == 0)
+	    nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
+		     VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
 	  else
 	    {
 	      remove_session = 1;
@@ -100,25 +104,22 @@ update_state_one_pkt (vcdp_tw_t *tw,
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_ACK)
 	{
 	  /* Either ACK to SYN */
-	  if (state_flags &
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN)
-	    new_state_flags &=
-	      ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
+	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN)
+	    nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
 	  /* Or ACK to FIN */
-	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP &&
+	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP &&
 	      acknum == tcp_session->fin_num[VCDP_FLOW_REVERSE])
-	    new_state_flags ^=
-	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP |
-	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
+	    nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP |
+		      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
 	  /* Or regular ACK */
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
 	{
 	  /*If we were up, we are not anymore */
-	  new_state_flags &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+	  nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
 	  /*Seen our FIN, wait for the other FIN and for an ACK*/
 	  tcp_session->fin_num[VCDP_FLOW_FORWARD] = seqnum + 1;
-	  new_state_flags |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT;
+	  nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT;
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_RST)
 	{
@@ -131,33 +132,29 @@ update_state_one_pkt (vcdp_tw_t *tw,
     {
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
 	{
-	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN)
-	    new_state_flags ^=
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
+	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN)
+	    nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
+		      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_ACK)
 	{
 	  /* Either ACK to SYN */
-	  if (state_flags &
-	      VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN)
-	    new_state_flags &=
-	      ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
+	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN)
+	    nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
 	  /* Or ACK to FIN */
-	  if (state_flags & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT &&
+	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT &&
 	      acknum == tcp_session->fin_num[VCDP_FLOW_FORWARD])
-	    new_state_flags ^=
-	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT |
-	      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
+	    nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT |
+		      VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
 	  /* Or regular ACK */
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_FIN)
 	{
 	  /*If we were up, we are not anymore */
-	  new_state_flags &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+	  nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
 	  /*Seen our FIN, wait for the other FIN and for an ACK*/
 	  tcp_session->fin_num[VCDP_FLOW_REVERSE] = seqnum + 1;
-	  new_state_flags |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP;
+	  nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP;
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_RST)
 	{
@@ -167,24 +164,24 @@ update_state_one_pkt (vcdp_tw_t *tw,
 	}
     }
   /* If all flags are cleared connection is established! */
-  if (new_state_flags == 0)
+  if (nsf[0] == 0)
     {
-      new_state_flags = VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
+      nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
     }
 
   /* If all FINs are ACKED, game over */
-  if (new_state_flags & (VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT |
-			 VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP))
+  if ((nsf[0] & (VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT)) &&
+      (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP))
     {
-      new_state_flags = VCDP_TCP_CHECK_SESSION_FLAG_TIME_WAIT;
+      nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_TIME_WAIT;
       remove_session = 1;
     }
 out:
-  tcp_session->flags = new_state_flags;
+  tcp_session->flags = nsf[0];
   if (remove_session)
     next_timeout = 0;
-  else if (new_state_flags & VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED)
+  else if (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED)
     next_timeout = VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT;
   else
     next_timeout = VCDP_TIMER_EMBRYONIC_TIMEOUT;
@@ -213,7 +210,8 @@ VLIB_NODE_FN (vcdp_tcp_check_node)
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
-
+  u32 state_flags[VLIB_FRAME_SIZE], *sf = state_flags;
+  u32 new_state_flags[VLIB_FRAME_SIZE], *nsf = new_state_flags;
   vlib_get_buffers (vm, from, bufs, n_left);
   while (n_left > 0)
     {
@@ -222,19 +220,24 @@ VLIB_NODE_FN (vcdp_tcp_check_node)
       tcp_session = vec_elt_at_index (tptd->state, session_idx);
       if (vcdp_direction_from_flow_index (b[0]->flow_id) == VCDP_FLOW_FORWARD)
 	update_state_one_pkt (tw, tcp_session, session, VCDP_FLOW_FORWARD,
-			      to_next, b);
+			      to_next, b, sf, nsf);
       else
 	update_state_one_pkt (tw, tcp_session, session, VCDP_FLOW_REVERSE,
-			      to_next, b);
+			      to_next, b, sf, nsf);
       n_left -= 1;
       b += 1;
       to_next += 1;
+      sf += 1;
+      nsf += 1;
     }
   vlib_buffer_enqueue_to_next (vm, node, from, next_indices, frame->n_vectors);
   if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))
     {
       int i;
       b = bufs;
+      sf = state_flags;
+      nsf = new_state_flags;
+      n_left = frame->n_vectors;
       for (i = 0; i < n_left; i++)
 	{
 	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
@@ -242,7 +245,11 @@ VLIB_NODE_FN (vcdp_tcp_check_node)
 	      vcdp_tcp_check_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->flow_id = b[0]->flow_id;
+	      t->old_state_flags = sf[0];
+	      t->new_state_flags = nsf[0];
 	      b++;
+	      sf++;
+	      nsf++;
 	    }
 	  else
 	    break;
