@@ -27,7 +27,8 @@
   _ (SEEN_ACK_TO_FIN_INIT, 5, "r")                                            \
   _ (SEEN_ACK_TO_FIN_RESP, 6, "R")                                            \
   _ (ESTABLISHED, 7, "U")                                                     \
-  _ (TIME_WAIT, 8, "X")
+  _ (REMOVING, 8, "D")                                                        \
+  _ (BLOCKED, 9, "X")
 
 typedef enum
 {

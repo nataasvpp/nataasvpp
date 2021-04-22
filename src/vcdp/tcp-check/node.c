@@ -73,22 +73,23 @@ update_state_one_pkt (vcdp_tw_t *tw,
   u8 remove_session = 0;
   if (PREDICT_FALSE (tcp_session->version != session->session_version))
     {
-      if (flags != VCDP_TCP_CHECK_TCP_FLAGS_SYN)
-	{
-	  /* Abnormal, block the session and drop the packet */
-	  session->bitmaps[VCDP_FLOW_FORWARD] = 0x1;
-	  session->bitmaps[VCDP_FLOW_REVERSE] = 0x1;
-	  vcdp_buffer (b[0])->service_bitmap = 0x1;
-	  next_timeout = VCDP_TIMER_SECURITY_TIMER;
-	  goto out2;
-	}
       tcp_session->version = session->session_version;
       tcp_session->flags = 0;
       tcp_session->as_u64_0 = 0;
+      if (flags != VCDP_TCP_CHECK_TCP_FLAGS_SYN)
+	{
+	  /* Abnormal, put the session in blocked state */
+	  session->bitmaps[VCDP_FLOW_FORWARD] = 0x1;
+	  session->bitmaps[VCDP_FLOW_REVERSE] = 0x1;
+	  vcdp_buffer (b[0])->service_bitmap = 0x1;
+	  tcp_session->flags = VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED;
+	}
     }
   nsf[0] = (sf[0] = tcp_session->flags);
   if (dir == VCDP_FLOW_FORWARD)
     {
+      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED)
+	goto out;
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
 	{
 	  /* New session, must be a SYN otherwise bad */
@@ -129,6 +130,8 @@ update_state_one_pkt (vcdp_tw_t *tw,
     }
   if (dir == VCDP_FLOW_REVERSE)
     {
+      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED)
+	goto out;
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN)
 	{
 	  if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN)
@@ -150,13 +153,14 @@ update_state_one_pkt (vcdp_tw_t *tw,
 	{
 	  /*If we were up, we are not anymore */
 	  nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED;
-	  /*Seen our FIN, wait for the other FIN and for an ACK*/
+	  /* Seen our FIN, wait for the other FIN and for an ACK */
 	  tcp_session->fin_num[VCDP_FLOW_REVERSE] = seqnum + 1;
 	  nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP;
 	}
       if (flags & VCDP_TCP_CHECK_TCP_FLAGS_RST)
 	{
 	  /* Reason to kill the connection */
+	  nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_REMOVING;
 	  remove_session = 1;
 	  goto out;
 	}
@@ -172,7 +176,7 @@ update_state_one_pkt (vcdp_tw_t *tw,
   if ((nsf[0] & (VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT)) &&
       (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP))
     {
-      nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_TIME_WAIT;
+      nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_REMOVING;
       remove_session = 1;
     }
 out:
@@ -181,9 +185,11 @@ out:
     next_timeout = 0;
   else if (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED)
     next_timeout = VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT;
+  else if (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED)
+    next_timeout = VCDP_TIMER_SECURITY_TIMER;
   else
     next_timeout = VCDP_TIMER_EMBRYONIC_TIMEOUT;
-out2:
+
   vcdp_session_timer_update_maybe_past (tw, &session->timer, current_time,
 					next_timeout);
   vcdp_next (b[0], to_next);
