@@ -120,7 +120,7 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   gnv = (void *) (geneve_out->encap_data + geneve_out->encap_size);
   gnv[0] =
     // Not sure if 0x0C or 0x03 (number of bytes or of 4B-words???)
-    clib_host_to_net_u32 (0x0C006558); /*3 words of option geneve version 0*/
+    clib_host_to_net_u32 (0x03006558); /*3 words of option geneve version 0*/
   gnv[1] = clib_host_to_net_u32 (tenant->output_tenant_id << 8);
   gnv[2] = clib_host_to_net_u32 (VCDP_GENEVE_OPTION_SESSION_ID_FIRST_WORD);
   gnv[3] =
