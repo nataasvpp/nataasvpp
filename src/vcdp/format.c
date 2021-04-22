@@ -153,7 +153,7 @@ format_vcdp_tenant (u8 *s, va_list *args)
   __clib_unused vcdp_main_t *vcdp = va_arg (*args, vcdp_main_t *);
   u32 tenant_idx = va_arg (*args, u32);
   vcdp_tenant_t *tenant = va_arg (*args, vcdp_tenant_t *);
-  s = format (s, "index: %d\n", format_white_space, indent, tenant_idx);
+  s = format (s, "index: %d\n", tenant_idx);
   s = format (s, "%Uforward service chain:\n", format_white_space, indent);
   s = format (s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap,
 	      tenant->bitmaps[VCDP_FLOW_FORWARD]);
@@ -186,7 +186,7 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
   s = format (s, "%U%s: %llu packets\n", format_white_space, indent + 2, z,   \
 	      ctr2.packets);                                                  \
   s = format (s, "%U  %llu bytes\n", format_white_space,                      \
-	      indent + strlen (z) + 2, z, ctr2.bytes);
+	      indent + strlen (z) + 2, ctr2.bytes);
     foreach_vcdp_tenant_data_counter
 #undef _
     return s;

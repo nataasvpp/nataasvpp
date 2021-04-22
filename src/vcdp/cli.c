@@ -247,7 +247,7 @@ vcdp_show_tenant_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
       if (tenant_id != ~0 && tenant->tenant_id != tenant_id)
 	continue;
 
-      vlib_cli_output (vm, "Tenant %d", tenant_id);
+      vlib_cli_output (vm, "Tenant %d", tenant->tenant_id);
       vlib_cli_output (vm, "  %U", format_vcdp_tenant, vcdp, tenant_idx,
 		       tenant);
       if (detail)
