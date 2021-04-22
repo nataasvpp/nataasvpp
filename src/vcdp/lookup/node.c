@@ -174,8 +174,10 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     }
   session->type = VCDP_SESSION_TYPE_IP4;
   session->session_version += 1;
-  session_id = ((ptd->session_id_ctr++) & (vcdp->session_id_ctr_mask)) |
+  session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) |
 	       ptd->session_id_template;
+  ptd->session_id_ctr +=
+    2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
   kv2.key = session_id;

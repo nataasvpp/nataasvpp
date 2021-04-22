@@ -81,8 +81,7 @@ format_vcdp_geneve_output_trace (u8 *s, va_list *args)
 static_always_inline int
 vcdp_geneve_output_load_data (gw_main_t *gm,
 			      gw_geneve_output_data_t *geneve_out,
-			      vcdp_session_t *session, vlib_buffer_t *b,
-			      u32 session_idx)
+			      vcdp_session_t *session, vlib_buffer_t *b)
 {
   u32 tenant_idx = vcdp_buffer (b)->tenant_index;
   gw_tenant_t *tenant = gw_tenant_at_index (gm, tenant_idx);
@@ -125,8 +124,9 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
   gnv[1] = clib_host_to_net_u32 (tenant->output_tenant_id << 8);
   gnv[2] = clib_host_to_net_u32 (VCDP_GENEVE_OPTION_SESSION_ID_FIRST_WORD);
   gnv[3] =
-    clib_host_to_net_u32 (session->session_id >> 32);  /* session id high  */
-  gnv[4] = clib_host_to_net_u32 (session->session_id); /* session id low */
+    clib_host_to_net_u32 (session->session_id >> 32); /* session id high  */
+  gnv[4] = clib_host_to_net_u32 (session->session_id |
+				 direction); /* session id low */
   geneve_out->encap_size += VCDP_GENEVE_TOTAL_LEN;
   eth = (void *) (geneve_out->encap_data + geneve_out->encap_size);
   /* TODO: fix mac to something decent (right now,
@@ -145,9 +145,9 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
 			   vcdp_session_t *session, u32 thread_index,
 			   u32 session_idx, u16 *to_next, vlib_buffer_t **b)
 {
-  if (PREDICT_FALSE (geneve_out->session_version != session->session_version &&
-		     vcdp_geneve_output_load_data (gm, geneve_out, session,
-						   b[0], session_idx)))
+  if (PREDICT_FALSE (
+	geneve_out->session_version != session->session_version &&
+	vcdp_geneve_output_load_data (gm, geneve_out, session, b[0])))
     {
       to_next[0] = VCDP_GENEVE_OUTPUT_NEXT_DROP;
       vlib_node_increment_counter (vm, node->node_index,
