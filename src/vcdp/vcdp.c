@@ -167,6 +167,14 @@ vcdp_tenant_clear_counters (vcdp_main_t *vcdp, u32 tenant_idx)
 #undef _
 }
 
+static void
+vcdp_tenant_init_timeouts (vcdp_tenant_t *tenant)
+{
+#define _(x, y, z) tenant->timeouts[VCDP_TIMEOUT_##x] = y;
+  foreach_vcdp_timeout
+#undef _
+}
+
 clib_error_t *
 vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 {
@@ -185,6 +193,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	  tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
 	  tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
 	  tenant->tenant_id = tenant_id;
+	  vcdp_tenant_init_timeouts (tenant);
 	  kv.key = tenant_id;
 	  kv.value = tenant_idx;
 	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 1);
@@ -233,6 +242,21 @@ vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
 
   tenant = vcdp_tenant_at_index (vcdp, kv.value);
   tenant->bitmaps[direction] = bitmap;
+  return 0;
+}
+
+clib_error_t *
+vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx,
+		  u32 timeout_val)
+{
+  vcdp_init_main_if_needed (vcdp);
+  clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
+  vcdp_tenant_t *tenant;
+  if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+    return clib_error_return (
+      0, "Can't configure timeout: tenant id %d not found", tenant_id);
+  tenant = vcdp_tenant_at_index (vcdp, kv.value);
+  tenant->timeouts[timeout_idx] = timeout_val;
   return 0;
 }
 

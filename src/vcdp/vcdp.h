@@ -211,6 +211,7 @@ typedef struct
 {
   u32 tenant_id;
   u32 bitmaps[VCDP_FLOW_F_B_N];
+  u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_tenant_t;
 
 typedef struct
@@ -342,6 +343,8 @@ clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
 				   u8 is_del);
 clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 				 u8 direction);
+clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
+				u32 timeout_idx, u32 timeout_val);
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

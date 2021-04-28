@@ -57,7 +57,7 @@ format_vcdp_tcp_check_trace (u8 *s, va_list *args)
 }
 
 static_always_inline void
-update_state_one_pkt (vcdp_tw_t *tw,
+update_state_one_pkt (vcdp_tw_t *tw, vcdp_tenant_t *tenant,
 		      vcdp_tcp_check_session_state_t *tcp_session,
 		      vcdp_session_t *session, f64 current_time, u8 dir,
 		      u16 *to_next, vlib_buffer_t **b, u32 *sf, u32 *nsf)
@@ -184,11 +184,11 @@ out:
   if (remove_session)
     next_timeout = 0;
   else if (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_ESTABLISHED)
-    next_timeout = VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT;
+    next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_ESTABLISHED];
   else if (nsf[0] & VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED)
-    next_timeout = VCDP_TIMER_SECURITY_TIMER;
+    next_timeout = tenant->timeouts[VCDP_TIMEOUT_SECURITY];
   else
-    next_timeout = VCDP_TIMER_EMBRYONIC_TIMEOUT;
+    next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];
 
   vcdp_session_timer_update_maybe_past (tw, &session->timer, current_time,
 					next_timeout);
@@ -209,6 +209,7 @@ VLIB_NODE_FN (vcdp_tcp_check_node)
   vcdp_tcp_check_per_thread_data_t *tptd =
     vec_elt_at_index (vtcm->ptd, thread_index);
   vcdp_session_t *session;
+  vcdp_tenant_t *tenant;
   u32 session_idx;
   vcdp_tcp_check_session_state_t *tcp_session;
   vcdp_tw_t *tw = &ptd->wheel;
@@ -225,11 +226,12 @@ VLIB_NODE_FN (vcdp_tcp_check_node)
       session_idx = vcdp_session_from_flow_index (b[0]->flow_id);
       session = vcdp_session_at_index (ptd, session_idx);
       tcp_session = vec_elt_at_index (tptd->state, session_idx);
+      tenant = vcdp_tenant_at_index (vcdp, vcdp_buffer (b[0])->tenant_index);
       if (vcdp_direction_from_flow_index (b[0]->flow_id) == VCDP_FLOW_FORWARD)
-	update_state_one_pkt (tw, tcp_session, session, current_time,
+	update_state_one_pkt (tw, tenant, tcp_session, session, current_time,
 			      VCDP_FLOW_FORWARD, to_next, b, sf, nsf);
       else
-	update_state_one_pkt (tw, tcp_session, session, current_time,
+	update_state_one_pkt (tw, tenant, tcp_session, session, current_time,
 			      VCDP_FLOW_REVERSE, to_next, b, sf, nsf);
       n_left -= 1;
       b += 1;

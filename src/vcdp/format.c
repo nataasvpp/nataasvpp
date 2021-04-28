@@ -189,5 +189,13 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
 	      indent + strlen (z) + 2, ctr2.bytes);
     foreach_vcdp_tenant_data_counter
 #undef _
+      s = format (s, "%U%s\n", format_white_space, indent,
+		  "Configured Timeout:");
+
+#define _(x, y, z)                                                            \
+  s = format (s, "%U%s: %d seconds\n", format_white_space, indent + 2, z,     \
+	      tenant->timeouts[VCDP_TIMEOUT_##x]);
+  foreach_vcdp_timeout
+#undef _
     return s;
 }

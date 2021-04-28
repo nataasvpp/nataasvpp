@@ -23,16 +23,27 @@ typedef struct
   f64 next_expiration;
   u32 handle;
 } vcdp_session_timer_t;
-#define vcdp_timer_start_internal	   tw_timer_start_2t_1w_2048sl
-#define vcdp_timer_stop_internal	   tw_timer_stop_2t_1w_2048sl
-#define vcdp_timer_update_internal	   tw_timer_update_2t_1w_2048sl
-#define vcdp_expire_timers		   tw_timer_expire_timers_2t_1w_2048sl
-#define VCDP_TIMER_SI_MASK		   (0x7fffffff)
-#define VCDP_TIMER_INTERVAL		   ((f64) 1.0) /*in seconds*/
-#define VCDP_TIMER_EMBRYONIC_TIMEOUT	   (5)
-#define VCDP_TIMER_ESTABLISHED_TIMEOUT	   (120)
-#define VCDP_TIMER_TCP_ESTABLISHED_TIMEOUT (3600)
-#define VCDP_TIMER_SECURITY_TIMER	   (30)
+
+#define foreach_vcdp_timeout                                                  \
+  _ (EMBRYONIC, 5, "embryonic")                                               \
+  _ (ESTABLISHED, 120, "established")                                         \
+  _ (TCP_ESTABLISHED, 3600, "tcp-established")                                \
+  _ (SECURITY, 30, "security")
+
+typedef enum
+{
+#define _(name, val, str) VCDP_TIMEOUT_##name,
+  foreach_vcdp_timeout
+#undef _
+    VCDP_N_TIMEOUT
+} vcdp_timeout_type_t;
+
+#define vcdp_timer_start_internal  tw_timer_start_2t_1w_2048sl
+#define vcdp_timer_stop_internal   tw_timer_stop_2t_1w_2048sl
+#define vcdp_timer_update_internal tw_timer_update_2t_1w_2048sl
+#define vcdp_expire_timers	   tw_timer_expire_timers_2t_1w_2048sl
+#define VCDP_TIMER_SI_MASK	   (0x7fffffff)
+#define VCDP_TIMER_INTERVAL	   ((f64) 1.0) /*in seconds*/
 
 static_always_inline void
 vcdp_tw_init (vcdp_tw_t *tw, void *expired_timer_callback, f64 timer_interval,

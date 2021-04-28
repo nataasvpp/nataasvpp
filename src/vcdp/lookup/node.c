@@ -188,9 +188,9 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_memcpy_fast (&session->key, k, 24);
   session->pseudo_dir = lookup_val[0] & 0x1;
 
-  /*TODO: must be configurable per tenant*/
   vcdp_session_timer_start (&ptd->wheel, &session->timer, session_idx,
-			    time_now, VCDP_TIMER_EMBRYONIC_TIMEOUT);
+			    time_now,
+			    tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
   lookup_val[0] ^= kv.value;
   vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],

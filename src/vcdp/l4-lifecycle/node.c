@@ -71,7 +71,9 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
   while (n_left)
     {
       u32 session_idx = vcdp_session_from_flow_index (b[0]->flow_id);
+      u16 tenant_idx = vcdp_buffer (b[0])->tenant_index;
       vcdp_session_t *session = vcdp_session_at_index (ptd, session_idx);
+      vcdp_tenant_t *tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
       u8 direction = vcdp_direction_from_flow_index (b[0]->flow_id);
       /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
        */
@@ -95,9 +97,9 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
 	  if (session->state == VCDP_SESSION_STATE_ESTABLISHED)
 	    {
 	      /* TODO: must be configurable per tenant */
-	      vcdp_session_timer_update (&ptd->wheel, &session->timer,
-					 ptd->current_time,
-					 VCDP_TIMER_ESTABLISHED_TIMEOUT);
+	      vcdp_session_timer_update (
+		&ptd->wheel, &session->timer, ptd->current_time,
+		tenant->timeouts[VCDP_TIMEOUT_ESTABLISHED]);
 	    }
 	}
       vcdp_next (b[0], to_next);

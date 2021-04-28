@@ -115,6 +115,51 @@ done:
 }
 
 static clib_error_t *
+vcdp_set_timeout_command_fn (vlib_main_t *vm, unformat_input_t *input,
+			     vlib_cli_command_t *cmd)
+{
+  unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 tenant_id = ~0;
+  u32 timeout_idx = ~0;
+  u32 timeout_val = ~0;
+
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "tenant %d", &tenant_id))
+	;
+#define _(x, y, z)                                                            \
+  else if (unformat (line_input, z " %d", &timeout_val)) timeout_idx =        \
+    VCDP_TIMEOUT_##x;
+      foreach_vcdp_timeout
+#undef _
+	else
+      {
+	err = unformat_parse_error (line_input);
+	goto done;
+      }
+    }
+  if (tenant_id == ~0)
+    {
+      err = clib_error_return (0, "missing tenant id");
+      goto done;
+    }
+  if (timeout_idx == ~0)
+    {
+      err = clib_error_return (0, "missing timeout");
+      goto done;
+    }
+
+  err = vcdp_set_timeout (vcdp, tenant_id, timeout_idx, timeout_val);
+done:
+  unformat_free (line_input);
+  return err;
+}
+
+static clib_error_t *
 vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 			       vlib_cli_command_t *cmd)
 {
@@ -287,4 +332,11 @@ VLIB_CLI_COMMAND (show_vcdp_tenant, static) = {
   .path = "show vcdp tenant",
   .short_help = "show vcdp tenant [<tenant-id> [detail]]",
   .function = vcdp_show_tenant_detail_command_fn,
+};
+
+VLIB_CLI_COMMAND (vcdp_set_timeout_command, static) = {
+  .path = "set vcdp timeout",
+  .short_help = "set vcdp timeout tenant <tenant-id>"
+		" <timeout-name> <timeout-value>",
+  .function = vcdp_set_timeout_command_fn
 };
