@@ -180,6 +180,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
+  session->state = VCDP_SESSION_STATE_FSOL;
   kv2.key = session_id;
   kv2.value = kv.value;
   clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 1);
@@ -193,8 +194,11 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 			    tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
   lookup_val[0] ^= kv.value;
+  /* Bidirectional counter zeroing */
   vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			      lookup_val[0]);
+  vlib_zero_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
+			      lookup_val[0] | 0x1);
   vlib_increment_simple_counter (
     &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
     thread_index, tenant_idx, 1);
