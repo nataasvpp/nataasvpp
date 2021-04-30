@@ -98,7 +98,7 @@ static const u8x16 dst_ip_byteswap_x2 = { 15, 14, 13, 12, -1, -1, -1, -1,
 					  15, 14, 13, 12, -1, -1, -1, -1 };
 
 static_always_inline void
-calc_key (vlib_buffer_t *b, u32 tenant_id, vcdp_session_ip4_key_t *skey,
+calc_key (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
 	  u64 *lookup_val, u64 *h)
 {
   u8 pr;
@@ -142,7 +142,7 @@ calc_key (vlib_buffer_t *b, u32 tenant_id, vcdp_session_ip4_key_t *skey,
 
   /* store key */
   skey->ip4_key.as_u8x16 = k;
-  skey->tenant_id = tenant_id;
+  skey->context_id = context_id;
   clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
   h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));

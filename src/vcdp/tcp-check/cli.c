@@ -29,6 +29,7 @@ vcdp_tcp_check_show_sessions_command_fn (vlib_main_t *vm,
   vcdp_tcp_check_per_thread_data_t *vptd;
   vcdp_session_t *session;
   vcdp_tcp_check_session_state_t *tcp_session;
+  vcdp_tenant_t *tenant;
   u32 thread_index;
   u32 session_index;
   u32 tenant_id = ~0;
@@ -57,7 +58,8 @@ vcdp_tcp_check_show_sessions_command_fn (vlib_main_t *vm,
 	pool_foreach_index (session_index, ptd->sessions)
 	  {
 	    session = vcdp_session_at_index (ptd, session_index);
-	    if (tenant_id != ~0 && tenant_id != session->key.tenant_id)
+	    tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
+	    if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
 	      continue;
 	    if (session->key.ip4_key.proto != IP_PROTOCOL_TCP)
 	      continue;
@@ -69,7 +71,7 @@ vcdp_tcp_check_show_sessions_command_fn (vlib_main_t *vm,
 				     "ingress\t\t\t-> egress\t\tflags");
 	      }
 	    tcp_session = vec_elt_at_index (vptd->state, session_index);
-	    vlib_cli_output (vm, "%U", format_vcdp_tcp_check_session,
+	    vlib_cli_output (vm, "%U", format_vcdp_tcp_check_session, vcdp,
 			     session_index, session, tcp_session);
 	  }
       }

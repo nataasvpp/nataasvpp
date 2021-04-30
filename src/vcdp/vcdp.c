@@ -176,7 +176,8 @@ vcdp_tenant_init_timeouts (vcdp_tenant_t *tenant)
 }
 
 clib_error_t *
-vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
+vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u32 context_id,
+		     u8 is_del)
 {
   vcdp_init_main_if_needed (vcdp);
   clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
@@ -193,6 +194,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u8 is_del)
 	  tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
 	  tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
 	  tenant->tenant_id = tenant_id;
+	  tenant->context_id = context_id;
 	  vcdp_tenant_init_timeouts (tenant);
 	  kv.key = tenant_id;
 	  kv.value = tenant_idx;

@@ -42,7 +42,7 @@ vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
   vcdp_main_t *vcdp = &vcdp_main;
   u8 is_del = 0;
   u32 tenant_id = ~0;
-
+  u32 context_id = ~0;
   if (!unformat_user (input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
@@ -51,6 +51,8 @@ vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	is_del = 0;
       else if (unformat (line_input, "del %d", &tenant_id))
 	is_del = 1;
+      else if (unformat (line_input, "context %d", &context_id))
+	;
       else
 	{
 	  err = unformat_parse_error (line_input);
@@ -62,7 +64,9 @@ vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
       err = clib_error_return (0, "missing tenant id");
       goto done;
     }
-  err = vcdp_tenant_add_del (vcdp, tenant_id, is_del);
+  if (context_id == ~0)
+    context_id = tenant_id;
+  err = vcdp_tenant_add_del (vcdp, tenant_id, context_id, is_del);
 done:
   unformat_free (line_input);
   return err;
@@ -168,6 +172,7 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
+  vcdp_tenant_t *tenant;
   u32 thread_index;
   u32 tenant_id = ~0;
   u8 first;
@@ -194,7 +199,8 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	first = 1;
 	pool_foreach (session, ptd->sessions)
 	  {
-	    if (tenant_id != ~0 && tenant_id != session->key.tenant_id)
+	    tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
+	    if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
 	      continue;
 	    if (first)
 	      {
@@ -205,7 +211,8 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 		      "prot\tingress\t\t\t-> egress\t\tstate\t\tTTL(s)");
 	      }
 	    vlib_cli_output (vm, "%U", format_vcdp_session,
-			     session - ptd->sessions, session, now);
+			     session - ptd->sessions, session,
+			     tenant->tenant_id, now);
 	  }
       }
 
@@ -305,7 +312,7 @@ vcdp_show_tenant_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
 
 VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
   .path = "vcdp tenant",
-  .short_help = "vcdp tenant <add|del> <tenant-id>",
+  .short_help = "vcdp tenant <add|del> <tenant-id> context <context-id>",
   .function = vcdp_tenant_add_del_command_fn,
 };
 

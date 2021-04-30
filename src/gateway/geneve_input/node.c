@@ -78,7 +78,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   vlib_combined_counter_main_t *cm =
     &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_INCOMING];
-
+  vcdp_tenant_t *tenant;
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
@@ -124,8 +124,9 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 	}
 
       /* Store tenant_id as flow_id (to simplify the future lookup) */
-      b[0]->flow_id = tenant_id;
       tenant_idx = kv.value;
+      tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+      b[0]->flow_id = tenant->context_id;
       vcdp_buffer (b[0])->tenant_index = tenant_idx;
       current_next[0] = VCDP_GENEVE_INPUT_NEXT_LOOKUP;
       off +=

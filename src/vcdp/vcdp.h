@@ -170,7 +170,7 @@ typedef struct
   {
     struct
     {
-      u32 tenant_id;
+      u32 context_id;
       u8 zeros[4];
     };
     u64 as_u64;
@@ -210,6 +210,7 @@ typedef struct
 typedef struct
 {
   u32 tenant_id;
+  u32 context_id;
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_tenant_t;
@@ -340,7 +341,7 @@ vcdp_session_remove_or_rearm (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 }
 
 clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
-				   u8 is_del);
+				   u32 context_id, u8 is_del);
 clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 				 u8 direction);
 clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,

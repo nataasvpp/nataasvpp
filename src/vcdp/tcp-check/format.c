@@ -33,11 +33,12 @@ format_vcdp_tcp_check_session_flags (u8 *s, va_list *args)
 u8 *
 format_vcdp_tcp_check_session (u8 *s, va_list *args)
 {
+  vcdp_main_t *vcdp = va_arg (*args, vcdp_main_t *);
   u32 session_index = va_arg (*args, u32);
   vcdp_session_t *session = va_arg (*args, vcdp_session_t *);
   vcdp_tcp_check_session_state_t *tcp_session =
     va_arg (*args, vcdp_tcp_check_session_state_t *);
-
+  vcdp_tenant_t *tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
   u32 ingress_ip4, egress_ip4;
   u16 ingress_port, egress_port;
   u64 session_net = clib_host_to_net_u64 (session->session_id);
@@ -56,11 +57,11 @@ format_vcdp_tcp_check_session (u8 *s, va_list *args)
       egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
     }
   s = format (s, "0x%U\t%d\t%d\t%U\t%U:%u\t-> %U:%u\t%U", format_hex_bytes,
-	      &session_net, sizeof (u64), session->key.tenant_id,
-	      session_index, format_vcdp_session_type, session->type,
-	      format_ip4_address, &ingress_ip4, ingress_port,
-	      format_ip4_address, &egress_ip4, egress_port,
-	      format_vcdp_tcp_check_session_flags, tcp_session->flags);
+	      &session_net, sizeof (u64), tenant->tenant_id, session_index,
+	      format_vcdp_session_type, session->type, format_ip4_address,
+	      &ingress_ip4, ingress_port, format_ip4_address, &egress_ip4,
+	      egress_port, format_vcdp_tcp_check_session_flags,
+	      tcp_session->flags);
 
   return s;
 }

@@ -45,6 +45,7 @@ format_vcdp_session (u8 *s, va_list *args)
 {
   u32 session_index = va_arg (*args, u32);
   vcdp_session_t *session = va_arg (*args, vcdp_session_t *);
+  u32 tenant_id = va_arg (*args, u32);
   f64 now = va_arg (*args, f64);
   f64 remaining_time = session->timer.next_expiration - now;
   u32 ingress_ip4, egress_ip4;
@@ -67,9 +68,9 @@ format_vcdp_session (u8 *s, va_list *args)
       egress_port = clib_net_to_host_u16 (session->key.ip4_key.port_hi);
     }
   s = format (s, "0x%U\t%d\t%d\t%U\t%U\t%U:%u\t-> %U:%u\t%U\t%f",
-	      format_hex_bytes, &session_net, sizeof (u64),
-	      session->key.tenant_id, session_index, format_vcdp_session_type,
-	      session->type, format_ip_protocol, session->key.ip4_key.proto,
+	      format_hex_bytes, &session_net, sizeof (u64), tenant_id,
+	      session_index, format_vcdp_session_type, session->type,
+	      format_ip_protocol, session->key.ip4_key.proto,
 	      format_ip4_address, &ingress_ip4, ingress_port,
 	      format_ip4_address, &egress_ip4, egress_port,
 	      format_vcdp_session_state, session->state, remaining_time);
@@ -154,6 +155,8 @@ format_vcdp_tenant (u8 *s, va_list *args)
   u32 tenant_idx = va_arg (*args, u32);
   vcdp_tenant_t *tenant = va_arg (*args, vcdp_tenant_t *);
   s = format (s, "index: %d\n", tenant_idx);
+  s = format (s, "%Ucontext: %d\n", format_white_space, indent,
+	      tenant->context_id);
   s = format (s, "%Uforward service chain:\n", format_white_space, indent);
   s = format (s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap,
 	      tenant->bitmaps[VCDP_FLOW_FORWARD]);

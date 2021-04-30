@@ -116,6 +116,7 @@ process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
 		 vlib_combined_counter_main_t *cm, u32 thread_index,
 		 vlib_buffer_t **b, u16 *current_next)
 {
+  vcdp_tenant_t *tenant;
   clib_bihash_kv_8_8_t kv = { 0 };
   u8 *data = vlib_buffer_get_current (b[0]);
   u32 orig_len = vlib_buffer_length_in_chain (vm, b[0]);
@@ -144,8 +145,9 @@ process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
       vnet_feature_next_u16 (current_next, b[0]);
       return;
     }
-  b[0]->flow_id = tenant_id;
   tenant_idx = kv.value;
+  tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+  b[0]->flow_id = tenant->context_id;
   vcdp_buffer (b[0])->tenant_index = tenant_idx;
   vnet_buffer (b[0])->l2_hdr_offset = b[0]->current_data;
   vnet_buffer (b[0])->l3_hdr_offset = b[0]->current_data + off;
