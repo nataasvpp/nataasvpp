@@ -61,7 +61,7 @@ vcdp_tcp_check_show_sessions_command_fn (vlib_main_t *vm,
 	    tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
 	    if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
 	      continue;
-	    if (session->key.ip4_key.proto != IP_PROTOCOL_TCP)
+	    if (session->proto != IP_PROTOCOL_TCP)
 	      continue;
 	    if (first)
 	      {

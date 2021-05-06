@@ -186,8 +186,11 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 1);
   clib_memcpy_fast (session->bitmaps, tenant->bitmaps,
 		    sizeof (session->bitmaps));
-  clib_memcpy_fast (&session->key, k, 24);
-  session->pseudo_dir = lookup_val[0] & 0x1;
+  clib_memcpy_fast (&session->key[VCDP_SESSION_KEY_PRIMARY], k, sizeof (*k));
+  session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
+  session->proto = k->ip4_key.proto;
+  session->key_flags = VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID |
+		       VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID;
 
   vcdp_session_timer_start (&ptd->wheel, &session->timer, session_idx,
 			    time_now,

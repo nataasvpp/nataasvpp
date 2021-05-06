@@ -128,10 +128,23 @@ enum
 
 enum
 {
-  VCDP_PACKET_ORIGINAL = 0,
-  VCDP_PACKET_NORMALISED = 1
+  VCDP_SESSION_KEY_PRIMARY,
+  VCDP_SESSION_KEY_SECONDARY,
+  VCDP_SESSION_N_KEY
 };
+/* Flags to determine key validity in the session */
+#define foreach_vcdp_session_key_flag                                         \
+  _ (PRI_INIT_VALID, 0x1, "pri-init-valid")                                   \
+  _ (PRI_RESP_VALID, 0x2, "pri-resp-valid")                                   \
+  _ (SEC_INIT_VALID, 0x4, "sec-init-valid")                                   \
+  _ (SEC_RESP_VALID, 0x8, "sec-resp-valid")
 
+enum
+{
+#define _(x, n, s) VCDP_SESSION_KEY_FLAG_##x = n,
+  foreach_vcdp_session_key_flag
+#undef _
+};
 typedef union
 {
   struct
@@ -186,13 +199,15 @@ typedef struct
   vcdp_session_timer_t timer;
   session_version_t session_version;
   u8 state; /* see vcdp_session_state_t */
-  u8 unused0[29];
+  u8 proto;
+  u8 unused0[28];
   CLIB_CACHE_LINE_ALIGN_MARK (cache1);
-  vcdp_session_ip4_key_t key;
-  u8 pseudo_dir;
-  u8 type; /* see vcdp_session_type_t */
+  vcdp_session_ip4_key_t key[VCDP_SESSION_N_KEY];
+  u8 pseudo_dir[VCDP_SESSION_N_KEY];
   u16 tenant_idx;
-  u8 unused1[36];
+  u8 type; /* see vcdp_session_type_t */
+  u8 key_flags;
+  u8 unused1[10];
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
 STATIC_ASSERT_SIZEOF (vcdp_session_t, 128);
 
@@ -316,8 +331,20 @@ vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_kv_24_8_t kv = { 0 };
   kv2.key = session->session_id;
   pool_put_index (ptd->sessions, session_index);
-  clib_memcpy_fast (&kv.key, &session->key, sizeof (session->key));
-  clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID |
+			    VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID))
+    {
+      clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_PRIMARY],
+			sizeof (session->key[0]));
+      clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+    }
+  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SEC_INIT_VALID |
+			    VCDP_SESSION_KEY_FLAG_SEC_RESP_VALID))
+    {
+      clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_SECONDARY],
+			sizeof (session->key[0]));
+      clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
+    }
   clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
   vlib_increment_simple_counter (
     &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED],
@@ -346,6 +373,8 @@ clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 				 u8 direction);
 clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
 				u32 timeout_idx, u32 timeout_val);
+
+void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result);
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

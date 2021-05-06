@@ -262,6 +262,47 @@ vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx,
   return 0;
 }
 
+void
+vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result)
+{
+  u8 init_key_idx = session->key_flags & VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID ?
+		      VCDP_SESSION_KEY_PRIMARY :
+		      VCDP_SESSION_KEY_SECONDARY;
+  u8 resp_key_idx = session->key_flags & VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID ?
+		      VCDP_SESSION_KEY_PRIMARY :
+		      VCDP_SESSION_KEY_SECONDARY;
+  vcdp_ip4_key_t *init_key = &session->key[init_key_idx].ip4_key;
+  vcdp_ip4_key_t *resp_key = &session->key[resp_key_idx].ip4_key;
+  u8 init_pseudo_dir = session->pseudo_dir[init_key_idx];
+  u8 resp_pseudo_dir = session->pseudo_dir[resp_key_idx];
+  u8 proto = session->proto;
+  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP;
+
+  result->as_u64x2 = init_key->as_u64x2;
+
+  if (with_port && init_pseudo_dir)
+    {
+      result->ip_addr_lo = init_key->ip_addr_hi;
+      result->port_lo = clib_net_to_host_u16 (init_key->port_hi);
+    }
+  else
+    {
+      result->ip_addr_lo = init_key->ip_addr_lo;
+      result->port_lo = clib_net_to_host_u16 (init_key->port_lo);
+    }
+
+  if (with_port && resp_pseudo_dir)
+    {
+      result->ip_addr_hi = resp_key->ip_addr_lo;
+      result->port_hi = clib_net_to_host_u16 (resp_key->port_lo);
+    }
+  else
+    {
+      result->ip_addr_hi = resp_key->ip_addr_hi;
+      result->port_hi = clib_net_to_host_u16 (resp_key->port_hi);
+    }
+}
+
 VLIB_INIT_FUNCTION (vcdp_init);
 
 VLIB_PLUGIN_REGISTER () = {

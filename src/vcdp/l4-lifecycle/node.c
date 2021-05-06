@@ -77,7 +77,7 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
       u8 direction = vcdp_direction_from_flow_index (b[0]->flow_id);
       /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
        */
-      if (session->key.ip4_key.proto == IP_PROTOCOL_TCP)
+      if (session->proto == IP_PROTOCOL_TCP)
 	{
 	  session->bitmaps[VCDP_FLOW_FORWARD] &=
 	    ~(1 << VCDP_SERVICE_L4_LIFECYCLE);
