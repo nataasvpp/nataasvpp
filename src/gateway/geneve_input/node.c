@@ -82,6 +82,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   u32 *from = vlib_frame_vector_args (frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
+  u32 thread_index = vlib_get_thread_index ();
 
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
@@ -96,7 +97,6 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       u16 tenant_idx;
       clib_bihash_kv_8_8_t kv = {};
       u16 off = 0;
-      u32 thread_index = vlib_get_thread_index ();
       u32 len = vlib_buffer_length_in_chain (vm, b[0]);
       if (ip4->protocol != IP_PROTOCOL_UDP)
 	{

@@ -432,6 +432,10 @@ VLIB_NODE_FN (vcdp_lookup_node)
 	    session
 	      ->bitmaps[vcdp_direction_from_flow_index (local_flow_index[0])];
 	  vcdp_buffer (b[0])->service_bitmap = pbmp;
+
+	  /* The tenant of the buffer is the tenant of the session */
+	  vcdp_buffer (b[0])->tenant_index = session->tenant_idx;
+
 	  vcdp_next (b[0], current_next);
 
 	  local_flow_index += 1;
