@@ -46,7 +46,7 @@ nat_external_interface_set_tenant (nat_main_t *nat, u32 sw_if_index,
 
 clib_error_t *
 nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
-			ip4_address_t *addr, uword fib_index)
+			ip4_address_t *addr)
 {
   u16 alloc_pool_idx;
   uword *val = hash_get (nat->alloc_pool_idx_by_id, alloc_pool_id);

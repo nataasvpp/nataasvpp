@@ -104,8 +104,7 @@ clib_error_t *nat_external_interface_set_tenant (nat_main_t *nat,
 						 u32 tenant_id, u8 unset);
 
 clib_error_t *nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id,
-				      u8 is_del, ip4_address_t *addr,
-				      uword fib_index);
+				      u8 is_del, ip4_address_t *addr);
 
 clib_error_t *nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id,
 				   u32 outside_tenant_id, u32 table_id,
