@@ -163,7 +163,7 @@ geneve_output_rewrite_one (vlib_main_t *vm, vlib_node_runtime_t *node,
       b[0]->flags |=
 	(VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID |
 	 VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
-      vnet_buffer2 (b[0])->oflags |=
+      vnet_buffer (b[0])->oflags |=
 	VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
       vlib_buffer_advance (b[0], -geneve_out->encap_size);
       data = vlib_buffer_get_current (b[0]);
