@@ -16,6 +16,9 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
 
+#include <vppinfra/bihash_24_8.h>
+#include <vppinfra/bihash_template.c>
+
 #include <vcdp/vcdp.h>
 
 #include <vnet/plugin/plugin.h>
@@ -301,6 +304,14 @@ vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result)
       result->ip_addr_hi = resp_key->ip_addr_hi;
       result->port_hi = clib_net_to_host_u16 (resp_key->port_hi);
     }
+}
+
+int
+vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
+					   clib_bihash_kv_24_8_t *kv, u64 hash,
+					   u8 is_add)
+{
+  return clib_bihash_add_del_inline_with_hash_24_8 (h, kv, hash, is_add, 0, 0);
 }
 
 VLIB_INIT_FUNCTION (vcdp_init);

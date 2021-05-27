@@ -26,7 +26,6 @@
 #include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_8_8.h>
 
-#include <vppinfra/bihash_template.h>
 #include <vppinfra/tw_timer_2t_1w_2048sl.h>
 
 #include <vcdp/timer/timer.h>
@@ -322,51 +321,6 @@ vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
   return pool_elt_at_index (vcdpm->tenants, idx);
 }
 
-static_always_inline void
-vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-		     vcdp_session_t *session, u32 thread_index,
-		     u32 session_index)
-{
-  clib_bihash_kv_8_8_t kv2 = { 0 };
-  clib_bihash_kv_24_8_t kv = { 0 };
-  kv2.key = session->session_id;
-  pool_put_index (ptd->sessions, session_index);
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID |
-			    VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID))
-    {
-      clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_PRIMARY],
-			sizeof (session->key[0]));
-      clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
-    }
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SEC_INIT_VALID |
-			    VCDP_SESSION_KEY_FLAG_SEC_RESP_VALID))
-    {
-      clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_SECONDARY],
-			sizeof (session->key[0]));
-      clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
-    }
-  clib_bihash_add_del_8_8 (&vcdp->session_index_by_id, &kv2, 0);
-  vlib_increment_simple_counter (
-    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED],
-    thread_index, session->tenant_idx, 1);
-}
-
-static_always_inline void
-vcdp_session_remove_or_rearm (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-			      u32 thread_index, u32 session_index)
-{
-  vcdp_session_t *session = vcdp_session_at_index (ptd, session_index);
-  f64 diff = (session->timer.next_expiration -
-	      (ptd->current_time + VCDP_TIMER_INTERVAL)) /
-	     VCDP_TIMER_INTERVAL;
-  if (diff > (f64) 1.)
-    /* Rearm the timer accordingly */
-    vcdp_session_timer_start (&ptd->wheel, &session->timer, session_index,
-			      ptd->current_time, diff);
-  else
-    vcdp_session_remove (vcdp, ptd, session, thread_index, session_index);
-}
-
 clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
 				   u32 context_id, u8 is_del);
 clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
@@ -375,6 +329,10 @@ clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
 				u32 timeout_idx, u32 timeout_val);
 
 void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result);
+
+int vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
+					       clib_bihash_kv_24_8_t *kv,
+					       u64 hash, u8 is_add);
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

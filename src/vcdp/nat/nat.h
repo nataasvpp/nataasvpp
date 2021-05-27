@@ -16,6 +16,7 @@
 #define __included_nat_h__
 
 #include <vlib/vlib.h>
+#include <vcdp/vcdp.h>
 #include <vnet/ip/ip46_address.h>
 
 #define NAT_INVALID_TENANT_IDX	(u16) (~0)
@@ -34,14 +35,43 @@ enum
 typedef struct
 {
   u16 flags;
+  u32 reverse_context;
   uword out_alloc_pool_idx;
   uword fib_index;
 } nat_tenant_t;
 
+#define foreach_nat_rewrite_op                                                \
+  _ (SADDR, 0x1)                                                              \
+  _ (SPORT, 0x2)                                                              \
+  _ (DADDR, 0x4)                                                              \
+  _ (DPORT, 0x8)                                                              \
+  _ (ICMP_ID, 0x10)                                                           \
+  _ (TXFIB, 0x20)
+
+typedef enum
+{
+#define _(sym, x) NAT_REWRITE_OP_##sym = x,
+  foreach_nat_rewrite_op
+#undef _
+} nat_rewrite_op_t;
 typedef struct
 {
-
+  CLIB_CACHE_LINE_ALIGN_MARK (cache0);
+  struct
+  {
+    ip4_address_t saddr, daddr;
+    u16 sport;
+    u16 dport;
+    u32 fib_index;
+    u16 icmp_id;
+    u8 proto;
+  } rewrite;
+  u32 ops; /* see nat_rewrite_op_t */
+  uword l3_csum_delta;
+  uword l4_csum_delta;
+  session_version_t version;
 } nat_rewrite_data_t;
+STATIC_ASSERT_SIZEOF (nat_rewrite_data_t, 64);
 
 typedef struct
 {
@@ -78,6 +108,7 @@ clib_error_t *nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id,
 				      uword fib_index);
 
 clib_error_t *nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id,
-				   u32 table_id, u32 alloc_pool_id, u8 unset);
+				   u32 outside_tenant_id, u32 table_id,
+				   u32 alloc_pool_id, u8 unset);
 
 #endif

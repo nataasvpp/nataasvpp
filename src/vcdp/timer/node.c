@@ -14,7 +14,7 @@
  */
 
 #include <vlib/vlib.h>
-#include <vcdp/vcdp.h>
+#include <vcdp/vcdp_funcs.h>
 
 #define foreach_vcdp_timer_expire_error _ (EXPIRED, "session expired")
 

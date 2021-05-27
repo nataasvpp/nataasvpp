@@ -86,8 +86,8 @@ nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
 }
 
 clib_error_t *
-nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id, u32 table_id,
-		     u32 alloc_pool_id, u8 unset)
+nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id,
+		     u32 table_id, u32 alloc_pool_id, u8 unset)
 {
   ip4_main_t *im = &ip4_main;
   uword *fib_index = hash_get (im->fib_index_by_table_id, table_id);
@@ -96,18 +96,27 @@ nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id, u32 table_id,
   clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
   vcdp_main_t *vcdp = &vcdp_main;
   nat_tenant_t *tenant;
+  vcdp_tenant_t *outside_tenant;
   uword tenant_idx;
+  uword outside_tenant_idx;
 
-  if (!fib_index)
+  if (!unset && !fib_index)
     return clib_error_return (0, "Unknown table %d", table_id);
 
-  if (!out_alloc_pool_idx)
+  if (!unset && !out_alloc_pool_idx)
     return clib_error_return (0, "Unknown allocation pool %d", alloc_pool_id);
 
   if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
     return clib_error_return (0, "Unknown tenant %d", tenant_id);
 
   tenant_idx = kv.value;
+  kv.key = outside_tenant_id;
+  kv.value = 0;
+  if (!unset && clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+    return clib_error_return (0, "Unknown tenant %d", tenant_id);
+  else
+    outside_tenant_idx = kv.value;
+
   vec_validate (nat->tenants, tenant_idx);
   tenant = vec_elt_at_index (nat->tenants, tenant_idx);
 
@@ -123,12 +132,15 @@ nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id, u32 table_id,
       tenant->flags &= ~NAT_TENANT_FLAG_SNAT;
       tenant->fib_index = ~0;
       tenant->out_alloc_pool_idx = ~0;
+      tenant->reverse_context = ~0;
     }
   else
     {
+      outside_tenant = vcdp_tenant_at_index (vcdp, outside_tenant_idx);
       tenant->flags |= NAT_TENANT_FLAG_SNAT;
       tenant->fib_index = fib_index[0];
       tenant->out_alloc_pool_idx = out_alloc_pool_idx[0];
+      tenant->reverse_context = outside_tenant->context_id;
     }
   return 0;
 }

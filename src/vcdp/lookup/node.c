@@ -22,7 +22,7 @@
 #include <vppinfra/bihash_template.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
-#include <vcdp/vcdp.h>
+#include <vcdp/vcdp_funcs.h>
 
 #define foreach_vcdp_lookup_error                                             \
   _ (MISS, "flow miss")                                                       \
