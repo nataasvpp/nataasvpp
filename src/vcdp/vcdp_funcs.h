@@ -97,7 +97,7 @@ vcdp_renormalise_key (vcdp_session_ip4_key_t *key, u32 old_pseudo)
 {
   u8 proto = key->ip4_key.proto;
   if ((proto == IP_PROTOCOL_TCP || proto == IP_PROTOCOL_UDP) &&
-      key->ip4_key.ip_addr_hi > key->ip4_key.ip_addr_lo)
+      key->ip4_key.ip_addr_hi < key->ip4_key.ip_addr_lo)
     {
       u32 tmp_ip4;
       u16 tmp_port;

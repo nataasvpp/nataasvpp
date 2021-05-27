@@ -68,9 +68,10 @@ nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
       nat_alloc_pool_t *alloc_pool;
       uword num = vec_len (addr);
       uword num_static = clib_min (num, NAT_ALLOC_POOL_ARRAY_SZ);
-      num -= num_static;
       pool_get_zero (nat->alloc_pool, alloc_pool);
+      alloc_pool->num = num;
       alloc_pool_idx = alloc_pool - nat->alloc_pool;
+      num -= num_static;
       for (int i = 0; i < num_static; i++)
 	alloc_pool->addr[i] = addr[i];
       if (num > 0)
