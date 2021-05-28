@@ -36,7 +36,9 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
 				       .src_port = ~0,
 				       .dst_port = ~0,
 				       .direction = ~0,
-				       .output_tenant_id = ~0 };
+				       .output_tenant_id = ~0,
+				       .src_mac = { .bytes = { 0 } },
+				       .dst_mac = { .bytes = { 0 } } };
   clib_error_t *err = 0;
   u32 tmp;
 
@@ -60,6 +62,10 @@ gateway_set_output_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	args.src_port = clib_host_to_net_u16 (tmp);
       else if (unformat (line_input, "dst-port %d", &tmp))
 	args.dst_port = clib_host_to_net_u16 (tmp);
+      else if (unformat (line_input, "src-mac %U dst-mac %U",
+			 unformat_mac_address, &args.src_mac,
+			 unformat_mac_address, &args.dst_mac))
+	args.static_mac = 1;
       else if (unformat (line_input, "forward"))
 	args.direction = VCDP_FLOW_FORWARD;
       else if (unformat (line_input, "reverse"))
@@ -90,6 +96,7 @@ VLIB_CLI_COMMAND (gateway_set_output_command, static) = {
 		"src <src ip> dst <dst ip> "
 		"src-port <src-port> dst-port <dst-port> "
 		"[output-tenant <tenant-id>] "
+		"[src-mac <src-mac-address> dst-mac <dst-mac-address>]"
 		"<forward|reverse>",
   .function = gateway_set_output_command_fn,
 };

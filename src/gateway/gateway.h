@@ -30,11 +30,13 @@
 
 #include <vcdp/vcdp.h>
 
-#define foreach_gw_tenant_flag _ (OUTPUT_DATA_SET, "output-data-set", 0)
+#define foreach_gw_tenant_flag                                                \
+  _ (OUTPUT_DATA_SET, "output-data-set", 0)                                   \
+  _ (STATIC_MAC, "static-mac", 1)
 
 typedef enum
 {
-#define _(a, b, c) GW_TENANT_F_##a = (1 << (c))
+#define _(a, b, c) GW_TENANT_F_##a = (1 << (c)),
   foreach_gw_tenant_flag
 #undef _
 } gw_tenant_flags_t;
@@ -63,6 +65,8 @@ typedef struct
   ip4_address_t geneve_dst_ip[VCDP_FLOW_F_B_N];
   u16 geneve_src_port[VCDP_FLOW_F_B_N];
   u16 geneve_dst_port[VCDP_FLOW_F_B_N];
+  mac_address_t src_mac[VCDP_FLOW_F_B_N];
+  mac_address_t dst_mac[VCDP_FLOW_F_B_N];
 
 } gw_tenant_t;
 
@@ -90,10 +94,13 @@ typedef struct
   u32 tenant_id;
   ip4_address_t src_addr;
   ip4_address_t dst_addr;
-  u16 src_port;		/*network order*/
-  u16 dst_port;		/*network order*/
-  u8 direction;		/* 0 is forward, 1 is reverse */
+  u16 src_port; /*network order*/
+  u16 dst_port; /*network order*/
+  u8 direction; /* 0 is forward, 1 is reverse */
+  u8 static_mac;
   u32 output_tenant_id; /* ~0 means output on the same tenant as input */
+  mac_address_t src_mac;
+  mac_address_t dst_mac;
 } gw_set_geneve_output_args_t;
 
 extern gw_main_t gateway_main;

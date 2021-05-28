@@ -129,10 +129,18 @@ vcdp_geneve_output_load_data (gw_main_t *gm,
 				 direction); /* session id low */
   geneve_out->encap_size += VCDP_GENEVE_TOTAL_LEN;
   eth = (void *) (geneve_out->encap_data + geneve_out->encap_size);
-  /* TODO: fix mac to something decent (right now,
-   we take old mac src/dst and behave as "bump in the wire") */
-  clib_memcpy_fast (eth, b->data + b->current_data - sizeof (*eth),
-		    sizeof (*eth));
+  if (tenant->flags & GW_TENANT_F_STATIC_MAC)
+    {
+      clib_memcpy_fast (eth->src_address, tenant->src_mac[direction].bytes,
+			sizeof (mac_address_t));
+      clib_memcpy_fast (eth->dst_address, tenant->dst_mac[direction].bytes,
+			sizeof (mac_address_t));
+      eth->type = clib_host_to_net_u16 (ETHERNET_TYPE_IP4);
+    }
+  else
+    clib_memcpy_fast (eth, b->data + b->current_data - sizeof (*eth),
+		      sizeof (*eth));
+
   geneve_out->encap_size += sizeof (*eth);
   ASSERT (geneve_out->encap_size < sizeof (geneve_out->encap_data));
   return 0;

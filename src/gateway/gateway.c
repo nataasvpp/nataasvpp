@@ -93,12 +93,17 @@ gw_set_geneve_output (gw_set_geneve_output_args_t *args)
   /* Caching tenant id in gt */
   gt->output_tenant_id =
     args->output_tenant_id == ~0 ? vt->tenant_id : args->output_tenant_id;
-  gt->flags |= GW_TENANT_F_OUTPUT_DATA_SET;
+  gt->flags = GW_TENANT_F_OUTPUT_DATA_SET;
   gt->geneve_src_ip[dir] = args->src_addr;
   gt->geneve_dst_ip[dir] = args->dst_addr;
   gt->geneve_src_port[dir] = args->src_port;
   gt->geneve_dst_port[dir] = args->dst_port;
-
+  if (args->static_mac)
+    {
+      gt->flags |= GW_TENANT_F_STATIC_MAC;
+      gt->src_mac[dir] = args->src_mac;
+      gt->dst_mac[dir] = args->dst_mac;
+    }
   args->rv = 0;
   args->err = 0;
 }
