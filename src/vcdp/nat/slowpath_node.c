@@ -121,8 +121,7 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
   while ((++n_retries) < 5 &&
 	 vcdp_session_try_add_secondary_key (
 	   vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h,
-	   VCDP_SESSION_KEY_FLAG_SEC_INIT_VALID,
-	   VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID))
+	   VCDP_SESSION_KEY_FLAG_SECONDARY_VALID, 0))
     {
       /* Use h to try a different port
        TODO: find something nicer than this ugly modulo */

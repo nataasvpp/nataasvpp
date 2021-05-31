@@ -25,15 +25,13 @@ vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_kv_24_8_t kv = { 0 };
   kv2.key = session->session_id;
   pool_put_index (ptd->sessions, session_index);
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID |
-			    VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID))
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID)
     {
       clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_PRIMARY],
 			sizeof (session->key[0]));
       clib_bihash_add_del_24_8 (&vcdp->table4, &kv, 0);
     }
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SEC_INIT_VALID |
-			    VCDP_SESSION_KEY_FLAG_SEC_RESP_VALID))
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
     {
       clib_memcpy_fast (&kv.key, &session->key[VCDP_SESSION_KEY_SECONDARY],
 			sizeof (session->key[0]));

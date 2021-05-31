@@ -189,8 +189,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_memcpy_fast (&session->key[VCDP_SESSION_KEY_PRIMARY], k, sizeof (*k));
   session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
   session->proto = k->ip4_key.proto;
-  session->key_flags = VCDP_SESSION_KEY_FLAG_PRI_INIT_VALID |
-		       VCDP_SESSION_KEY_FLAG_PRI_RESP_VALID;
+  session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID;
 
   vcdp_session_timer_start (&ptd->wheel, &session->timer, session_idx,
 			    time_now,

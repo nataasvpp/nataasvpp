@@ -38,7 +38,7 @@ format_vcdp_session_type (u8 *s, va_list *args)
   return s;
 }
 
-/* Tenant Session_index Session_Type Protocol Ingress -> Egress State
+/* Tenant Session_index Session_Type Protocol Context Ingress -> Egress State
  * TTL(seconds) */
 u8 *
 format_vcdp_session (u8 *s, va_list *args)
@@ -49,15 +49,25 @@ format_vcdp_session (u8 *s, va_list *args)
   f64 now = va_arg (*args, f64);
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64 (session->session_id);
+  u8 n_keys = vcdp_session_n_keys (session);
   vcdp_ip4_key_t key;
-  vcdp_normalise_key (session, &key);
-  s =
-    format (s, "0x%U\t%d\t%d\t%U\t%U\t%U:%u\t-> %U:%u\t%U\t%f",
-	    format_hex_bytes, &session_net, sizeof (u64), tenant_id,
-	    session_index, format_vcdp_session_type, session->type,
-	    format_ip_protocol, key.proto, format_ip4_address, &key.ip_addr_lo,
-	    key.port_lo, format_ip4_address, &key.ip_addr_hi, key.port_hi,
-	    format_vcdp_session_state, session->state, remaining_time);
+  vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_PRIMARY);
+  s = format (s, "0x%U\t%d\t%d\t%U\t%U\t", format_hex_bytes, &session_net,
+	      sizeof (u64), tenant_id, session_index, format_vcdp_session_type,
+	      session->type, format_ip_protocol, key.proto);
+  s = format (s, "%d\t%U:%u\t-> %U:%u\t%U\t%f",
+	      session->key[VCDP_SESSION_KEY_PRIMARY].context_id,
+	      format_ip4_address, &key.ip_addr_lo, key.port_lo,
+	      format_ip4_address, &key.ip_addr_hi, key.port_hi,
+	      format_vcdp_session_state, session->state, remaining_time);
+  if (n_keys == 2)
+    {
+      vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_SECONDARY);
+      s = format (s, "\n\t\t\t\t\t\t\t%d\t%U:%u\t-> %U:%u",
+		  session->key[VCDP_SESSION_KEY_SECONDARY].context_id,
+		  format_ip4_address, &key.ip_addr_lo, key.port_lo,
+		  format_ip4_address, &key.ip_addr_hi, key.port_hi);
+    }
   return s;
 }
 
@@ -90,7 +100,8 @@ format_vcdp_session_detail (u8 *s, va_list *args)
 			     session_index << 1, &fctr);
   vlib_get_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			     (session_index << 1) | 0x1, &bctr);
-  vcdp_normalise_key (session, &key);
+  /* TODO: deal with secondary keys */
+  vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_PRIMARY);
 
   s = format (s, "  session id: 0x%U\n", format_hex_bytes, &session_net,
 	      sizeof (u64));

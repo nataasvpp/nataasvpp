@@ -133,10 +133,8 @@ enum
 };
 /* Flags to determine key validity in the session */
 #define foreach_vcdp_session_key_flag                                         \
-  _ (PRI_INIT_VALID, 0x1, "pri-init-valid")                                   \
-  _ (PRI_RESP_VALID, 0x2, "pri-resp-valid")                                   \
-  _ (SEC_INIT_VALID, 0x4, "sec-init-valid")                                   \
-  _ (SEC_RESP_VALID, 0x8, "sec-resp-valid")
+  _ (PRIMARY_VALID, 0x1, "primary-valid")                                     \
+  _ (SECONDARY_VALID, 0x2, "secondary-valid")
 
 enum
 {
@@ -321,6 +319,15 @@ vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
   return pool_elt_at_index (vcdpm->tenants, idx);
 }
 
+static_always_inline u8
+vcdp_session_n_keys (vcdp_session_t *session)
+{
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
+    return 2;
+  else
+    return 1;
+}
+
 clib_error_t *vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id,
 				   u32 context_id, u8 is_del);
 clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
@@ -328,7 +335,8 @@ clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
 				u32 timeout_idx, u32 timeout_val);
 
-void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result);
+void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result,
+			 u8 key_idx);
 
 int vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 					       clib_bihash_kv_24_8_t *kv,

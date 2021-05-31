@@ -41,7 +41,8 @@ format_vcdp_tcp_check_session (u8 *s, va_list *args)
   vcdp_tenant_t *tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
   vcdp_ip4_key_t key;
 
-  vcdp_normalise_key (session, &key);
+  /*TODO: deal with secondary keys*/
+  vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_PRIMARY);
   u64 session_net = clib_host_to_net_u64 (session->session_id);
 
   s = format (s, "0x%U\t%d\t%d\t%U\t%U:%u\t-> %U:%u\t%U", format_hex_bytes,
