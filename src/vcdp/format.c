@@ -29,6 +29,20 @@ format_vcdp_session_state (u8 *s, va_list *args)
     return s;
 }
 
+static u8 *
+format_vcdp_ip4_address_and_port_padded (u8 *s, va_list *args)
+{
+  u32 current_pos = vec_len (s);
+  i16 padding;
+  ip4_address_t *addr = va_arg (*args, ip4_address_t *);
+  u32 port = va_arg (*args, u32);
+  s = format (s, "%U:%u", format_ip4_address, addr, port);
+  padding = 21 - (vec_len (s) - current_pos);
+  if (padding > 0)
+    s = format (s, "%U", format_white_space, padding);
+  return s;
+}
+
 u8 *
 format_vcdp_session_type (u8 *s, va_list *args)
 {
@@ -55,18 +69,20 @@ format_vcdp_session (u8 *s, va_list *args)
   s = format (s, "0x%U\t%d\t%d\t%U\t%U\t", format_hex_bytes, &session_net,
 	      sizeof (u64), tenant_id, session_index, format_vcdp_session_type,
 	      session->type, format_ip_protocol, key.proto);
-  s = format (s, "%d\t%U:%u\t-> %U:%u\t%U\t%f",
+  s = format (s, "%d\t%U\t->\t%U\t%U\t%f",
 	      session->key[VCDP_SESSION_KEY_PRIMARY].context_id,
-	      format_ip4_address, &key.ip_addr_lo, key.port_lo,
-	      format_ip4_address, &key.ip_addr_hi, key.port_hi,
-	      format_vcdp_session_state, session->state, remaining_time);
+	      format_vcdp_ip4_address_and_port_padded, &key.ip_addr_lo,
+	      key.port_lo, format_vcdp_ip4_address_and_port_padded,
+	      &key.ip_addr_hi, key.port_hi, format_vcdp_session_state,
+	      session->state, remaining_time);
   if (n_keys == 2)
     {
       vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_SECONDARY);
-      s = format (s, "\n\t\t\t\t\t\t\t%d\t%U:%u\t-> %U:%u",
+      s = format (s, "\n\t\t\t\t\t\t\t%d\t%U\t->\t%U",
 		  session->key[VCDP_SESSION_KEY_SECONDARY].context_id,
-		  format_ip4_address, &key.ip_addr_lo, key.port_lo,
-		  format_ip4_address, &key.ip_addr_hi, key.port_hi);
+		  format_vcdp_ip4_address_and_port_padded, &key.ip_addr_lo,
+		  key.port_lo, format_vcdp_ip4_address_and_port_padded,
+		  &key.ip_addr_hi, key.port_hi);
     }
   return s;
 }
