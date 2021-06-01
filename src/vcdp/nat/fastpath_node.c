@@ -47,6 +47,7 @@ static char *vcdp_nat_fastpath_error_strings[] = {
 
 typedef struct
 {
+  u32 thread_index;
   u32 flow_id;
 } vcdp_nat_fastpath_trace_t;
 
@@ -56,9 +57,13 @@ format_vcdp_nat_fastpath_trace (u8 *s, va_list *args)
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_nat_fastpath_trace_t *t = va_arg (*args, vcdp_nat_fastpath_trace_t *);
-  s =
-    format (s, "vcdp-nat-fastpath: flow-id %u (session %u, %s)\n", t->flow_id,
-	    t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  nat_main_t *nm = &nat_main;
+  nat_per_thread_data_t *ptd = vec_elt_at_index (nm->ptd, t->thread_index);
+  nat_rewrite_data_t *rewrite = vec_elt_at_index (ptd->flows, t->flow_id);
+  s = format (
+    s, "vcdp-nat-fastpath: flow-id %u (session %u, %s) rewrite: %U\n",
+    t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
+    format_vcdp_nat_rewrite, rewrite);
 
   return s;
 }
@@ -190,6 +195,7 @@ vcdp_nat_fastpath_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 	      vcdp_nat_fastpath_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->flow_id = b[0]->flow_id;
+	      t->thread_index = thread_index;
 	      b++;
 	    }
 	  else

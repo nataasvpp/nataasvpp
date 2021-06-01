@@ -36,7 +36,10 @@ static char *vcdp_nat_slowpath_error_strings[] = {
 typedef struct
 {
   u32 flow_id;
+  u32 thread_index;
 } vcdp_nat_slowpath_trace_t;
+
+format_function_t format_vcdp_bitmap;
 
 static u8 *
 format_vcdp_nat_slowpath_trace (u8 *s, va_list *args)
@@ -44,9 +47,17 @@ format_vcdp_nat_slowpath_trace (u8 *s, va_list *args)
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_nat_slowpath_trace_t *t = va_arg (*args, vcdp_nat_slowpath_trace_t *);
-  s =
-    format (s, "vcdp-nat-slowpath: flow-id %u (session %u, %s)\n", t->flow_id,
-	    t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index (vcdp->per_thread_data, t->thread_index);
+  /* FIXME: This is a scam, the session-idx can be invalid at format time!*/
+  vcdp_session_t *session = &ptd->sessions[t->flow_id >> 1];
+  s = format (s, "vcdp-nat-output: flow-id %u (session %u, %s)\n", t->flow_id,
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format (s, "  new forward service chain: %U\n", format_vcdp_bitmap,
+	      session->bitmaps[VCDP_FLOW_FORWARD]);
+  s = format (s, "  new reverse service chain: %U\n", format_vcdp_bitmap,
+	      session->bitmaps[VCDP_FLOW_REVERSE]);
 
   return s;
 }
@@ -239,6 +250,7 @@ VLIB_NODE_FN (vcdp_nat_slowpath_node)
 	      vcdp_nat_slowpath_trace_t *t =
 		vlib_add_trace (vm, node, b[0], sizeof (*t));
 	      t->flow_id = b[0]->flow_id;
+	      t->thread_index = thread_index;
 	      b++;
 	    }
 	  else
@@ -249,7 +261,7 @@ VLIB_NODE_FN (vcdp_nat_slowpath_node)
 }
 
 VLIB_REGISTER_NODE (vcdp_nat_slowpath_node) = {
-  .name = "vcdp-nat-slowpath",
+  .name = "vcdp-nat-output",
   .vector_size = sizeof (u32),
   .format_trace = format_vcdp_nat_slowpath_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,

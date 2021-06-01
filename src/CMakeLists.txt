@@ -30,10 +30,11 @@ add_vpp_plugin(vcdp_gateway
 
   vcdp/nat/nat.c
   vcdp/nat/cli.c
+  vcdp/nat/format.c
   vcdp/nat/fastpath_node.c
   vcdp/nat/slowpath_node.c
   vcdp/nat/external_input_node.c
-  
+
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/cli.c

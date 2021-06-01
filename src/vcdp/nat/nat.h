@@ -41,16 +41,16 @@ typedef struct
 } nat_tenant_t;
 
 #define foreach_nat_rewrite_op                                                \
-  _ (SADDR, 0x1)                                                              \
-  _ (SPORT, 0x2)                                                              \
-  _ (DADDR, 0x4)                                                              \
-  _ (DPORT, 0x8)                                                              \
-  _ (ICMP_ID, 0x10)                                                           \
-  _ (TXFIB, 0x20)
+  _ (SADDR, 0x1, "src-addr")                                                  \
+  _ (SPORT, 0x2, "src-port")                                                  \
+  _ (DADDR, 0x4, "dst-addr")                                                  \
+  _ (DPORT, 0x8, "dst-port")                                                  \
+  _ (ICMP_ID, 0x10, "icmp-id")                                                \
+  _ (TXFIB, 0x20, "tx-fib")
 
 typedef enum
 {
-#define _(sym, x) NAT_REWRITE_OP_##sym = x,
+#define _(sym, x, s) NAT_REWRITE_OP_##sym = x,
   foreach_nat_rewrite_op
 #undef _
 } nat_rewrite_op_t;
@@ -109,5 +109,5 @@ clib_error_t *nat_alloc_pool_add_del (nat_main_t *nat, u32 alloc_pool_id,
 clib_error_t *nat_tenant_set_snat (nat_main_t *nat, u32 tenant_id,
 				   u32 outside_tenant_id, u32 table_id,
 				   u32 alloc_pool_id, u8 unset);
-
+format_function_t format_vcdp_nat_rewrite;
 #endif

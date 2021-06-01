@@ -22,7 +22,7 @@
   _ (NAT_EARLY_REWRITE, "vcdp-nat-early-rewrite", 1)                          \
   _ (L4_LIFECYCLE, "vcdp-l4-lifecycle", 2)                                    \
   _ (TCP_CHECK, "vcdp-tcp-check", 3)                                          \
-  _ (NAT_SLOWPATH, "vcdp-nat-slowpath", 4)                                    \
+  _ (NAT_SLOWPATH, "vcdp-nat-output", 4)                                      \
   _ (NAT_LATE_REWRITE, "vcdp-nat-late-rewrite", 5)                            \
   _ (GENEVE_OUTPUT, "vcdp-geneve-output", 6)                                  \
   _ (DUMMY_DOT1Q_OUTPUT, "vcdp-dummy-dot1q-output", 7)
