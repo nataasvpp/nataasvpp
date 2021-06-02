@@ -134,9 +134,12 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
 	   vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h,
 	   VCDP_SESSION_KEY_FLAG_SECONDARY_VALID, 0))
     {
-      /* Use h to try a different port
-       TODO: find something nicer than this ugly modulo */
-      ip4_new_port = 1024 + ((u32) h % 64512);
+      /* Use h to try a different port */
+      u32 h2 = h;
+      u64 reduced = h2;
+      reduced *= 64512ULL;
+      reduced >>= 32;
+      ip4_new_port = 1024 + reduced;
       *ip4_key_src_port = ip4_new_port;
     }
 
