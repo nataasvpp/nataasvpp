@@ -33,7 +33,7 @@ In other words, a tenant is the data structure definining the configuration of a
 As described in the previous section, there are several ways to inject packets in the VCDP data plane, and it is mainly agnostic to *how* it receives packets. To inject a certain packet, code must:
 
 1. Set the tenant index buffer metadata to define the configuration of any new session that might be initiated by the packet
-2. Set the flow id buffer metadata to define the context if for the session lookup (Note that this will be erased by lookup and replaced with the flow index of the session)
+2. Set the flow id buffer metadata to the context id which should be used for the session lookup (Note that this will be erased by lookup and replaced with `(session_index << 1) | direction` as per above)
 3. Sent the packet to the `vcdp-lookup` node
 
 Typically, hooks to enter the VCDP data plane could be implemented as intercepting features in VPP, or special DPO if the FIB is to be used to decide whether the VCDP data plane is to be used or not.
