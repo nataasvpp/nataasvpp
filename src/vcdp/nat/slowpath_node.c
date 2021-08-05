@@ -83,6 +83,7 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
   u32 ip4_old_src_addr;
   u32 ip4_new_src_addr;
   u16 *ip4_key_src_port;
+  u16 *ip4_key_dst_port;
   u16 ip4_old_port;
   u16 ip4_new_port;
 
@@ -125,6 +126,8 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
   /* Allocate a new port */
   ip4_key_src_port =
     pseudo_dir ? &new_key.ip4_key.port_hi : &new_key.ip4_key.port_lo;
+  ip4_key_dst_port =
+    pseudo_dir ? &new_key.ip4_key.port_lo : &new_key.ip4_key.port_hi;
   ip4_old_port = *ip4_key_src_port;
 
   /* First try with original src port */
@@ -139,8 +142,10 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
       u64 reduced = h2;
       reduced *= 64512ULL;
       reduced >>= 32;
-      ip4_new_port = 1024 + reduced;
+      ip4_new_port = clib_host_to_net_u16 (1024 + reduced);
       *ip4_key_src_port = ip4_new_port;
+      if (PREDICT_FALSE (proto == IP_PROTOCOL_ICMP))
+	*ip4_key_dst_port = ip4_new_port;
     }
 
   if (n_retries == 5)
@@ -173,19 +178,32 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
   nat_session[0].version = session->session_version;
   nat_session[1].version = session->session_version;
 
-  nat_session[0].ops =
-    NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB;
+  if (PREDICT_TRUE (proto != IP_PROTOCOL_ICMP))
+    {
+      nat_session[0].ops =
+	NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB;
+      nat_session[0].rewrite.sport = ip4_new_port;
+      nat_session[1].ops =
+	NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB;
+      nat_session[1].rewrite.dport = ip4_old_port;
+    }
+  else
+    {
+      nat_session[0].ops =
+	NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB;
+      nat_session[0].rewrite.icmp_id = ip4_new_port;
+      nat_session[1].ops =
+	NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB;
+      nat_session[1].rewrite.icmp_id = ip4_old_port;
+    }
+
   nat_session[0].rewrite.saddr.as_u32 = ip4_new_src_addr;
-  nat_session[0].rewrite.sport = ip4_new_port;
   nat_session[0].rewrite.fib_index = tenant->fib_index;
   nat_session[0].rewrite.proto = proto;
   nat_session[0].l3_csum_delta = l3_sum_delta_forward;
   nat_session[0].l4_csum_delta = l4_sum_delta_forward;
 
-  nat_session[1].ops =
-    NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB;
   nat_session[1].rewrite.daddr.as_u32 = ip4_old_src_addr;
-  nat_session[1].rewrite.dport = ip4_old_port;
   nat_session[1].rewrite.fib_index = old_fib_index;
   nat_session[1].rewrite.proto = proto;
   nat_session[1].l3_csum_delta = l3_sum_delta_reverse;

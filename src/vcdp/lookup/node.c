@@ -83,11 +83,16 @@ static const u8 l4_mask_bits[256] = {
   [IP_PROTOCOL_IPSEC_ESP] = 32, [IP_PROTOCOL_IPSEC_AH] = 32,
 };
 
+/* L4 data offset to copy into session */
+static const u8 l4_offset_32w[256] = { [IP_PROTOCOL_ICMP] = 1 };
+
 /* TODO: add ICMP, ESP, and AH (+ additional
  * branching or lookup for different
  * shuffling mask) */
 static const u64 tcp_udp_bitmask =
   ((1 << IP_PROTOCOL_TCP) | (1 << IP_PROTOCOL_UDP));
+static const u64 icmp_type_bitmask =
+  (1ULL << ICMP4_echo_request) | (1ULL << ICMP4_echo_reply);
 static const u8x16 key_shuff_no_norm = { 0, 1, 2,  3,  -1, 5,  -1, -1,
 					 8, 9, 10, 11, 12, 13, 14, 15 };
 static const u8x16 key_shuff_norm = { 2,  3,  0,  1,  -1, 5, -1, -1,
@@ -97,21 +102,29 @@ static const u8x16 src_ip_byteswap_x2 = { 11, 10, 9, 8, -1, -1, -1, -1,
 static const u8x16 dst_ip_byteswap_x2 = { 15, 14, 13, 12, -1, -1, -1, -1,
 					  15, 14, 13, 12, -1, -1, -1, -1 };
 
-static_always_inline void
+static const u8x16 key_swap_icmp = { 2, 3, 0,  1,  4,  5,  6,  7,
+				     8, 9, 10, 11, 12, 13, 14, 15 };
+static const u8x16 key_l4_data_mask = { -1, -1, -1, -1, 0, 0, 0, 0,
+					0,  0,	0,  0,	0, 0, 0, 0 };
+
+static_always_inline u8
 calc_key (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
-	  u64 *lookup_val, u64 *h)
+	  u64 *lookup_val, u64 *h, u8 slow_path)
 {
   u8 pr;
   i64x2 norm, zero = {};
   u8x16 k, swap;
   u32 l4_hdr;
   void *next_header;
-
   ip4_header_t *ip = vlib_buffer_get_current (b);
+  u8 slowpath_needed;
 
   /* load last 16 bytes of ip header into 128-bit register */
   k = *(u8x16u *) ((u8 *) ip + 4);
   pr = ip->protocol;
+  next_header = ip4_next_header (ip);
+  slowpath_needed = pr == IP_PROTOCOL_ICMP; /*TODO: add fragmentation also
+   || (ip->flags_and_fragment_offset & IP4_HEADER_FLAG_MORE_FRAGMENTS);*/
 
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
    * compare so result will hold all ones if we need to swap src and dst
@@ -119,19 +132,37 @@ calc_key (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   norm = (((i64x2) u8x16_shuffle (k, src_ip_byteswap_x2)) >
 	  ((i64x2) u8x16_shuffle (k, dst_ip_byteswap_x2)));
 
-  /* we only normalize tcp and tcp, for other cases we reset all bits to 0 */
-  norm &= i64x2_splat ((1ULL << pr) & tcp_udp_bitmask) != zero;
-
+  /* we only normalize tcp and udp, for other cases we
+   * reset all bits to 0 */
+  if (slow_path && pr == IP_PROTOCOL_ICMP)
+    {
+      icmp46_header_t *icmp = next_header;
+      u8 type = icmp->type;
+      norm &= i64x2_splat ((1ULL << type) & icmp_type_bitmask) != zero;
+    }
+  else
+    {
+      norm &= i64x2_splat ((1ULL << pr) & tcp_udp_bitmask) != zero;
+    }
   swap = key_shuff_no_norm;
   /* if norm is zero, we don't need to normalize so nothing happens here */
   swap += (key_shuff_norm - key_shuff_no_norm) & (u8x16) norm;
 
   /* overwrite first 4 bytes with first 0 - 4 bytes of l4 header */
   next_header = ip4_next_header (ip);
-  l4_hdr = *(u32 *) next_header & pow2_mask (l4_mask_bits[pr]);
+  if (slow_path)
+    l4_hdr = ((u32 *) next_header + l4_offset_32w[pr])[0] &
+	     pow2_mask (l4_mask_bits[pr]);
+  else
+    l4_hdr = *(u32 *) next_header & pow2_mask (l4_mask_bits[pr]);
+
   k = (u8x16) u32x4_insert (k, l4_hdr, 0);
 
   k = u8x16_shuffle (k, swap);
+  /* Reshuffle for ICMP
+     TODO: merge with fast path? */
+  if (slow_path && pr == IP_PROTOCOL_ICMP)
+    k += u8x16_shuffle (k, key_swap_icmp) & key_l4_data_mask;
   lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
   /* extract tcp flags */
@@ -146,6 +177,10 @@ calc_key (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
   h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));
+
+  /* If slowpath needed == 1, we may have done a lot of useless work that will
+   be overwritten, but we avoid too much branching in fastpath */
+  return slowpath_needed;
 }
 
 static_always_inline int
@@ -207,20 +242,21 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   return 0;
 }
 
-static_always_inline void
+static_always_inline u8
 vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
 		  vcdp_session_ip4_key_t *k, u64 *lookup_val, u64 *h,
-		  int prefetch_buffer_stride)
+		  int prefetch_buffer_stride, u8 slowpath)
 {
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
-
+  u8 slowpath_needed = 0;
   if (prefetch_buffer_stride)
     {
       clib_prefetch_load (pb[0]);
       clib_prefetch_load (pb[0]->data);
     }
 
-  calc_key (b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0);
+  slowpath_needed |=
+    calc_key (b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0, slowpath);
 
   if (prefetch_buffer_stride)
     {
@@ -228,7 +264,8 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[1]->data);
     }
 
-  calc_key (b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1);
+  slowpath_needed |=
+    calc_key (b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1, slowpath);
 
   if (prefetch_buffer_stride)
     {
@@ -236,7 +273,8 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[2]->data);
     }
 
-  calc_key (b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2);
+  slowpath_needed |=
+    calc_key (b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2, slowpath);
 
   if (prefetch_buffer_stride)
     {
@@ -244,7 +282,78 @@ vcdp_lookup_four (clib_bihash_24_8_t *t, vlib_buffer_t **b,
       clib_prefetch_load (pb[3]->data);
     }
 
-  calc_key (b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3);
+  slowpath_needed |=
+    calc_key (b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3, slowpath);
+  return slowpath_needed;
+}
+
+static_always_inline void
+vcdp_prepare_all_keys_slow (vcdp_main_t *vcdp, vlib_buffer_t **b,
+			    vcdp_session_ip4_key_t *k, u64 *lv, u64 *h,
+			    u32 n_left);
+
+static_always_inline uword
+vcdp_prepare_all_keys (vcdp_main_t *vcdp, vlib_buffer_t **b,
+		       vcdp_session_ip4_key_t *k, u64 *lv, u64 *h, u32 n_left,
+		       u8 slowpath)
+{
+  /* main loop - prefetch next 4 buffers,
+   * prefetch previous 4 buckets */
+  while (n_left >= 8)
+    {
+      if (vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 4, slowpath) &&
+	  !slowpath)
+	return n_left;
+
+      b += 4;
+      k += 4;
+      lv += 4;
+      h += 4;
+      n_left -= 4;
+    }
+
+  /* last 4 packets - dont prefetch next 4 buffers,
+   * prefetch previous 4 buckets */
+  if (n_left >= 4)
+    {
+      if (vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 0, slowpath) &&
+	  !slowpath)
+	return n_left;
+
+      b += 4;
+      k += 4;
+      lv += 4;
+      h += 4;
+      n_left -= 4;
+    }
+
+  while (n_left > 0)
+    {
+      if (calc_key (b[0], b[0]->flow_id, k + 0, lv + 0, h + 0, slowpath) &&
+	  !slowpath)
+	return n_left;
+
+      b += 1;
+      k += 1;
+      lv += 1;
+      h += 1;
+      n_left -= 1;
+    }
+  return 0;
+}
+static_always_inline void
+vcdp_prepare_all_keys_slow (vcdp_main_t *vcdp, vlib_buffer_t **b,
+			    vcdp_session_ip4_key_t *k, u64 *lv, u64 *h,
+			    u32 n_left)
+{
+  vcdp_prepare_all_keys (vcdp, b, k, lv, h, n_left, 1);
+}
+static_always_inline uword
+vcdp_prepare_all_keys_fast (vcdp_main_t *vcdp, vlib_buffer_t **b,
+			    vcdp_session_ip4_key_t *k, u64 *lv, u64 *h,
+			    u32 n_left)
+{
+  return vcdp_prepare_all_keys (vcdp, b, k, lv, h, n_left, 0);
 }
 
 VLIB_NODE_FN (vcdp_lookup_node)
@@ -276,6 +385,7 @@ VLIB_NODE_FN (vcdp_lookup_node)
   u64 __attribute__ ((aligned (32))) lookup_vals[VLIB_FRAME_SIZE],
     *lv = lookup_vals;
   u16 hit_count = 0;
+  uword n_left_slow_keys;
 
   vlib_get_buffers (vm, from, bufs, n_left);
   b = bufs;
@@ -284,48 +394,14 @@ VLIB_NODE_FN (vcdp_lookup_node)
   vcdp_session_index_iterate_expired (ptd, session_index)
     vcdp_session_remove_or_rearm (vcdp, ptd, thread_index, session_index);
 
-  /* main loop - prefetch next 4 buffers,
-   * prefetch previous 4 buckets */
-  while (n_left >= 8)
+  if (PREDICT_FALSE ((n_left_slow_keys = vcdp_prepare_all_keys_fast (
+			vcdp, b, k, lv, h, n_left))))
     {
-      vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 4);
-
-      b += 4;
-      k += 4;
-      lv += 4;
-      h += 4;
-      n_left -= 4;
+      uword n_done = n_left - n_left_slow_keys;
+      vcdp_prepare_all_keys_slow (vcdp, b + n_done, k + n_done, lv + n_done,
+				  h + n_done, n_left_slow_keys);
     }
 
-  /* last 4 packets - dont prefetch next 4 buffers,
-   * prefetch previous 4 buckets */
-  if (n_left >= 4)
-    {
-      vcdp_lookup_four (&vcdp->table4, b, k, lv, h, 0);
-
-      b += 4;
-      k += 4;
-      lv += 4;
-      h += 4;
-      n_left -= 4;
-    }
-
-  while (n_left > 0)
-    {
-      calc_key (b[0], b[0]->flow_id, k + 0, lv + 0, h + 0);
-
-      b += 1;
-      k += 1;
-      lv += 1;
-      h += 1;
-      n_left -= 1;
-    }
-
-  n_left = frame->n_vectors;
-  b = bufs;
-  h = hashes;
-  k = keys;
-  lv = lookup_vals;
   while (n_left)
     {
       if (PREDICT_TRUE (n_left > 8))

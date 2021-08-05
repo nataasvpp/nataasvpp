@@ -154,11 +154,6 @@ typedef union
 	u16 port_lo;
 	u16 port_hi;
       };
-      struct
-      {
-	u8 type;
-	u8 code;
-      };
     };
     u8 unused;
     u8 proto;

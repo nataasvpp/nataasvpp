@@ -77,9 +77,11 @@ nat_fastpath_process_one (nat_rewrite_data_t *nat_session,
   u8 proto = nat_session->rewrite.proto;
   u32 ops;
   ip4_header_t *ip4 = (void *) data;
-  ip_csum_t ip_sum = 0, tcp_sum = 0, udp_sum = 0;
+  ip_csum_t ip_sum = 0, tcp_sum = 0, udp_sum = 0, icmp_sum = 0;
   tcp_header_t *tcp;
   udp_header_t *udp;
+  icmp46_header_t *icmp;
+  u16 *icmp_id;
 
   if (session->session_version != nat_session->version)
     {
@@ -129,6 +131,17 @@ nat_fastpath_process_one (nat_rewrite_data_t *nat_session,
 
       if (ops & NAT_REWRITE_OP_DPORT)
 	udp->dst_port = nat_session->rewrite.dport;
+    }
+  else if (proto == IP_PROTOCOL_ICMP)
+    {
+      icmp = ip4_next_header (ip4);
+      icmp_sum = icmp->checksum;
+      icmp_id = (u16 *) (icmp + 1);
+      icmp_sum = ip_csum_sub_even (icmp_sum, nat_session->l4_csum_delta);
+      icmp_sum = ip_csum_fold (icmp_sum);
+      icmp->checksum = icmp_sum;
+      if (ops & NAT_REWRITE_OP_ICMP_ID)
+	*icmp_id = nat_session->rewrite.icmp_id;
     }
   else
     {
