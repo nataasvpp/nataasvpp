@@ -30,6 +30,7 @@ add_vpp_plugin(vcdp_gateway
 
   vcdp/nat/nat.c
   vcdp/nat/cli.c
+  vcdp/nat/api.c
   vcdp/nat/format.c
   vcdp/nat/fastpath_node.c
   vcdp/nat/slowpath_node.c
@@ -38,6 +39,7 @@ add_vpp_plugin(vcdp_gateway
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/cli.c
+  vcdp/api.c
   dummy/dot1q.c
 
   gateway/gateway.c
@@ -54,4 +56,10 @@ add_vpp_plugin(vcdp_gateway
   gateway/geneve_input/node.c
   gateway/geneve_output/node.c
   dummy/dot1q.c
+
+  API_FILES
+  vcdp/vcdp.api
+  vcdp/nat/nat.api
+  #gateway/gateway.api
+  #gateway/geneve_input/geneve_input.api
 )

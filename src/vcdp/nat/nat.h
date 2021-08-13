@@ -95,6 +95,7 @@ typedef struct
   nat_alloc_pool_t *alloc_pool; /* pool of allocation pools */
   nat_per_thread_data_t *ptd;	/* vec */
   uword *alloc_pool_idx_by_id;	/* hash */
+  u16 msg_id_base;
 } nat_main_t;
 
 extern nat_main_t nat_main;

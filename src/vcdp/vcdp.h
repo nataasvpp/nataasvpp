@@ -241,7 +241,7 @@ typedef struct
 
   /* per-thread data */
   vcdp_per_thread_data_t *per_thread_data;
-
+  u16 msg_id_base;
 } vcdp_main_t;
 
 extern vcdp_main_t vcdp_main;
