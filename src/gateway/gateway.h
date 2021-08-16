@@ -77,6 +77,7 @@ typedef struct
 
   /* per-thread data */
   gw_per_thread_data_t *per_thread_data;
+  u16 msg_id_base;
 } gw_main_t;
 
 typedef struct

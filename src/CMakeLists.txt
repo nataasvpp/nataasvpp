@@ -44,8 +44,8 @@ add_vpp_plugin(vcdp_gateway
 
   gateway/gateway.c
   gateway/cli.c
+  gateway/api.c
   gateway/geneve_input/node.c
-  gateway/geneve_input/cli.c
   gateway/geneve_output/node.c
 
   MULTIARCH_SOURCES
@@ -60,6 +60,5 @@ add_vpp_plugin(vcdp_gateway
   API_FILES
   vcdp/vcdp.api
   vcdp/nat/nat.api
-  #gateway/gateway.api
-  #gateway/geneve_input/geneve_input.api
+  gateway/gateway.api
 )
