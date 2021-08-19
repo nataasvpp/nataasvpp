@@ -198,3 +198,38 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
 #undef _
     return s;
 }
+
+uword
+unformat_vcdp_service (unformat_input_t *input, va_list *args)
+{
+  u8 *result = va_arg (*args, u8 *);
+  int i = -1;
+#define _(n, s, idx)                                                          \
+  if (unformat (input, (s)))                                                  \
+    i = (idx);
+  foreach_vcdp_service
+#undef _
+
+    if (i > -1)
+  {
+    *result = i;
+    return 1;
+  }
+  return 0;
+}
+
+uword
+unformat_vcdp_service_bitmap (unformat_input_t *input, va_list *args)
+{
+  u32 *result = va_arg (*args, u32 *);
+  int i = -1;
+  u32 bitmap = 0;
+  while (unformat_user (input, unformat_vcdp_service, &i))
+    bitmap |= 1 << i;
+  if (i > -1)
+    {
+      *result = bitmap;
+      return 1;
+    }
+  return 0;
+}

@@ -56,11 +56,29 @@ vl_api_vcdp_set_services_t_handler (vl_api_vcdp_set_services_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32 (mp->tenant_id);
-  u32 bitmap = clib_net_to_host_u32 (mp->bmp);
+  u32 bitmap = 0;
+  u8 idx = 0;
   u8 dir = vcdp_api_direction (mp->dir);
+  int rv;
+  for (uword i = 0; i < mp->n_services; i++)
+    {
+      char *cstring = (char *) mp->services[i].data;
+      unformat_input_t tmp;
+      unformat_init_string (&tmp, cstring,
+			    strnlen (cstring, sizeof (mp->services[0].data)));
+      rv = unformat_user (&tmp, unformat_vcdp_service, &idx);
+      unformat_free (&tmp);
+      if (!rv)
+	{
+	  rv = -1;
+	  goto fail;
+	}
+      bitmap |= (1 << idx);
+    }
   clib_error_t *err = vcdp_set_services (vcdp, tenant_id, bitmap, dir);
   vl_api_vcdp_set_services_reply_t *rmp;
-  int rv = err ? -1 : 0;
+  rv = err ? -1 : 0;
+fail:
   REPLY_MACRO (VL_API_VCDP_SET_SERVICES_REPLY + vcdp->msg_id_base);
 }
 

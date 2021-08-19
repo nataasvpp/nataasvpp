@@ -253,6 +253,8 @@ format_function_t format_vcdp_session_state;
 format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
+unformat_function_t unformat_vcdp_service;
+unformat_function_t unformat_vcdp_service_bitmap;
 
 static_always_inline u32
 vcdp_session_index_from_lookup (u64 val)

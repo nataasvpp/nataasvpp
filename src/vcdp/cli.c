@@ -89,18 +89,18 @@ vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
     {
       if (unformat (line_input, "tenant %d", &tenant_id))
 	;
-#define _(n, s, idx) else if (unformat (line_input, (s))) bitmap |= 1 << (idx);
-
-      foreach_vcdp_service
-#undef _
-	else if (unformat (line_input, "forward")) direction =
-	  VCDP_FLOW_FORWARD;
-      else if (unformat (line_input, "reverse")) direction = VCDP_FLOW_REVERSE;
+      else if (unformat_user (line_input, unformat_vcdp_service_bitmap,
+			      &bitmap))
+	;
+      else if (unformat (line_input, "forward"))
+	direction = VCDP_FLOW_FORWARD;
+      else if (unformat (line_input, "reverse"))
+	direction = VCDP_FLOW_REVERSE;
       else
-      {
-	err = unformat_parse_error (line_input);
-	goto done;
-      }
+	{
+	  err = unformat_parse_error (line_input);
+	  goto done;
+	}
     }
   if (tenant_id == ~0)
     {

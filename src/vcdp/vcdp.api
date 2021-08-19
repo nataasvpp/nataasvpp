@@ -23,7 +23,10 @@ enum vcdp_session_direction : u8
   VCDP_API_REVERSE = 1,
 };
 
-typedef u32 vcdp_service_bitmap;
+typedef vcdp_service_name
+{
+  string data[32];
+};
 
 /** \brief
     @param client_index - opaque cookie to identify the sender
@@ -49,8 +52,9 @@ autoreply define vcdp_set_services
   u32 context;
 
   u32 tenant_id;
-  vl_api_vcdp_service_bitmap_t bmp;
-  vl_api_vcdp_session_direction_t dir; 
+  vl_api_vcdp_session_direction_t dir;
+  u8 n_services;
+  vl_api_vcdp_service_name_t services[n_services];
 };
 
 autoreply define vcdp_set_timeout
