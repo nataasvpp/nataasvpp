@@ -274,7 +274,8 @@ vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result,
   u8 init_pseudo_dir = session->pseudo_dir[key_idx];
   u8 resp_pseudo_dir = session->pseudo_dir[key_idx];
   u8 proto = session->proto;
-  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP;
+  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP ||
+		 proto == IP_PROTOCOL_ICMP;
 
   result->as_u64x2 = init_key->as_u64x2;
 

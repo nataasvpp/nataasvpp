@@ -16,6 +16,7 @@
  */
 
 option version = "0.0.1";
+import "vnet/ip/ip_types.api";
 
 enum vcdp_session_direction : u8
 {
@@ -23,9 +24,30 @@ enum vcdp_session_direction : u8
   VCDP_API_REVERSE = 1,
 };
 
+enum vcdp_session_state : u8
+{
+  VCDP_API_SESSION_STATE_FSOL = 0,
+  VCDP_API_SESSION_STATE_ESTABLISHED = 1,
+  VCDP_API_SESSION_STATE_TIME_WAIT = 2,
+};
+
+enum vcdp_session_type : u8
+{
+  VCDP_API_SESSION_TYPE_IP4 = 0,
+};
+
 typedef vcdp_service_name
 {
   string data[32];
+};
+
+typedef vcdp_session_key
+{
+  u32 context_id;
+  vl_api_ip4_address_t init_addr;
+  u16 init_port;
+  vl_api_ip4_address_t resp_addr;
+  u16 resp_port;
 };
 
 /** \brief
@@ -55,6 +77,49 @@ autoreply define vcdp_set_services
   vl_api_vcdp_session_direction_t dir;
   u8 n_services;
   vl_api_vcdp_service_name_t services[n_services];
+};
+
+define vcdp_session_dump
+{
+  u32 client_index;
+  u32 context;
+};
+
+define vcdp_session_details
+{
+  u32 context;
+  
+  u64 session_id;
+  u32 thread_index;
+  u32 tenant_id;
+  u32 session_idx;
+  vl_api_vcdp_session_type_t session_type;
+  vl_api_ip_proto_t protocol;
+  vl_api_vcdp_session_state_t state;
+  f64 remaining_time;
+/* Avoid service strings to keep it compact */
+  u32 forward_bitmap;
+  u32 reverse_bitmap;
+  u8 n_keys;
+  vl_api_vcdp_session_key_t keys[n_keys];
+};
+
+define vcdp_tenant_dump
+{
+  u32 client_index;
+  u32 context;
+};
+
+define vcdp_tenant_details
+{
+  u32 context;
+
+  u32 index;
+  u32 context_id;
+  u32 forward_bitmap;
+  u32 reverse_bitmap;
+  u32 n_timeout;
+  u32 timeout[n_timeout];
 };
 
 autoreply define vcdp_set_timeout
