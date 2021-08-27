@@ -70,6 +70,7 @@ typedef struct
 typedef struct
 {
   vcdp_tcp_check_per_thread_data_t *ptd;
+  u16 msg_id_base;
 } vcdp_tcp_check_main_t;
 
 extern vcdp_tcp_check_main_t vcdp_tcp;

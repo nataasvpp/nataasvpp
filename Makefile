@@ -41,7 +41,7 @@ clean:
 	@rm -rf $(build_dir)
 
 fixstyle:
-	@for i in src/*/*.[ch] src/*/*/*.[ch] ; do clang-format -i $$i; done
+	@for i in plugins/*/*.[ch] plugins/*/*/*.[ch] ; do clang-format -i $$i; done
 #	@find . -regex '\./gateway/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
 #	@find . -regex '\./vcdp/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
 

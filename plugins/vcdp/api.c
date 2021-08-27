@@ -24,19 +24,7 @@
 #include <vcdp/vcdp.api_enum.h>
 #include <vcdp/vcdp.api_types.h>
 #include <vlibapi/api_helper_macros.h>
-
-static u8
-vcdp_api_direction (vl_api_vcdp_session_direction_t dir)
-{
-  switch (dir)
-    {
-    case VCDP_API_FORWARD:
-      return VCDP_FLOW_FORWARD;
-    case VCDP_API_REVERSE:
-      return VCDP_API_REVERSE;
-    }
-  return VCDP_FLOW_FORWARD;
-}
+#include <vcdp/vcdp_types_funcs.h>
 
 static void
 vl_api_vcdp_tenant_add_del_t_handler (vl_api_vcdp_tenant_add_del_t *mp)
@@ -98,18 +86,6 @@ vl_api_vcdp_set_timeout_t_handler (vl_api_vcdp_set_timeout_t *mp)
   REPLY_MACRO (VL_API_VCDP_SET_TIMEOUT_REPLY + vcdp->msg_id_base);
 }
 
-static vl_api_vcdp_session_type_t
-vcdp_session_type_encode (vcdp_session_type_t x)
-{
-  switch (x)
-    {
-    case VCDP_SESSION_TYPE_IP4:
-      return VCDP_API_SESSION_TYPE_IP4;
-    default:
-      return -1;
-    }
-};
-
 static vl_api_vcdp_session_state_t
 vcdp_session_state_encode (vcdp_session_state_t x)
 {
@@ -125,17 +101,6 @@ vcdp_session_state_encode (vcdp_session_state_t x)
       return -1;
     }
 };
-
-static void
-vcdp_ip4_key_encode (u32 context_id, vcdp_ip4_key_t *key,
-		     vl_api_vcdp_session_key_t *out)
-{
-  out->context_id = clib_host_to_net_u32 (context_id);
-  ip4_address_encode ((ip4_address_t *) &key->ip_addr_lo, out->init_addr);
-  ip4_address_encode ((ip4_address_t *) &key->ip_addr_hi, out->resp_addr);
-  out->init_port = clib_host_to_net_u16 (key->port_lo);
-  out->resp_port = clib_host_to_net_u16 (key->port_hi);
-}
 
 static void
 vcdp_send_session_details (vl_api_registration_t *rp, u32 context,

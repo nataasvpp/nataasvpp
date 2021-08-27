@@ -1,0 +1,51 @@
+/*
+ *------------------------------------------------------------------
+ * Copyright (c) 2019 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *------------------------------------------------------------------
+ */
+
+option version = "0.0.1";
+import "vnet/ip/ip_types.api";
+
+enum vcdp_session_direction : u8
+{
+  VCDP_API_FORWARD = 0,
+  VCDP_API_REVERSE = 1,
+};
+
+enum vcdp_session_state : u8
+{
+  VCDP_API_SESSION_STATE_FSOL = 0,
+  VCDP_API_SESSION_STATE_ESTABLISHED = 1,
+  VCDP_API_SESSION_STATE_TIME_WAIT = 2,
+};
+
+enum vcdp_session_type : u8
+{
+  VCDP_API_SESSION_TYPE_IP4 = 0,
+};
+
+typedef vcdp_service_name
+{
+  string data[32];
+};
+
+typedef vcdp_session_key
+{
+  u32 context_id;
+  vl_api_ip4_address_t init_addr;
+  u16 init_port;
+  vl_api_ip4_address_t resp_addr;
+  u16 resp_port;
+};

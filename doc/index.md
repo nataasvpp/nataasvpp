@@ -72,7 +72,7 @@ In some cases, a given session must be accessible through different 5-tuples. Ty
 
 ## Structure of the src folder
 
-* `src/vcdp/` Contains everything related to the core data plane
+* `plugins/vcdp/` Contains everything related to the core data plane
   * `cli.c` Self explanatory
   * `common.h` Vcdp buffer metadata
   * `format.c` Self explanatory
@@ -86,13 +86,13 @@ In some cases, a given session must be accessible through different 5-tuples. Ty
   * `nat/` The NAT services
   * `tcp-check/` The tcp-check service. When l4-lifecycle detects a TCP session, it removes itself from the service chains and add tcp-check instead. This service maintains a basic bipartite TCP state machine and manages the lifecycle of TCP sessions accordingly
   * `timer/` Timer management code for session expiration
-* `src/gateway/`  Contains everything related to GENEVE-based interfacing
+* `plugins/gateway/`  Contains everything related to GENEVE-based interfacing
   * `geneve_input/` Feature node (on `ip4-unicast`) designed to intercept GENEVE packets, use the VNI to determine the input tenant, and inject into `vcdp-lookup`
   * `geneve_output/` Service node (terminating a VCDP service chain) designed to add a GENEVE header, and inject a packet back into `ip4-lookup`
   * `cli.c` Self explanatory
   * `gateway.c` Internal API to be used by cli for GENEVE input and output configuration/management
   * `gateway.h` Associated data structures
-* `src/dummy/dot1q.c` same as `src/gateway` but with 802.1q in the role of GENEVE, and VLAN tag in the role of the VNI.
+* `plugins/dummy/dot1q.c` same as `plugins/gateway` but with 802.1q in the role of GENEVE, and VLAN tag in the role of the VNI.
 
 
 

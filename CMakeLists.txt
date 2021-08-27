@@ -7,4 +7,4 @@ set(VPP_BINARY_DIR ${CMAKE_BINARY_DIR}/CMakeFiles)
 
 project(vcdp)
 find_package(VPP)
-add_subdirectory(src)
+add_subdirectory(plugins)

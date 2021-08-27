@@ -23,6 +23,7 @@ add_vpp_plugin(vcdp_gateway
   vcdp/tcp-check/tcp_check.c
   vcdp/tcp-check/format.c
   vcdp/tcp-check/cli.c
+  vcdp/tcp-check/api.c
 
   vcdp/timer/node.c
 
@@ -58,7 +59,9 @@ add_vpp_plugin(vcdp_gateway
   dummy/dot1q.c
 
   API_FILES
+  vcdp/vcdp_types.api
   vcdp/vcdp.api
   vcdp/nat/nat.api
+  vcdp/tcp-check/tcp_check.api
   gateway/gateway.api
 )
