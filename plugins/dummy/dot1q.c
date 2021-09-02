@@ -19,6 +19,7 @@
 #include <vnet/feature/feature.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/common.h>
+#include <vcdp/service.h>
 typedef struct
 {
   u32 next_index;
@@ -291,4 +292,12 @@ VLIB_REGISTER_NODE (vcdp_dummy_dot1q_output_node) = {
 
   .sibling_of = "vcdp-dummy-dot1q-input"
 
+};
+
+VCDP_SERVICE_DEFINE (dummy_dot1q_output) = {
+  .node_name = "vcdp-dummy-dot1q-output",
+  .runs_before = VCDP_SERVICES (0),
+  .runs_after = VCDP_SERVICES ("vcdp-drop", "vcdp-l4-lifecycle",
+			       "vcdp-tcp-check"),
+  .is_terminal = 1
 };

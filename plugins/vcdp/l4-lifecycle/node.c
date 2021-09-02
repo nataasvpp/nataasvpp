@@ -52,6 +52,8 @@ format_vcdp_l4_lifecycle_trace (u8 *s, va_list *args)
   return s;
 }
 
+VCDP_SERVICE_DECLARE (tcp_check)
+VCDP_SERVICE_DECLARE (l4_lifecycle)
 VLIB_NODE_FN (vcdp_l4_lifecycle_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -80,12 +82,12 @@ VLIB_NODE_FN (vcdp_l4_lifecycle_node)
       if (session->proto == IP_PROTOCOL_TCP)
 	{
 	  session->bitmaps[VCDP_FLOW_FORWARD] &=
-	    ~(1 << VCDP_SERVICE_L4_LIFECYCLE);
+	    ~VCDP_SERVICE_MASK (l4_lifecycle);
 	  session->bitmaps[VCDP_FLOW_REVERSE] &=
-	    ~(1 << VCDP_SERVICE_L4_LIFECYCLE);
-	  vcdp_buffer (b[0])->service_bitmap |= (1 << VCDP_SERVICE_TCP_CHECK);
-	  session->bitmaps[VCDP_FLOW_FORWARD] |= (1 << VCDP_SERVICE_TCP_CHECK);
-	  session->bitmaps[VCDP_FLOW_REVERSE] |= (1 << VCDP_SERVICE_TCP_CHECK);
+	    ~VCDP_SERVICE_MASK (l4_lifecycle);
+	  vcdp_buffer (b[0])->service_bitmap |= VCDP_SERVICE_MASK (tcp_check);
+	  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK (tcp_check);
+	  session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK (tcp_check);
 	}
       else
 	{
@@ -146,4 +148,11 @@ VLIB_REGISTER_NODE (vcdp_l4_lifecycle_node) = {
 
   .sibling_of = "vcdp-lookup"
 
+};
+
+VCDP_SERVICE_DEFINE (l4_lifecycle) = {
+  .node_name = "vcdp-l4-lifecycle",
+  .runs_before = VCDP_SERVICES (0),
+  .runs_after = VCDP_SERVICES ("vcdp-drop"),
+  .is_terminal = 0
 };

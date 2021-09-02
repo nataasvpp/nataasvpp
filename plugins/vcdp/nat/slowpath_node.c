@@ -61,7 +61,9 @@ format_vcdp_nat_slowpath_trace (u8 *s, va_list *args)
 
   return s;
 }
-
+VCDP_SERVICE_DECLARE (nat_late_rewrite)
+VCDP_SERVICE_DECLARE (nat_early_rewrite)
+VCDP_SERVICE_DECLARE (nat_output)
 static_always_inline void
 nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
 			   u32 *fib_index_by_sw_if_index, u16 thread_index,
@@ -209,11 +211,11 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
   nat_session[1].l3_csum_delta = l3_sum_delta_reverse;
   nat_session[1].l4_csum_delta = l4_sum_delta_reverse;
 
-  vcdp_buffer (b[0])->service_bitmap |= 1 << VCDP_SERVICE_NAT_LATE_REWRITE;
-  session->bitmaps[VCDP_FLOW_FORWARD] &= ~(1 << VCDP_SERVICE_NAT_SLOWPATH);
-  session->bitmaps[VCDP_FLOW_REVERSE] &= ~(1 << VCDP_SERVICE_NAT_SLOWPATH);
-  session->bitmaps[VCDP_FLOW_FORWARD] |= 1 << VCDP_SERVICE_NAT_LATE_REWRITE;
-  session->bitmaps[VCDP_FLOW_REVERSE] |= 1 << VCDP_SERVICE_NAT_EARLY_REWRITE;
+  vcdp_buffer (b[0])->service_bitmap |= VCDP_SERVICE_MASK (nat_late_rewrite);
+  session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK (nat_output);
+  session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK (nat_output);
+  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK (nat_late_rewrite);
+  session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK (nat_early_rewrite);
 
 end_of_packet:
   vcdp_next (b[0], to_next);
@@ -291,4 +293,12 @@ VLIB_REGISTER_NODE (vcdp_nat_slowpath_node) = {
   .error_strings = vcdp_nat_slowpath_error_strings,
   .sibling_of = "vcdp-lookup"
 
+};
+
+VCDP_SERVICE_DEFINE (nat_output) = {
+  .node_name = "vcdp-nat-output",
+  .runs_before = VCDP_SERVICES ("vcdp-geneve-output", "vcdp-nat-late-rewrite"),
+  .runs_after = VCDP_SERVICES ("vcdp-drop", "vcdp-l4-lifecycle",
+			       "vcdp-tcp-check"),
+  .is_terminal = 0
 };

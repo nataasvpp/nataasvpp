@@ -14,7 +14,7 @@
  */
 
 #include <vlib/vlib.h>
-
+#include <vcdp/service.h>
 #define foreach_vcdp_drop_error _ (DROP, "drop")
 
 typedef enum
@@ -107,3 +107,8 @@ VLIB_REGISTER_NODE (vcdp_drop_node) = {
   }
 
 };
+
+VCDP_SERVICE_DEFINE (drop) = { .node_name = "vcdp-drop",
+			       .runs_before = VCDP_SERVICES (0),
+			       .runs_after = VCDP_SERVICES (0),
+			       .is_terminal = 1 };

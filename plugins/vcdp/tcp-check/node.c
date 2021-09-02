@@ -278,3 +278,10 @@ VLIB_REGISTER_NODE (vcdp_tcp_check_node) = {
   .sibling_of = "vcdp-lookup"
 
 };
+
+VCDP_SERVICE_DEFINE (tcp_check) = {
+  .node_name = "vcdp-tcp-check",
+  .runs_before = VCDP_SERVICES (0),
+  .runs_after = VCDP_SERVICES ("vcdp-drop", "vcdp-l4-lifecycle"),
+  .is_terminal = 0
+};

@@ -16,7 +16,7 @@
 #include <vlib/vlib.h>
 #include <gateway/gateway.h>
 #include <vcdp/common.h>
-
+#include <vcdp/service.h>
 #define VCDP_GENEVE_OPTION_CLASS	   ((u16) 0xDEAD)
 #define VCDP_GENEVE_OPTION_TYPE_SESSION_ID ((u8) 0xBE)
 #define VCDP_GENEVE_OPTION_SESSION_ID_SIZE ((u8) 0x2)
@@ -317,4 +317,12 @@ VLIB_REGISTER_NODE (vcdp_geneve_output_node) = {
 #undef _
   }
 
+};
+
+VCDP_SERVICE_DEFINE (geneve_output) = {
+  .node_name = "vcdp-geneve-output",
+  .runs_before = VCDP_SERVICES (0),
+  .runs_after = VCDP_SERVICES ("vcdp-drop", "vcdp-l4-lifecycle",
+			       "vcdp-tcp-check"),
+  .is_terminal = 1
 };

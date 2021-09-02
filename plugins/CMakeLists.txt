@@ -39,6 +39,7 @@ add_vpp_plugin(vcdp_gateway
 
   vcdp/format.c
   vcdp/vcdp.c
+  vcdp/service.c
   vcdp/cli.c
   vcdp/api.c
   dummy/dot1q.c

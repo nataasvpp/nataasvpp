@@ -651,24 +651,14 @@ format_vcdp_handoff_trace (u8 *s, va_list *args)
 }
 
 /* *INDENT-OFF* */
-VLIB_REGISTER_NODE (vcdp_lookup_node) =
-{
+VLIB_REGISTER_NODE (vcdp_lookup_node) = {
   .name = "vcdp-lookup",
   .vector_size = sizeof (u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_lookup_error_strings),
+  .n_errors = ARRAY_LEN (vcdp_lookup_error_strings),
   .error_strings = vcdp_lookup_error_strings,
-
-  .n_next_nodes = VCDP_SERVICE_N,
-
-  /* edit / add dispositions here */
-  .next_nodes = {
-#define _(s, n, x) [VCDP_SERVICE_##s] = n,
-      foreach_vcdp_service
-#undef _
-  },
 };
 
 VLIB_REGISTER_NODE (vcdp_handoff_node) = {

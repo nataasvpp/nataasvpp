@@ -91,12 +91,12 @@ u8 *
 format_vcdp_bitmap (u8 *s, va_list *args)
 {
   u32 bmp = va_arg (*args, u32);
-#define _(x, str, idx)                                                        \
-  if (bmp & (0x1 << idx))                                                     \
-    s = format (s, "%s,", str);
-  foreach_vcdp_service
-#undef _
-    return s;
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  int i;
+  for (i = 0; i < vec_len (sm->services); i++)
+    if (bmp & sm->services[i]->service_mask[0])
+      s = format (s, "%s,", sm->services[i]->node_name);
+  return s;
 }
 
 u8 *
@@ -202,19 +202,18 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
 uword
 unformat_vcdp_service (unformat_input_t *input, va_list *args)
 {
+  vcdp_service_main_t *sm = &vcdp_service_main;
   u8 *result = va_arg (*args, u8 *);
-  int i = -1;
-#define _(n, s, idx)                                                          \
-  if (unformat (input, (s)))                                                  \
-    i = (idx);
-  foreach_vcdp_service
-#undef _
-
-    if (i > -1)
-  {
-    *result = i;
-    return 1;
-  }
+  int i;
+  for (i = 0; i < vec_len (sm->services); i++)
+    {
+      vcdp_service_registration_t *reg = vec_elt_at_index (sm->services, i)[0];
+      if (unformat (input, reg->node_name))
+	{
+	  *result = reg->index_in_bitmap[0];
+	  return 1;
+	}
+    }
   return 0;
 }
 
