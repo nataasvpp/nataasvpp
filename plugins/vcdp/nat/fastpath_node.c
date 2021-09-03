@@ -17,6 +17,7 @@
 #include <vcdp/nat/nat.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
+
 #define foreach_vcdp_nat_fastpath_error _ (DROP, "drop")
 
 #define foreach_vcdp_nat_terminal_next                                        \
@@ -68,6 +69,8 @@ format_vcdp_nat_fastpath_trace (u8 *s, va_list *args)
   return s;
 }
 
+VCDP_SERVICE_DECLARE (drop)
+
 static_always_inline void
 nat_fastpath_process_one (nat_rewrite_data_t *nat_session,
 			  vcdp_session_t *session, u16 *to_next,
@@ -85,7 +88,7 @@ nat_fastpath_process_one (nat_rewrite_data_t *nat_session,
 
   if (session->session_version != nat_session->version)
     {
-      vcdp_buffer (b[0])->service_bitmap = 0x1;
+      vcdp_buffer (b[0])->service_bitmap = VCDP_SERVICE_MASK (drop);
       goto end_of_packet;
     }
 
@@ -146,7 +149,7 @@ nat_fastpath_process_one (nat_rewrite_data_t *nat_session,
   else
     {
       /*FIXME, must be done at the beginning!*/
-      vcdp_buffer (b[0])->service_bitmap = 0x1;
+      vcdp_buffer (b[0])->service_bitmap = VCDP_SERVICE_MASK (drop);
       goto end_of_packet;
     }
 

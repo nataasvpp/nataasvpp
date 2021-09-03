@@ -26,6 +26,10 @@
 
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
+#include <vcdp/service.h>
+#define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK (drop)
+
+VCDP_SERVICE_DECLARE (drop)
 
 vcdp_main_t vcdp_main;
 

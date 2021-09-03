@@ -43,8 +43,6 @@
 #define BIHASH_TENANT_NUM_BUCKETS (1 << (VCDP_LOG2_TENANTS - 2))
 #define BIHASH_TENANT_MEM_SIZE	  (1 << 15)
 
-#define VCDP_DEFAULT_BITMAP (0x1)
-
 /* Convention session_index is 31 bit
  * Flow_index (embedded in vlib_buffer_t as "flow_id")
  * Flow_index = (session_index << 1) + !(is_forward)

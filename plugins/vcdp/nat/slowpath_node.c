@@ -41,6 +41,7 @@ typedef struct
 
 format_function_t format_vcdp_bitmap;
 
+VCDP_SERVICE_DECLARE (drop)
 static u8 *
 format_vcdp_nat_slowpath_trace (u8 *s, va_list *args)
 {
@@ -97,7 +98,7 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
 
   if (PREDICT_FALSE (!(tenant->flags & NAT_TENANT_FLAG_SNAT)))
     {
-      vcdp_buffer (b[0])->service_bitmap = 0x1;
+      vcdp_buffer (b[0])->service_bitmap = VCDP_SERVICE_MASK (drop);
       goto end_of_packet;
     }
 
@@ -154,7 +155,7 @@ nat_slow_path_process_one (vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd,
     {
       /* Port allocation failure */
       /* TODO: do the sensible thing, drop the packet + increase counters */
-      vcdp_buffer (b[0])->service_bitmap = 0x1;
+      vcdp_buffer (b[0])->service_bitmap = VCDP_SERVICE_MASK (drop);
       goto end_of_packet;
     }
 

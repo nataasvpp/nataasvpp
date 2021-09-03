@@ -56,6 +56,7 @@ format_vcdp_tcp_check_trace (u8 *s, va_list *args)
   return s;
 }
 
+VCDP_SERVICE_DECLARE (drop)
 static_always_inline void
 update_state_one_pkt (vcdp_tw_t *tw, vcdp_tenant_t *tenant,
 		      vcdp_tcp_check_session_state_t *tcp_session,
@@ -79,9 +80,9 @@ update_state_one_pkt (vcdp_tw_t *tw, vcdp_tenant_t *tenant,
       if (flags != VCDP_TCP_CHECK_TCP_FLAGS_SYN)
 	{
 	  /* Abnormal, put the session in blocked state */
-	  session->bitmaps[VCDP_FLOW_FORWARD] = 0x1;
-	  session->bitmaps[VCDP_FLOW_REVERSE] = 0x1;
-	  vcdp_buffer (b[0])->service_bitmap = 0x1;
+	  session->bitmaps[VCDP_FLOW_FORWARD] = VCDP_SERVICE_MASK (drop);
+	  session->bitmaps[VCDP_FLOW_REVERSE] = VCDP_SERVICE_MASK (drop);
+	  vcdp_buffer (b[0])->service_bitmap = VCDP_SERVICE_MASK (drop);
 	  tcp_session->flags = VCDP_TCP_CHECK_SESSION_FLAG_BLOCKED;
 	}
     }
