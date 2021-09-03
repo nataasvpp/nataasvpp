@@ -1,5 +1,5 @@
 #include <vcdp/vcdp.h>
-#include <vcdp/nat/nat.h>
+#include <vcdp_services/nat/nat.h>
 #include <vppinfra/pool.h>
 
 clib_error_t *

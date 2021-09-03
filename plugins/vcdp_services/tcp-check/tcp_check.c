@@ -1,4 +1,4 @@
-#include <vcdp/tcp-check/tcp_check.h>
+#include <vcdp_services/tcp-check/tcp_check.h>
 
 vcdp_tcp_check_main_t vcdp_tcp;
 

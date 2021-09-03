@@ -17,14 +17,14 @@
 
 #include <vcdp/vcdp.h>
 
-#include <vcdp/nat/nat.h>
+#include <vcdp_services/nat/nat.h>
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
 #include <vnet/ip/ip_types_api.h>
 
 #include <vnet/format_fns.h>
-#include <vcdp/nat/nat.api_enum.h>
-#include <vcdp/nat/nat.api_types.h>
+#include <vcdp_services/nat/nat.api_enum.h>
+#include <vcdp_services/nat/nat.api_types.h>
 #include <vlibapi/api_helper_macros.h>
 
 static void
@@ -84,7 +84,7 @@ vl_api_vcdp_nat_snat_set_unset_t_handler (vl_api_vcdp_nat_snat_set_unset_t *mp)
   REPLY_MACRO (VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY + nat->msg_id_base);
 }
 
-#include <vcdp/nat/nat.api.c>
+#include <vcdp_services/nat/nat.api.c>
 static clib_error_t *
 vcdp_nat_api_hookup (vlib_main_t *vm)
 {

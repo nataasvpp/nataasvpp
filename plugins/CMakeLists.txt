@@ -19,23 +19,23 @@ add_vpp_plugin(vcdp_gateway
 
   vcdp/drop/node.c
 
-  vcdp/tcp-check/node.c
-  vcdp/tcp-check/tcp_check.c
-  vcdp/tcp-check/format.c
-  vcdp/tcp-check/cli.c
-  vcdp/tcp-check/api.c
+  vcdp_services/tcp-check/node.c
+  vcdp_services/tcp-check/tcp_check.c
+  vcdp_services/tcp-check/format.c
+  vcdp_services/tcp-check/cli.c
+  vcdp_services/tcp-check/api.c
 
   vcdp/timer/node.c
 
-  vcdp/l4-lifecycle/node.c
+  vcdp_services/l4-lifecycle/node.c
 
-  vcdp/nat/nat.c
-  vcdp/nat/cli.c
-  vcdp/nat/api.c
-  vcdp/nat/format.c
-  vcdp/nat/fastpath_node.c
-  vcdp/nat/slowpath_node.c
-  vcdp/nat/external_input_node.c
+  vcdp_services/nat/nat.c
+  vcdp_services/nat/cli.c
+  vcdp_services/nat/api.c
+  vcdp_services/nat/format.c
+  vcdp_services/nat/fastpath_node.c
+  vcdp_services/nat/slowpath_node.c
+  vcdp_services/nat/external_input_node.c
 
   vcdp/format.c
   vcdp/vcdp.c
@@ -53,8 +53,8 @@ add_vpp_plugin(vcdp_gateway
   MULTIARCH_SOURCES
   vcdp/lookup/node.c
   vcdp/drop/node.c
-  vcdp/tcp-check/node.c
-  vcdp/l4-lifecycle/node.c
+  vcdp_services/tcp-check/node.c
+  vcdp_services/l4-lifecycle/node.c
   gateway/geneve_input/node.c
   gateway/geneve_output/node.c
   dummy/dot1q.c
@@ -62,7 +62,7 @@ add_vpp_plugin(vcdp_gateway
   API_FILES
   vcdp/vcdp_types.api
   vcdp/vcdp.api
-  vcdp/nat/nat.api
-  vcdp/tcp-check/tcp_check.api
+  vcdp_services/nat/nat.api
+  vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
 )

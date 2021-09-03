@@ -17,7 +17,7 @@
 
 #include <vlib/vlib.h>
 #include <vnet/feature/feature.h>
-#include <vcdp/nat/nat.h>
+#include <vcdp_services/nat/nat.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/common.h>
 typedef struct

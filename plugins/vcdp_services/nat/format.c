@@ -14,7 +14,7 @@
  */
 #include <vlib/vlib.h>
 #include <vcdp/vcdp.h>
-#include <vcdp/nat/nat.h>
+#include <vcdp_services/nat/nat.h>
 
 static u8 *
 format_vcdp_nat_rewrite_SADDR (u8 *s, va_list *args)

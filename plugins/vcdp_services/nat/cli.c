@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <vcdp/nat/nat.h>
+#include <vcdp_services/nat/nat.h>
 
 static clib_error_t *
 vcdp_nat_external_interface_set_unset_fn (vlib_main_t *vm,
