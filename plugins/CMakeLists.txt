@@ -37,6 +37,8 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/external_input_node.c
 
+#  vcdp_services/sample/node.c
+
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/service.c
