@@ -76,16 +76,19 @@ In some cases, a given session must be accessible through different 5-tuples. Ty
   * `cli.c` Self explanatory
   * `common.h` Vcdp buffer metadata
   * `format.c` Self explanatory
-  * `service.h` Definition of the services with their indices in the bitmap + the `vcdp_next` helper to go forwards in the chain
+  * `service.h` Service registration helper macros + the `vcdp_next` helper to go forwards in the chain
+  * `service.c` Implementation of the service registration logic and constraints resolution
   * `vcdp_funcs.h` Inline helper functions
   * `vcdp.h` Main data structures (`vcdp_session_t`,`vcdp_tenant_t`,`vcdp_per_thread_data_t`,`vcdp_main_t`
   * `vcdp.c` Internal VCDP API to be used by cli, API, etc...
   * `drop/` The drop service 
-  * `l4-lifecycle/` The l4-lifecycle service. Used to maintain the session state (rearm timers), depending on packet received in both directions. Typically, manages UDP session establishement (first signe of life + one reverse packet), and associated timers
   * `lookup/` Lookup node + session creation + handoff (if needed)
-  * `nat/` The NAT services
-  * `tcp-check/` The tcp-check service. When l4-lifecycle detects a TCP session, it removes itself from the service chains and add tcp-check instead. This service maintains a basic bipartite TCP state machine and manages the lifecycle of TCP sessions accordingly
   * `timer/` Timer management code for session expiration
+* `plugins/vcdp_services` Contains some typical VCDP services
+  * `l4-lifecycle/` The l4-lifecycle service. Used to maintain the session state (rearm timers), depending on packet received in both directions. Typically, manages UDP session establishement (first signe of life + one reverse packet), and associated timers
+  * `nat/` The NAT services
+  * `sample/` Examples of terminal and non terminal services
+  * `tcp-check/` The tcp-check service. When l4-lifecycle detects a TCP session, it removes itself from the service chains and add tcp-check instead. This service maintains a basic bipartite TCP state machine and manages the lifecycle of TCP sessions accordingly
 * `plugins/gateway/`  Contains everything related to GENEVE-based interfacing
   * `geneve_input/` Feature node (on `ip4-unicast`) designed to intercept GENEVE packets, use the VNI to determine the input tenant, and inject into `vcdp-lookup`
   * `geneve_output/` Service node (terminating a VCDP service chain) designed to add a GENEVE header, and inject a packet back into `ip4-lookup`
