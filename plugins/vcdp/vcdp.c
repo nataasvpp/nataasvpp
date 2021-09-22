@@ -321,6 +321,6 @@ vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 VLIB_INIT_FUNCTION (vcdp_init);
 
 VLIB_PLUGIN_REGISTER () = {
-  .version = VCDP_GW_PLUGIN_BUILD_VER,
-  .description = "vCDP Gateway Plugin",
+  .version = VCDP_CORE_PLUGIN_BUILD_VER,
+  .description = "vCDP Core Plugin",
 };

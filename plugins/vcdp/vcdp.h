@@ -336,6 +336,6 @@ void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result,
 int vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 					       clib_bihash_kv_24_8_t *kv,
 					       u64 hash, u8 is_add);
-#define VCDP_GW_PLUGIN_BUILD_VER "1.0"
+#define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

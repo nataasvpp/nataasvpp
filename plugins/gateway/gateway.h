@@ -116,4 +116,6 @@ void
 gw_enable_disable_geneve_input (gw_enable_disable_geneve_input_args_t *args);
 void gw_set_geneve_output (gw_set_geneve_output_args_t *args);
 
+#define VCDP_GW_PLUGIN_BUILD_VER "1.0"
+
 #endif /* __included_gateway_h__ */

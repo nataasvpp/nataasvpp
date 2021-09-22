@@ -13,19 +13,49 @@
 
 #include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_vpp_plugin(vcdp_gateway
+add_vpp_library(vcdp
   SOURCES
   vcdp/lookup/node.c
+  vcdp/drop/node.c
+  vcdp/format.c
+  vcdp/vcdp.c
+  vcdp/service.c
+  vcdp/cli.c
+  vcdp/api.c
+  vcdp/timer/node.c
 
+  MULTIARCH_SOURCES
+  vcdp/lookup/node.c
   vcdp/drop/node.c
 
+  API_FILES
+  vcdp/vcdp_types.api
+  vcdp/vcdp.api
+
+  INSTALL_HEADERS
+  vcdp/vcdp.h
+  vcdp/service.h
+  vcdp/vcdp_funcs.h
+  vcdp/vcdp_types_funcs.h
+  vcdp/common.h
+  vcdp/timer/timer.h
+
+  ####################
+  # This is a hack   #
+  # remove when VPP  #
+  # fixed            #
+  ####################
+  DEPENDS
+  vcdp_api_headers
+)
+
+add_vpp_plugin(vcdp_gateway
+  SOURCES
   vcdp_services/tcp-check/node.c
   vcdp_services/tcp-check/tcp_check.c
   vcdp_services/tcp-check/format.c
   vcdp_services/tcp-check/cli.c
   vcdp_services/tcp-check/api.c
-
-  vcdp/timer/node.c
 
   vcdp_services/l4-lifecycle/node.c
 
@@ -37,13 +67,6 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/external_input_node.c
 
-#  vcdp_services/sample/node.c
-
-  vcdp/format.c
-  vcdp/vcdp.c
-  vcdp/service.c
-  vcdp/cli.c
-  vcdp/api.c
   dummy/dot1q.c
 
   gateway/gateway.c
@@ -53,8 +76,6 @@ add_vpp_plugin(vcdp_gateway
   gateway/geneve_output/node.c
 
   MULTIARCH_SOURCES
-  vcdp/lookup/node.c
-  vcdp/drop/node.c
   vcdp_services/tcp-check/node.c
   vcdp_services/l4-lifecycle/node.c
   gateway/geneve_input/node.c
@@ -62,9 +83,10 @@ add_vpp_plugin(vcdp_gateway
   dummy/dot1q.c
 
   API_FILES
-  vcdp/vcdp_types.api
-  vcdp/vcdp.api
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
+
+  LINK_LIBRARIES
+  vcdp
 )
