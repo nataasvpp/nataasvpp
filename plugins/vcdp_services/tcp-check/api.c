@@ -42,7 +42,7 @@ vcdp_tcp_send_session_details (vl_api_registration_t *rp, u32 context,
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_check_main_t *tcp = &vcdp_tcp;
   vl_api_vcdp_tcp_session_details_t *mp;
-  vcdp_ip4_key_t key;
+  vcdp_session_ip46_key_t skey;
   vcdp_tenant_t *tenant;
   u32 tenant_id;
   size_t msg_size;
@@ -65,8 +65,22 @@ vcdp_tcp_send_session_details (vl_api_registration_t *rp, u32 context,
   mp->n_keys = n_keys;
   for (int i = 0; i < n_keys; i++)
     {
-      vcdp_normalise_key (session, &key, i);
-      vcdp_ip4_key_encode (session->key[i].context_id, &key, &mp->keys[i]);
+      if ((i == 0 &&
+	   session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
+	  (i == 1 &&
+	   session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4))
+	{
+	  vcdp_normalise_ip4_key (session, &skey.key4, i);
+	  vcdp_session_ip46_key_encode (&skey, IP46_TYPE_IP4, &mp->keys[i]);
+	}
+      if ((i == 0 &&
+	   session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6) ||
+	  (i == 1 &&
+	   session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
+	{
+	  vcdp_normalise_ip6_key (session, &skey.key6, i);
+	  vcdp_session_ip46_key_encode (&skey, IP46_TYPE_IP6, &mp->keys[i]);
+	}
     }
   vl_api_send_msg (rp, (u8 *) mp);
 }

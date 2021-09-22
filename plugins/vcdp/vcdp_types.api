@@ -44,8 +44,8 @@ typedef vcdp_service_name
 typedef vcdp_session_key
 {
   u32 context_id;
-  vl_api_ip4_address_t init_addr;
+  vl_api_address_t init_addr;
   u16 init_port;
-  vl_api_ip4_address_t resp_addr;
+  vl_api_address_t resp_addr;
   u16 resp_port;
 };

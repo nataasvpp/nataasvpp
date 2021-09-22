@@ -46,14 +46,28 @@ vcdp_session_type_encode (vcdp_session_type_t x)
 };
 
 static_always_inline void
-vcdp_ip4_key_encode (u32 context_id, vcdp_ip4_key_t *key,
-		     vl_api_vcdp_session_key_t *out)
+vcdp_session_ip46_key_encode (vcdp_session_ip46_key_t *skey, ip46_type_t type,
+			      vl_api_vcdp_session_key_t *out)
 {
-  out->context_id = clib_host_to_net_u32 (context_id);
-  ip4_address_encode ((ip4_address_t *) &key->ip_addr_lo, out->init_addr);
-  ip4_address_encode ((ip4_address_t *) &key->ip_addr_hi, out->resp_addr);
-  out->init_port = clib_host_to_net_u16 (key->port_lo);
-  out->resp_port = clib_host_to_net_u16 (key->port_hi);
+  ip46_address_t ip_addr_lo, ip_addr_hi;
+  if (type == IP46_TYPE_IP4)
+    {
+      out->context_id = clib_host_to_net_u32 (skey->key4.context_id);
+      ip_addr_lo.ip4.as_u32 = skey->key4.ip4_key.ip_addr_lo;
+      ip_addr_hi.ip4.as_u32 = skey->key4.ip4_key.ip_addr_hi;
+      out->init_port = clib_host_to_net_u16 (skey->key4.ip4_key.port_lo);
+      out->resp_port = clib_host_to_net_u16 (skey->key4.ip4_key.port_hi);
+    }
+  else
+    {
+      out->context_id = clib_host_to_net_u32 (skey->key6.context_id);
+      ip_addr_lo.ip6 = skey->key6.ip6_key.ip6_addr_lo;
+      ip_addr_hi.ip6 = skey->key6.ip6_key.ip6_addr_hi;
+      out->init_port = clib_host_to_net_u16 (skey->key6.ip6_key.port_lo);
+      out->resp_port = clib_host_to_net_u16 (skey->key6.ip6_key.port_hi);
+    }
+  ip_address_encode (&ip_addr_lo, type, &out->init_addr);
+  ip_address_encode (&ip_addr_hi, type, &out->resp_addr);
 }
 
 #endif /*__included_vcdp_types_funcs_h__*/

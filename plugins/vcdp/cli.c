@@ -17,6 +17,7 @@
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
 #include <vcdp/service.h>
+
 /*
  * add CLI:
  * vcdp tenant <add/del> <tenant-id>
@@ -197,6 +198,11 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
       {
 	ptd = vec_elt_at_index (vcdp->per_thread_data, thread_index);
 	first = 1;
+	table_t session_table_ = {}, *session_table = &session_table_;
+	u32 n = 0;
+	table_add_header_col (session_table, 10, "id", "tenant", "index",
+			      "type", "proto", "context", "ingress", "egress",
+			      "state", "TTL(s)");
 	pool_foreach (session, ptd->sessions)
 	  {
 	    tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
@@ -205,15 +211,16 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
 	    if (first)
 	      {
 		first = 0;
-		vlib_cli_output (vm, "Thread #%d:", thread_index);
-		vlib_cli_output (vm, "id\t\t\ttenant\tindex\ttype\t"
-				     "prot\tcontext\tingress\t\t\t->"
-				     "\tegress\t\t\tstate\t\tTTL(s)");
+		table_format_title (session_table,
+				    "Thread #%d:", thread_index);
 	      }
-	    vlib_cli_output (vm, "%U", format_vcdp_session,
-			     session - ptd->sessions, session,
-			     tenant->tenant_id, now);
+	    n = vcdp_table_format_insert_session (
+	      session_table, n, session - ptd->sessions, session,
+	      tenant->tenant_id, now);
 	  }
+	if (!first)
+	  vlib_cli_output (vm, "%U", format_table, session_table);
+	table_free (session_table);
       }
 
   return err;

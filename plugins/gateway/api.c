@@ -37,8 +37,10 @@ vl_api_vcdp_gateway_set_geneve_output_t_handler (
   vl_api_vcdp_gateway_set_geneve_output_reply_t *rmp;
   gw_set_geneve_output_args_t args;
   args.tenant_id = clib_net_to_host_u32 (mp->tenant_id);
-  ip4_address_decode (mp->src, &args.src_addr);
-  ip4_address_decode (mp->dst, &args.dst_addr);
+  ASSERT (mp->src.af == ADDRESS_IP4);
+  ASSERT (mp->dst.af == ADDRESS_IP4);
+  ip4_address_decode (mp->src.un.ip4, &args.src_addr);
+  ip4_address_decode (mp->dst.un.ip4, &args.dst_addr);
   args.src_port = mp->src_port;
   args.dst_port = mp->dst_port;
   args.direction = mp->dir;

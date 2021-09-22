@@ -34,8 +34,8 @@ autoreply define vcdp_gateway_set_geneve_output
 
   u32 tenant_id;
   u32 output_tenant_id;
-  vl_api_ip4_address_t src;
-  vl_api_ip4_address_t dst;
+  vl_api_address_t src;
+  vl_api_address_t dst;
   u16 src_port;
   u16 dst_port;
   u8 static_mac;

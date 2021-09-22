@@ -24,9 +24,11 @@
 #include <vppinfra/elog.h>
 
 #include <vppinfra/bihash_24_8.h>
+#include <vppinfra/bihash_48_8.h>
 #include <vppinfra/bihash_8_8.h>
 
 #include <vppinfra/tw_timer_2t_1w_2048sl.h>
+#include <vppinfra/format_table.h>
 
 #include <vcdp/timer/timer.h>
 
@@ -62,7 +64,7 @@
 typedef enum
 {
   VCDP_SESSION_TYPE_IP4,
-
+  VCDP_SESSION_TYPE_IP6,
   /* last */
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
@@ -131,8 +133,10 @@ enum
 };
 /* Flags to determine key validity in the session */
 #define foreach_vcdp_session_key_flag                                         \
-  _ (PRIMARY_VALID, 0x1, "primary-valid")                                     \
-  _ (SECONDARY_VALID, 0x2, "secondary-valid")
+  _ (PRIMARY_VALID_IP4, 0x1, "primary-valid-ip4")                             \
+  _ (PRIMARY_VALID_IP6, 0x2, "primary-valid-ip6")                             \
+  _ (SECONDARY_VALID_IP4, 0x4, "secondary-valid-ip4")                         \
+  _ (SECONDARY_VALID_IP6, 0x8, "secondary-valid-ip6")
 
 enum
 {
@@ -165,6 +169,48 @@ typedef union
 } __clib_packed vcdp_ip4_key_t;
 STATIC_ASSERT_SIZEOF (vcdp_ip4_key_t, 16);
 
+typedef union
+{
+  struct
+  {
+    union
+    {
+      u32 spi;
+      struct
+      {
+	u16 port_lo;
+	u16 port_hi;
+      };
+    };
+    u16 unused;
+    u8 proto;
+    u8 unused2;
+    ip6_address_t ip6_addr_lo;
+    ip6_address_t ip6_addr_hi;
+  };
+  struct
+  {
+    u32x2u as_u32x2;
+    u32x8u as_u32x8;
+  };
+  struct
+  {
+    u16x4u as_u16x4;
+    u16x16u as_u16x16;
+  };
+  struct
+  {
+    u8x8u as_u8x8;
+    u8x16u as_u8x16[2];
+  };
+  struct
+  {
+    u64 as_u64;
+    u64x4u as_u64x4;
+  };
+} __clib_packed vcdp_ip6_key_t;
+STATIC_ASSERT_SIZEOF (vcdp_ip6_key_t, 40);
+
 typedef struct
 {
   vcdp_ip4_key_t ip4_key;
@@ -183,6 +229,47 @@ STATIC_ASSERT_SIZEOF (vcdp_session_ip4_key_t, 24);
 
 typedef struct
 {
+  vcdp_ip6_key_t ip6_key;
+
+  union
+  {
+    struct
+    {
+      u32 context_id;
+      u8 zeros[4];
+    };
+    u64 as_u64;
+  };
+} __clib_packed vcdp_session_ip6_key_t;
+STATIC_ASSERT_SIZEOF (vcdp_session_ip6_key_t, 48);
+
+typedef union
+{
+  vcdp_session_ip4_key_t key4;
+  vcdp_session_ip6_key_t key6;
+} vcdp_session_ip46_key_t;
+
+typedef union
+{
+  vcdp_ip4_key_t key4;
+  vcdp_ip6_key_t key6;
+} vcdp_ip46_key_t;
+
+typedef union
+{
+  clib_bihash_kv_24_8_t kv4;
+  clib_bihash_kv_48_8_t kv6;
+} vcdp_bihash_kv46_t;
+
+#define VCDP_SESSION_IP46_KEYS_TYPE(n)                                        \
+  union                                                                       \
+  {                                                                           \
+    vcdp_session_ip4_key_t keys4[(n)];                                        \
+    vcdp_session_ip6_key_t keys6[(n)];                                        \
+  }
+
+typedef struct
+{
   CLIB_CACHE_LINE_ALIGN_MARK (cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u64 session_id;
@@ -190,16 +277,18 @@ typedef struct
   session_version_t session_version;
   u8 state; /* see vcdp_session_state_t */
   u8 proto;
+  u16 tenant_idx;
   u8 unused0[28];
   CLIB_CACHE_LINE_ALIGN_MARK (cache1);
-  vcdp_session_ip4_key_t key[VCDP_SESSION_N_KEY];
+
+  vcdp_session_ip46_key_t keys[VCDP_SESSION_N_KEY];
+
   u8 pseudo_dir[VCDP_SESSION_N_KEY];
-  u16 tenant_idx;
   u8 type; /* see vcdp_session_type_t */
   u8 key_flags;
-  u8 unused1[10];
+  u8 unused1[28];
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
-STATIC_ASSERT_SIZEOF (vcdp_session_t, 128);
+STATIC_ASSERT_SIZEOF (vcdp_session_t, 256);
 
 typedef struct
 {
@@ -228,6 +317,7 @@ typedef struct
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_24_8_t table4;
+  clib_bihash_48_8_t table6;
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
   u64 session_id_ctr_mask;
@@ -317,7 +407,8 @@ vcdp_tenant_at_index (vcdp_main_t *vcdpm, u32 idx)
 static_always_inline u8
 vcdp_session_n_keys (vcdp_session_t *session)
 {
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
+  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 |
+			    VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
     return 2;
   else
     return 1;
@@ -330,12 +421,23 @@ clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
 				u32 timeout_idx, u32 timeout_val);
 
-void vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result,
-			 u8 key_idx);
+void vcdp_normalise_ip4_key (vcdp_session_t *session,
+			     vcdp_session_ip4_key_t *result, u8 key_idx);
 
+void vcdp_normalise_ip6_key (vcdp_session_t *session,
+			     vcdp_session_ip6_key_t *result, u8 key_idx);
+
+u32 vcdp_table_format_insert_session (table_t *t, u32 n, u32 session_index,
+				      vcdp_session_t *session, u32 tenant_id,
+				      f64 now);
 int vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 					       clib_bihash_kv_24_8_t *kv,
 					       u64 hash, u8 is_add);
+
+int vcdp_bihash_add_del_inline_with_hash_48_8 (clib_bihash_48_8_t *h,
+					       clib_bihash_kv_48_8_t *kv,
+					       u64 hash, u8 is_add);
+
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 
 #endif /* __included_vcdp_h__ */

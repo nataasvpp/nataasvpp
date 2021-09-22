@@ -16,7 +16,7 @@
 #include <vnet/vnet.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp.h>
-
+#include <vppinfra/format_table.h>
 u8 *
 format_vcdp_session_state (u8 *s, va_list *args)
 {
@@ -29,62 +29,82 @@ format_vcdp_session_state (u8 *s, va_list *args)
     return s;
 }
 
-static u8 *
-format_vcdp_ip4_address_and_port_padded (u8 *s, va_list *args)
-{
-  u32 current_pos = vec_len (s);
-  i16 padding;
-  ip4_address_t *addr = va_arg (*args, ip4_address_t *);
-  u32 port = va_arg (*args, u32);
-  s = format (s, "%U:%u", format_ip4_address, addr, port);
-  padding = 21 - (vec_len (s) - current_pos);
-  if (padding > 0)
-    s = format (s, "%U", format_white_space, padding);
-  return s;
-}
-
 u8 *
 format_vcdp_session_type (u8 *s, va_list *args)
 {
   u32 session_type = va_arg (*args, u32);
   if (session_type == VCDP_SESSION_TYPE_IP4)
     s = format (s, "ipv4");
+  else if (session_type == VCDP_SESSION_TYPE_IP6)
+    s = format (s, "ipv6");
   return s;
 }
 
-/* Tenant Session_index Session_Type Protocol Context Ingress -> Egress State
- * TTL(seconds) */
-u8 *
-format_vcdp_session (u8 *s, va_list *args)
+u32
+vcdp_table_format_insert_session (table_t *t, u32 n, u32 session_index,
+				  vcdp_session_t *session, u32 tenant_id,
+				  f64 now)
 {
-  u32 session_index = va_arg (*args, u32);
-  vcdp_session_t *session = va_arg (*args, vcdp_session_t *);
-  u32 tenant_id = va_arg (*args, u32);
-  f64 now = va_arg (*args, f64);
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64 (session->session_id);
-  u8 n_keys = vcdp_session_n_keys (session);
-  vcdp_ip4_key_t key;
-  vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_PRIMARY);
-  s = format (s, "0x%U\t%d\t%d\t%U\t%U\t", format_hex_bytes, &session_net,
-	      sizeof (u64), tenant_id, session_index, format_vcdp_session_type,
-	      session->type, format_ip_protocol, key.proto);
-  s = format (s, "%d\t%U\t->\t%U\t%U\t%f",
-	      session->key[VCDP_SESSION_KEY_PRIMARY].context_id,
-	      format_vcdp_ip4_address_and_port_padded, &key.ip_addr_lo,
-	      key.port_lo, format_vcdp_ip4_address_and_port_padded,
-	      &key.ip_addr_hi, key.port_hi, format_vcdp_session_state,
-	      session->state, remaining_time);
-  if (n_keys == 2)
+  vcdp_session_ip46_key_t skey;
+  vcdp_ip4_key_t *key4 = &skey.key4.ip4_key;
+  vcdp_ip6_key_t *key6 = &skey.key6.ip6_key;
+  /* Session id */
+  table_format_cell (t, n, 0, "0x%U", format_hex_bytes, &session_net);
+  /* Tenant id */
+  table_format_cell (t, n, 1, "%d", tenant_id);
+  /* Session index */
+  table_format_cell (t, n, 2, "%d", session_index);
+  /* Session type */
+  table_format_cell (t, n, 3, "%U", format_vcdp_session_type, session->type);
+  /* Protocol */
+  table_format_cell (t, n, 4, "%U", format_ip_protocol, session->proto);
+  /* Session state */
+  table_format_cell (t, n, 8, "%U", format_vcdp_session_state, session->state);
+  /* Remaining time */
+  table_format_cell (t, n, 9, "%f", remaining_time);
+
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
     {
-      vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_SECONDARY);
-      s = format (s, "\n\t\t\t\t\t\t\t%d\t%U\t->\t%U",
-		  session->key[VCDP_SESSION_KEY_SECONDARY].context_id,
-		  format_vcdp_ip4_address_and_port_padded, &key.ip_addr_lo,
-		  key.port_lo, format_vcdp_ip4_address_and_port_padded,
-		  &key.ip_addr_hi, key.port_hi);
+      vcdp_normalise_ip4_key (session, &skey.key4, VCDP_SESSION_KEY_PRIMARY);
+      table_format_cell (t, n, 5, "%d", skey.key4.context_id);
+      table_format_cell (t, n, 6, "%U:%u", format_ip4_address,
+			 &key4->ip_addr_lo, key4->port_lo);
+      table_format_cell (t, n, 7, "%U:%u", format_ip4_address,
+			 &key4->ip_addr_hi, key4->port_hi);
     }
-  return s;
+  else if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6)
+    {
+      vcdp_normalise_ip6_key (session, &skey.key6, VCDP_SESSION_KEY_PRIMARY);
+      table_format_cell (t, n, 5, "%d", skey.key6.context_id);
+      table_format_cell (t, n, 6, "%U:%u", format_ip6_address,
+			 &key6->ip6_addr_lo, key6->port_lo);
+      table_format_cell (t, n, 7, "%U:%u", format_ip6_address,
+			 &key6->ip6_addr_hi, key6->port_hi);
+    }
+  n += 1;
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
+    {
+      vcdp_normalise_ip4_key (session, &skey.key4, VCDP_SESSION_KEY_SECONDARY);
+      table_format_cell (t, n, 5, "%d", skey.key4.context_id);
+      table_format_cell (t, n, 6, "%U:%u", format_ip4_address,
+			 &key4->ip_addr_lo, key4->port_lo);
+      table_format_cell (t, n, 7, "%U:%u", format_ip4_address,
+			 &key4->ip_addr_hi, key4->port_hi);
+      n += 1;
+    }
+  else if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
+    {
+      vcdp_normalise_ip6_key (session, &skey.key6, VCDP_SESSION_KEY_SECONDARY);
+      table_format_cell (t, n, 5, "%d", skey.key6.context_id);
+      table_format_cell (t, n, 6, "%U:%u", format_ip6_address,
+			 &key6->ip6_addr_lo, key6->port_lo);
+      table_format_cell (t, n, 7, "%U:%u", format_ip6_address,
+			 &key6->ip6_addr_hi, key6->port_hi);
+      n += 1;
+    }
+  return n;
 }
 
 u8 *
@@ -111,21 +131,33 @@ format_vcdp_session_detail (u8 *s, va_list *args)
   u64 session_net = clib_host_to_net_u64 (session->session_id);
   vlib_counter_t fctr, bctr;
   uword thread_index = ptd - vcdp_main.per_thread_data;
-  vcdp_ip4_key_t key;
+  vcdp_session_ip46_key_t skey;
+  vcdp_ip4_key_t *key4 = &skey.key4.ip4_key;
+  vcdp_ip6_key_t *key6 = &skey.key6.ip6_key;
   vlib_get_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			     session_index << 1, &fctr);
   vlib_get_combined_counter (&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
 			     (session_index << 1) | 0x1, &bctr);
   /* TODO: deal with secondary keys */
-  vcdp_normalise_key (session, &key, VCDP_SESSION_KEY_PRIMARY);
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
+    vcdp_normalise_ip4_key (session, &skey.key4, VCDP_SESSION_KEY_PRIMARY);
+  else
+    vcdp_normalise_ip6_key (session, &skey.key6, VCDP_SESSION_KEY_PRIMARY);
 
   s = format (s, "  session id: 0x%U\n", format_hex_bytes, &session_net,
 	      sizeof (u64));
   s = format (s, "  thread index: %d\n", thread_index);
   s = format (s, "  session index: %d\n", session_index);
-  s = format (s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol,
-	      key.proto, format_ip4_address, &key.ip_addr_lo, key.port_lo,
-	      format_ip4_address, &key.ip_addr_hi, key.port_hi);
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
+    s = format (s, "  specification: %U\t%U:%u\t-> %U:%u\n",
+		format_ip_protocol, key4->proto, format_ip4_address,
+		&key4->ip_addr_lo, key4->port_lo, format_ip4_address,
+		&key4->ip_addr_hi, key4->port_hi);
+  else
+    s = format (s, "  specification: %U\t%U:%u\t-> %U:%u\n",
+		format_ip_protocol, key6->proto, format_ip6_address,
+		&key6->ip6_addr_lo, key6->port_lo, format_ip6_address,
+		&key6->ip6_addr_hi, key6->port_hi);
   s = format (s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format (s, "  expires after: %fs\n", remaining_time);
   s = format (s, "  forward service chain: %U\n", format_vcdp_bitmap,

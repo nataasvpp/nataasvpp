@@ -19,6 +19,9 @@
 #include <vppinfra/bihash_24_8.h>
 #include <vppinfra/bihash_template.c>
 
+#include <vppinfra/bihash_48_8.h>
+#include <vppinfra/bihash_template.c>
+
 #include <vcdp/vcdp.h>
 #include <vcdp/service.h>
 #include <vnet/plugin/plugin.h>
@@ -118,6 +121,8 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
   pool_init_fixed (vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
   vcdp_init_tenant_counters (vcdp);
   clib_bihash_init_24_8 (&vcdp->table4, "vcdp ipv4 session table",
+			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
+  clib_bihash_init_48_8 (&vcdp->table6, "vcdp ipv6 session table",
 			 BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
   clib_bihash_init_8_8 (&vcdp->tenant_idx_by_id, "vcdp tenant table",
 			BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
@@ -274,39 +279,60 @@ vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx,
 }
 
 void
-vcdp_normalise_key (vcdp_session_t *session, vcdp_ip4_key_t *result,
-		    u8 key_idx)
+vcdp_normalise_ip4_key (vcdp_session_t *session,
+			vcdp_session_ip4_key_t *result, u8 key_idx)
 {
-  vcdp_ip4_key_t *init_key = &session->key[key_idx].ip4_key;
-  vcdp_ip4_key_t *resp_key = &session->key[key_idx].ip4_key;
-  u8 init_pseudo_dir = session->pseudo_dir[key_idx];
-  u8 resp_pseudo_dir = session->pseudo_dir[key_idx];
+  vcdp_session_ip4_key_t *skey = &session->keys[key_idx].key4;
+  vcdp_ip4_key_t *key = &skey->ip4_key;
+  u8 pseudo_dir = session->pseudo_dir[key_idx];
   u8 proto = session->proto;
   u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP ||
 		 proto == IP_PROTOCOL_ICMP;
 
-  result->as_u64x2 = init_key->as_u64x2;
-
-  if (with_port && init_pseudo_dir)
+  result->ip4_key.as_u64x2 = key->as_u64x2;
+  result->as_u64 = skey->as_u64;
+  if (with_port && pseudo_dir)
     {
-      result->ip_addr_lo = init_key->ip_addr_hi;
-      result->port_lo = clib_net_to_host_u16 (init_key->port_hi);
+      result->ip4_key.ip_addr_lo = key->ip_addr_hi;
+      result->ip4_key.port_lo = clib_net_to_host_u16 (key->port_hi);
+      result->ip4_key.ip_addr_hi = key->ip_addr_lo;
+      result->ip4_key.port_hi = clib_net_to_host_u16 (key->port_lo);
     }
   else
     {
-      result->ip_addr_lo = init_key->ip_addr_lo;
-      result->port_lo = clib_net_to_host_u16 (init_key->port_lo);
+      result->ip4_key.ip_addr_lo = key->ip_addr_lo;
+      result->ip4_key.port_lo = clib_net_to_host_u16 (key->port_lo);
+      result->ip4_key.ip_addr_hi = key->ip_addr_hi;
+      result->ip4_key.port_hi = clib_net_to_host_u16 (key->port_hi);
     }
+}
 
-  if (with_port && resp_pseudo_dir)
+void
+vcdp_normalise_ip6_key (vcdp_session_t *session,
+			vcdp_session_ip6_key_t *result, u8 key_idx)
+{
+  vcdp_session_ip6_key_t *skey = &session->keys[key_idx].key6;
+  vcdp_ip6_key_t *key = &skey->ip6_key;
+  u8 pseudo_dir = session->pseudo_dir[key_idx];
+  u8 proto = session->proto;
+  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP ||
+		 proto == IP_PROTOCOL_ICMP;
+
+  result->ip6_key.as_u64x4 = key->as_u64x4;
+  result->as_u64 = skey->as_u64;
+  if (with_port && pseudo_dir)
     {
-      result->ip_addr_hi = resp_key->ip_addr_lo;
-      result->port_hi = clib_net_to_host_u16 (resp_key->port_lo);
+      result->ip6_key.ip6_addr_lo = key->ip6_addr_hi;
+      result->ip6_key.port_lo = clib_net_to_host_u16 (key->port_hi);
+      result->ip6_key.ip6_addr_hi = key->ip6_addr_lo;
+      result->ip6_key.port_hi = clib_net_to_host_u16 (key->port_lo);
     }
   else
     {
-      result->ip_addr_hi = resp_key->ip_addr_hi;
-      result->port_hi = clib_net_to_host_u16 (resp_key->port_hi);
+      result->ip6_key.ip6_addr_lo = key->ip6_addr_lo;
+      result->ip6_key.port_lo = clib_net_to_host_u16 (key->port_lo);
+      result->ip6_key.ip6_addr_hi = key->ip6_addr_hi;
+      result->ip6_key.port_hi = clib_net_to_host_u16 (key->port_hi);
     }
 }
 
@@ -316,6 +342,14 @@ vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 					   u8 is_add)
 {
   return clib_bihash_add_del_inline_with_hash_24_8 (h, kv, hash, is_add, 0, 0);
+}
+
+int
+vcdp_bihash_add_del_inline_with_hash_48_8 (clib_bihash_48_8_t *h,
+					   clib_bihash_kv_48_8_t *kv, u64 hash,
+					   u8 is_add)
+{
+  return clib_bihash_add_del_inline_with_hash_48_8 (h, kv, hash, is_add, 0, 0);
 }
 
 VLIB_INIT_FUNCTION (vcdp_init);
