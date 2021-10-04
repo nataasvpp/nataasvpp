@@ -107,11 +107,11 @@ static const u64 icmp_type_bitmask =
 static const u8x16 key_ip4_shuff_no_norm = { 0, 1, 2,  3,  -1, 5,  -1, -1,
 					     8, 9, 10, 11, 12, 13, 14, 15 };
 
-static const u8x16 key_ip4_shuff_norm = { 2,  3,  0,  1,  -1, -1, 6,  -1,
-					  12, 13, 14, 15, 8,  9,  10, 11 };
+static const u8x16 key_ip4_shuff_norm = { 2,  3,  0,  1,  -1, 5, -1, -1,
+					  12, 13, 14, 15, 8,  9, 10, 11 };
 
 static const u8x8 key_ip6_shuff_no_norm_A = { 0, 1, 2, 3, -1, -1, 6, -1 };
-static const u8x8 key_ip6_shuff_norm_A = { 2, 3, 0, 1, -1, 5, -1, -1 };
+static const u8x8 key_ip6_shuff_norm_A = { 2, 3, 0, 1, -1, -1, 6, -1 };
 static const u32x8 key_ip6_shuff_no_norm_B = { 0, 1, 2, 3, 4, 5, 6, 7 };
 static const u32x8 key_ip6_shuff_norm_B = { 4, 5, 6, 7, 0, 1, 2, 3 };
 
@@ -908,10 +908,16 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   return frame->n_vectors;
 }
 
-VLIB_NODE_FN (vcdp_lookup_node)
+VLIB_NODE_FN (vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
   return vcdp_lookup_inline (vm, node, frame, 0);
+}
+
+VLIB_NODE_FN (vcdp_lookup_ip6_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_lookup_inline (vm, node, frame, 1);
 }
 
 VLIB_NODE_FN (vcdp_handoff_node)
@@ -1002,8 +1008,18 @@ format_vcdp_handoff_trace (u8 *s, va_list *args)
 }
 
 /* *INDENT-OFF* */
-VLIB_REGISTER_NODE (vcdp_lookup_node) = {
-  .name = "vcdp-lookup",
+VLIB_REGISTER_NODE (vcdp_lookup_ip4_node) = {
+  .name = "vcdp-lookup-ip4",
+  .vector_size = sizeof (u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+
+  .n_errors = ARRAY_LEN (vcdp_lookup_error_strings),
+  .error_strings = vcdp_lookup_error_strings,
+};
+
+VLIB_REGISTER_NODE (vcdp_lookup_ip6_node) = {
+  .name = "vcdp-lookup-ip6",
   .vector_size = sizeof (u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
@@ -1021,6 +1037,6 @@ VLIB_REGISTER_NODE (vcdp_handoff_node) = {
   .n_errors = ARRAY_LEN (vcdp_handoff_error_strings),
   .error_strings = vcdp_handoff_error_strings,
 
-  .sibling_of = "vcdp-lookup",
+  .sibling_of = "vcdp-lookup-ip4",
 
 };

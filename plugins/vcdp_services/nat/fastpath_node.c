@@ -241,7 +241,7 @@ VLIB_REGISTER_NODE (vcdp_nat_early_rewrite_node) = {
 
   .n_errors = ARRAY_LEN (vcdp_nat_fastpath_error_strings),
   .error_strings = vcdp_nat_fastpath_error_strings,
-  .sibling_of = "vcdp-lookup"
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 

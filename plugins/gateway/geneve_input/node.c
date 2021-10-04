@@ -38,7 +38,9 @@ format_vcdp_geneve_input_trace (u8 *s, va_list *args)
   return s;
 }
 
-#define foreach_vcdp_geneve_input_next	_ (LOOKUP, "vcdp-lookup")
+#define foreach_vcdp_geneve_input_next                                        \
+  _ (LOOKUP_IP4, "vcdp-lookup-ip4")                                           \
+  _ (LOOKUP_IP6, "vcdp-lookup-ip6")
 #define foreach_vcdp_geneve_input_error _ (NOERROR, "No error")
 
 typedef enum
@@ -98,6 +100,7 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       clib_bihash_kv_8_8_t kv = {};
       u16 off = 0;
       u32 len = vlib_buffer_length_in_chain (vm, b[0]);
+      u16 ethtype;
       if (ip4->protocol != IP_PROTOCOL_UDP)
 	{
 	  vnet_feature_next_u16 (current_next, b[0]);
@@ -128,7 +131,11 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
       b[0]->flow_id = tenant->context_id;
       vcdp_buffer (b[0])->tenant_index = tenant_idx;
-      current_next[0] = VCDP_GENEVE_INPUT_NEXT_LOOKUP;
+      ethtype = *(u16 *) (b[0]->data + b[0]->current_data + off + 20);
+      ethtype = clib_net_to_host_u16 (ethtype);
+      current_next[0] = ethtype == ETHERNET_TYPE_IP6 ?
+			  VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP6 :
+			  VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP4;
       off +=
 	8 /* geneve header no options */ + 14 /* ethernet header, no tag*/;
       vlib_buffer_advance (b[0], off);
@@ -159,7 +166,8 @@ VLIB_REGISTER_NODE (vcdp_geneve_input_node) = {
   .error_strings = vcdp_geneve_input_error_strings,
   .n_next_nodes = VCDP_GENEVE_INPUT_N_NEXT,
   .next_nodes = {
-          [VCDP_GENEVE_INPUT_NEXT_LOOKUP] = "vcdp-lookup",
+          [VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP4] = "vcdp-lookup-ip4",
+          [VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP6] = "vcdp-lookup-ip6",
   },
 };
 

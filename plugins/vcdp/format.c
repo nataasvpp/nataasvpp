@@ -51,7 +51,8 @@ vcdp_table_format_insert_session (table_t *t, u32 n, u32 session_index,
   vcdp_ip4_key_t *key4 = &skey.key4.ip4_key;
   vcdp_ip6_key_t *key6 = &skey.key6.ip6_key;
   /* Session id */
-  table_format_cell (t, n, 0, "0x%U", format_hex_bytes, &session_net);
+  table_format_cell (t, n, 0, "0x%U", format_hex_bytes, &session_net,
+		     sizeof (session_net));
   /* Tenant id */
   table_format_cell (t, n, 1, "%d", tenant_id);
   /* Session index */

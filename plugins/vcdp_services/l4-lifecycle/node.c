@@ -146,7 +146,7 @@ VLIB_REGISTER_NODE (vcdp_l4_lifecycle_node) = {
   .n_errors = ARRAY_LEN (vcdp_l4_lifecycle_error_strings),
   .error_strings = vcdp_l4_lifecycle_error_strings,
 
-  .sibling_of = "vcdp-lookup"
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 

@@ -293,7 +293,7 @@ VLIB_REGISTER_NODE (vcdp_nat_slowpath_node) = {
 
   .n_errors = ARRAY_LEN (vcdp_nat_slowpath_error_strings),
   .error_strings = vcdp_nat_slowpath_error_strings,
-  .sibling_of = "vcdp-lookup"
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 

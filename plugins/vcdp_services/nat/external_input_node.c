@@ -39,7 +39,7 @@ format_nat_external_input_trace (u8 *s, va_list *args)
   return s;
 }
 
-#define foreach_nat_external_input_next	 _ (LOOKUP, "vcdp-lookup")
+#define foreach_nat_external_input_next	 _ (LOOKUP, "vcdp-lookup-ip4")
 #define foreach_nat_external_input_error _ (NOERROR, "No error")
 
 typedef enum
@@ -131,7 +131,7 @@ VLIB_REGISTER_NODE (nat_external_input_node) = {
   .error_strings = nat_external_input_error_strings,
   .n_next_nodes = NAT_EXTERNAL_INPUT_N_NEXT,
   .next_nodes = {
-          [NAT_EXTERNAL_INPUT_NEXT_LOOKUP] = "vcdp-lookup",
+          [NAT_EXTERNAL_INPUT_NEXT_LOOKUP] = "vcdp-lookup-ip4",
   },
 };
 

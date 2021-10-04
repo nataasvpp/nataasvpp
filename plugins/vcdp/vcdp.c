@@ -138,7 +138,8 @@ static clib_error_t *
 vcdp_init (vlib_main_t *vm)
 {
   vlib_call_init_function (vm, vcdp_service_init);
-  vcdp_service_next_indices_init (vm, vcdp_lookup_node.index);
+  vcdp_service_next_indices_init (vm, vcdp_lookup_ip4_node.index);
+  vcdp_service_next_indices_init (vm, vcdp_lookup_ip6_node.index);
   vcdp_service_next_indices_init (vm, vcdp_handoff_node.index);
   return 0;
 }

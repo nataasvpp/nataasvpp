@@ -334,7 +334,8 @@ typedef struct
 
 extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
-extern vlib_node_registration_t vcdp_lookup_node;
+extern vlib_node_registration_t vcdp_lookup_ip4_node;
+extern vlib_node_registration_t vcdp_lookup_ip6_node;
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
 format_function_t format_vcdp_session_state;

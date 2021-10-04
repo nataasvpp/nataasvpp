@@ -40,7 +40,9 @@ format_vcdp_dummy_dot1q_input_trace (u8 *s, va_list *args)
   return s;
 }
 
-#define foreach_vcdp_dummy_dot1q_input_next  _ (LOOKUP, "vcdp-lookup")
+#define foreach_vcdp_dummy_dot1q_input_next                                   \
+  _ (LOOKUP_IP4, "vcdp-lookup-ip4")                                           \
+  _ (LOOKUP_IP6, "vcdp-lookup-ip6")
 #define foreach_vcdp_dummy_dot1q_input_error _ (NOERROR, "No error")
 
 typedef enum
@@ -87,7 +89,9 @@ format_vcdp_dummy_dot1q_output_trace (u8 *s, va_list *args)
   return s;
 }
 
-#define foreach_vcdp_dummy_dot1q_output_next  _ (LOOKUP, "vcdp-lookup")
+#define foreach_vcdp_dummy_dot1q_output_next                                  \
+  _ (LOOKUP_IP4, "vcdp-lookup-ip4")                                           \
+  _ (LOOKUP_IP6, "vcdp-lookup-ip6")
 #define foreach_vcdp_dummy_dot1q_output_error _ (NOERROR, "No error")
 
 typedef enum
@@ -133,7 +137,7 @@ process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
       type = clib_net_to_host_u16 (vlan->type);
       off += sizeof (vlan[0]);
     }
-  if (type != ETHERNET_TYPE_IP4)
+  if (type != ETHERNET_TYPE_IP4 && type != ETHERNET_TYPE_IP6)
     {
       vnet_feature_next_u16 (current_next, b[0]);
       return;
@@ -154,7 +158,9 @@ process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
   vnet_buffer (b[0])->l3_hdr_offset = b[0]->current_data + off;
   b[0]->flags |=
     VNET_BUFFER_F_L2_HDR_OFFSET_VALID | VNET_BUFFER_F_L3_HDR_OFFSET_VALID;
-  current_next[0] = VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP;
+  current_next[0] = type == ETHERNET_TYPE_IP4 ?
+		      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4 :
+		      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6;
   vlib_increment_combined_counter (cm, thread_index, tenant_idx, 1,
 				   orig_len - off);
   vlib_buffer_advance (b[0], off);
@@ -210,7 +216,8 @@ VLIB_REGISTER_NODE (vcdp_dummy_dot1q_input_node) = {
   .error_strings = vcdp_dummy_dot1q_input_error_strings,
   .n_next_nodes = VCDP_DUMMY_DOT1Q_INPUT_N_NEXT,
   .next_nodes = {
-          [VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP] = "vcdp-lookup",
+          [VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4] = "vcdp-lookup-ip4",
+          [VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6] = "vcdp-lookup-ip6",
   },
 };
 
