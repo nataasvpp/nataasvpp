@@ -49,6 +49,11 @@ add_vpp_library(vcdp
   vcdp_api_headers
 )
 
+add_vpp_test_library(vcdp
+  vcdp/vcdp_types.api
+  vcdp/vcdp.api
+)
+
 add_vpp_plugin(vcdp_gateway
   SOURCES
   vcdp_services/tcp-check/node.c
