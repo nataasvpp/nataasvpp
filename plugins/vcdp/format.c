@@ -203,7 +203,7 @@ uword
 unformat_vcdp_service (unformat_input_t *input, va_list *args)
 {
   vcdp_service_main_t *sm = &vcdp_service_main;
-  u8 *result = va_arg (*args, u8 *);
+  u32 *result = va_arg (*args, u32 *);
   int i;
   for (i = 0; i < vec_len (sm->services); i++)
     {
