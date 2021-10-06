@@ -143,7 +143,8 @@ vcdp_enable_disable_timer_expire_node (u8 is_disable)
 {
   vlib_main_t *vm;
   u32 n_vms = vlib_num_workers () + 1;
-  for (int i = 1; i < n_vms; i++)
+  /* Maybe disable main thread if workers are present */
+  for (int i = 0; i < n_vms; i++)
     {
       vm = vlib_get_main_by_index (i);
       vlib_node_t *node =
