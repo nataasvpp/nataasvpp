@@ -340,6 +340,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 	  return 1;
 	}
       session->type = VCDP_SESSION_TYPE_IP6;
+      session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6;
     }
   else
     {
@@ -353,6 +354,7 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 	  return 1;
 	}
       session->type = VCDP_SESSION_TYPE_IP4;
+      session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
     }
   session->session_version += 1;
   session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) |
@@ -375,7 +377,6 @@ vcdp_create_session (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 		      sizeof (session->keys[0].key4));
   session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
   session->proto = proto;
-  session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
 
   vcdp_session_timer_start (&ptd->wheel, &session->timer, session_idx,
 			    time_now,
