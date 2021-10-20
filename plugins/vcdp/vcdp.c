@@ -56,7 +56,7 @@ vcdp_init_ptd_counters (vcdp_per_thread_data_t *ptd, uword i)
 {
 #define _(x, y)                                                               \
   u8 *name = format (0, y "_%d", i);                                          \
-  u8 *stat_seg_name = format (0, "/vcdp/per_flow_counters/" y "/%d", i);      \
+  u8 *stat_seg_name = format (0, "/vcdp/per_flow_counters/" y "/%d%c", i, 0); \
   ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].name = (char *) name;           \
   ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].stat_segment_name =             \
     (char *) stat_seg_name;                                                   \

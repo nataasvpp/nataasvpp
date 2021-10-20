@@ -24,7 +24,6 @@ vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_kv_8_8_t kv2 = { 0 };
   vcdp_bihash_kv46_t kv = { 0 };
   kv2.key = session->session_id;
-  pool_put_index (ptd->sessions, session_index);
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
     {
       clib_memcpy_fast (&kv.kv4.key,
@@ -57,6 +56,7 @@ vcdp_session_remove (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   vlib_increment_simple_counter (
     &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED],
     thread_index, session->tenant_idx, 1);
+  pool_put_index (ptd->sessions, session_index);
 }
 
 static_always_inline void
