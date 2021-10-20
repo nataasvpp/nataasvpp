@@ -302,7 +302,7 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   skey->context_id = context_id;
   clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
-  h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));
+  h[0] = clib_bihash_hash_48_8 ((clib_bihash_kv_48_8_t *) (skey));
 
   /* If slowpath needed == 1, we may have done a lot of useless work that will
    be overwritten, but we avoid too much branching in fastpath */
