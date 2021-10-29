@@ -135,7 +135,8 @@ vcdp_session_try_add_secondary_key (vcdp_main_t *vcdp,
 static_always_inline u8
 vcdp_renormalise_ip4_key (vcdp_session_ip4_key_t *key, u32 old_pseudo)
 {
-  if (key->ip4_key.ip_addr_hi < key->ip4_key.ip_addr_lo)
+  if (clib_net_to_host_u32 (key->ip4_key.ip_addr_hi) <
+      clib_net_to_host_u32 (key->ip4_key.ip_addr_lo))
     {
       u32 tmp_ip4;
       u16 tmp_port;
