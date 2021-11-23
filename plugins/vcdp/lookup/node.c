@@ -89,21 +89,27 @@ typedef struct
 #define u32x8_shuffle(v, i) (u32x8) __builtin_shuffle ((u32x8) v, (u32x8) i)
 #endif
 static const u8 l4_mask_bits[256] = {
-  [IP_PROTOCOL_ICMP] = 16,	[IP_PROTOCOL_IGMP] = 8,
-  [IP_PROTOCOL_TCP] = 32,	[IP_PROTOCOL_UDP] = 32,
-  [IP_PROTOCOL_IPSEC_ESP] = 32, [IP_PROTOCOL_IPSEC_AH] = 32,
+  [IP_PROTOCOL_ICMP] = 16,     [IP_PROTOCOL_IGMP] = 8,
+  [IP_PROTOCOL_ICMP6] = 16,    [IP_PROTOCOL_TCP] = 32,
+  [IP_PROTOCOL_UDP] = 32,      [IP_PROTOCOL_IPSEC_ESP] = 32,
+  [IP_PROTOCOL_IPSEC_AH] = 32,
 };
 
 /* L4 data offset to copy into session */
-static const u8 l4_offset_32w[256] = { [IP_PROTOCOL_ICMP] = 1 };
+static const u8 l4_offset_32w[256] = {
+  [IP_PROTOCOL_ICMP] = 1, [IP_PROTOCOL_ICMP6] = 1
+};
 
 /* TODO: add ICMP, ESP, and AH (+ additional
  * branching or lookup for different
  * shuffling mask) */
 static const u64 tcp_udp_bitmask =
   ((1 << IP_PROTOCOL_TCP) | (1 << IP_PROTOCOL_UDP));
-static const u64 icmp_type_bitmask =
+static const u64 icmp4_type_bitmask =
   (1ULL << ICMP4_echo_request) | (1ULL << ICMP4_echo_reply);
+
+/*ICMP echo and reply are types 128 & 129 */
+static const u64 icmp6_type_bitmask_128off = 0x3;
 static const u8x16 key_ip4_shuff_no_norm = { 0, 1, 2,  3,  -1, 5,  -1, -1,
 					     8, 9, 10, 11, 12, 13, 14, 15 };
 
@@ -158,7 +164,7 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     {
       icmp46_header_t *icmp = next_header;
       u8 type = icmp->type;
-      norm &= i64x2_splat ((1ULL << type) & icmp_type_bitmask) != zero;
+      norm &= i64x2_splat ((1ULL << type) & icmp4_type_bitmask) != zero;
     }
   else
     {
@@ -240,7 +246,7 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   k.as_u32x8 = *(u32x8u *) ((u8 *) ip + 8);
   pr = ip->protocol;
   next_header = ip6_next_header (ip);
-  slowpath_needed = pr == IP_PROTOCOL_ICMP; /*TODO: add fragmentation also
+  slowpath_needed = pr == IP_PROTOCOL_ICMP6; /*TODO: add fragmentation also
    || (ip->flags_and_fragment_offset & IP4_HEADER_FLAG_MORE_FRAGMENTS);*/
 
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
@@ -254,11 +260,12 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
 
   /* we only normalize tcp and udp, for other cases we
    * reset all bits to 0 */
-  if (slow_path && pr == IP_PROTOCOL_ICMP)
+  if (slow_path && pr == IP_PROTOCOL_ICMP6)
     {
       icmp46_header_t *icmp = next_header;
       u8 type = icmp->type;
-      norm &= i64x2_splat ((1ULL << type) & icmp_type_bitmask) != zero;
+      norm &= i64x2_splat ((1ULL << (type - 128)) &
+			   icmp6_type_bitmask_128off) != zero;
     }
   else
     {
@@ -286,7 +293,7 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   k.as_u32x8 = u32x8_shuffle (k.as_u32x8, swap_B);
   /* Reshuffle for ICMP
      TODO: merge with fast path? */
-  if (slow_path && pr == IP_PROTOCOL_ICMP)
+  if (slow_path && pr == IP_PROTOCOL_ICMP6)
     k.as_u8x8 += u8x8_shuffle (k.as_u8x8, key_ip6_swap_icmp);
   lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
