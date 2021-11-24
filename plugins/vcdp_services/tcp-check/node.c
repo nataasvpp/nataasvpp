@@ -66,7 +66,10 @@ update_state_one_pkt (vcdp_tw_t *tw, vcdp_tenant_t *tenant,
   /* Parse the packet */
   /* TODO: !!! Broken with IP options !!! */
   u8 *data = vlib_buffer_get_current (b[0]);
-  tcp_header_t *tcph = (void *) (data + sizeof (ip4_header_t));
+  tcp_header_t *tcph =
+    (void *) (data + (session->type == VCDP_SESSION_TYPE_IP4 ?
+			sizeof (ip4_header_t) :
+			sizeof (ip6_header_t)));
   u8 flags = tcph->flags & VCDP_TCP_CHECK_TCP_FLAGS_MASK;
   u32 acknum = clib_net_to_host_u32 (tcph->ack_number);
   u32 seqnum = clib_net_to_host_u32 (tcph->seq_number);
