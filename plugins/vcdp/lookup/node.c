@@ -238,12 +238,13 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   u8x16 src_ip6, dst_ip6;
   u32 l4_hdr;
   void *next_header;
-  ip6_header_t *ip = vlib_buffer_get_current (b);
+  u8 *data = vlib_buffer_get_current (b);
+  ip6_header_t *ip = (void *) data;
   int slowpath_needed;
 
   /* loads 40 bytes of ip6 header */
-  k.as_u32x2 = *(u32x2u *) ip;
-  k.as_u32x8 = *(u32x8u *) ((u8 *) ip + 8);
+  k.as_u32x2 = *(u32x2u *) data;
+  k.as_u32x8 = *(u32x8u *) (data + 8);
   pr = ip->protocol;
   next_header = ip6_next_header (ip);
   slowpath_needed = pr == IP_PROTOCOL_ICMP6; /*TODO: add fragmentation also
