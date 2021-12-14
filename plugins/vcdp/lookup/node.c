@@ -208,6 +208,14 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   return slowpath_needed;
 }
 
+static_always_inline u32x2
+u32x2_insert (u32x2 x, u32 y, uword idx)
+{
+  u32x2 tmp = x;
+  tmp[idx] = y;
+  return tmp;
+}
+
 static_always_inline u8
 calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
 	     u64 *lookup_val, u64 *h, u8 slow_path)
@@ -288,7 +296,7 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   else
     l4_hdr = *(u32 *) next_header & pow2_mask (l4_mask_bits[pr]);
 
-  k.as_u32x2[0] = l4_hdr;
+  k.as_u32x2 = u32x2_insert (k.as_u32x2, l4_hdr, 0);
 
   k.as_u8x8 = u8x8_shuffle (k.as_u8x8, swap_A);
   k.as_u32x8 = u32x8_shuffle (k.as_u32x8, swap_B);
