@@ -25,6 +25,8 @@
 #include <vnet/format_fns.h>
 #include <vcdp_services/nat/nat.api_enum.h>
 #include <vcdp_services/nat/nat.api_types.h>
+
+#define REPLY_MSG_ID_BASE nat->msg_id_base
 #include <vlibapi/api_helper_macros.h>
 
 static void
@@ -39,8 +41,7 @@ vl_api_vcdp_nat_set_external_interface_t_handler (
     nat_external_interface_set_tenant (nat, sw_if_index, tenant_id, unset);
   int rv = err ? -1 : 0;
   vl_api_vcdp_nat_set_external_interface_reply_t *rmp;
-  REPLY_MACRO (VL_API_VCDP_NAT_SET_EXTERNAL_INTERFACE_REPLY +
-	       nat->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_NAT_SET_EXTERNAL_INTERFACE_REPLY);
 }
 
 static void
@@ -62,7 +63,7 @@ vl_api_vcdp_nat_alloc_pool_add_del_t_handler (
   err = nat_alloc_pool_add_del (nat, alloc_pool_id, is_del, addrs);
   vec_free (addrs);
   rv = err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_NAT_ALLOC_POOL_ADD_DEL_REPLY + nat->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_NAT_ALLOC_POOL_ADD_DEL_REPLY);
 }
 
 static void
@@ -81,7 +82,7 @@ vl_api_vcdp_nat_snat_set_unset_t_handler (vl_api_vcdp_nat_snat_set_unset_t *mp)
   err = nat_tenant_set_snat (nat, tenant_id, outside_tenant_id, table_id,
 			     alloc_pool_id, unset);
   rv = err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY + nat->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY);
 }
 
 #include <vcdp_services/nat/nat.api.c>

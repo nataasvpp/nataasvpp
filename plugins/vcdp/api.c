@@ -23,8 +23,10 @@
 #include <vnet/format_fns.h>
 #include <vcdp/vcdp.api_enum.h>
 #include <vcdp/vcdp.api_types.h>
-#include <vlibapi/api_helper_macros.h>
 #include <vcdp/vcdp_types_funcs.h>
+
+#define REPLY_MSG_ID_BASE vcdp->msg_id_base
+#include <vlibapi/api_helper_macros.h>
 
 static void
 vl_api_vcdp_tenant_add_del_t_handler (vl_api_vcdp_tenant_add_del_t *mp)
@@ -38,7 +40,7 @@ vl_api_vcdp_tenant_add_del_t_handler (vl_api_vcdp_tenant_add_del_t *mp)
     vcdp_tenant_add_del (vcdp, tenant_id, context_id, is_del);
   vl_api_vcdp_tenant_add_del_reply_t *rmp;
   int rv = err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_TENANT_ADD_DEL_REPLY + vcdp->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_TENANT_ADD_DEL_REPLY);
 }
 
 static void
@@ -69,7 +71,7 @@ vl_api_vcdp_set_services_t_handler (vl_api_vcdp_set_services_t *mp)
   vl_api_vcdp_set_services_reply_t *rmp;
   rv = err ? -1 : 0;
 fail:
-  REPLY_MACRO (VL_API_VCDP_SET_SERVICES_REPLY + vcdp->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_SET_SERVICES_REPLY);
 }
 
 static void
@@ -83,7 +85,7 @@ vl_api_vcdp_set_timeout_t_handler (vl_api_vcdp_set_timeout_t *mp)
     vcdp_set_timeout (vcdp, tenant_id, timeout_id, timeout_value);
   vl_api_vcdp_set_timeout_reply_t *rmp;
   int rv = err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_SET_TIMEOUT_REPLY + vcdp->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_SET_TIMEOUT_REPLY);
 }
 
 static vl_api_vcdp_session_state_t

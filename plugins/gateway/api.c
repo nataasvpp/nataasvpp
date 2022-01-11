@@ -26,6 +26,8 @@
 #include <vnet/format_fns.h>
 #include <gateway/gateway.api_enum.h>
 #include <gateway/gateway.api_types.h>
+
+#define REPLY_MSG_ID_BASE gw->msg_id_base
 #include <vlibapi/api_helper_macros.h>
 
 static void
@@ -50,7 +52,7 @@ vl_api_vcdp_gateway_set_geneve_output_t_handler (
   mac_address_decode (mp->dst_mac, &args.dst_mac);
   gw_set_geneve_output (&args);
   rv = args.err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_GATEWAY_SET_GENEVE_OUTPUT_REPLY + gw->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_GATEWAY_SET_GENEVE_OUTPUT_REPLY);
 }
 
 static void
@@ -65,8 +67,7 @@ vl_api_vcdp_gateway_geneve_input_enable_disable_t_handler (
   args.sw_if_index = clib_net_to_host_u32 (mp->sw_if_index);
   gw_enable_disable_geneve_input (&args);
   rv = args.err ? -1 : 0;
-  REPLY_MACRO (VL_API_VCDP_GATEWAY_GENEVE_INPUT_ENABLE_DISABLE_REPLY +
-	       gw->msg_id_base);
+  REPLY_MACRO (VL_API_VCDP_GATEWAY_GENEVE_INPUT_ENABLE_DISABLE_REPLY);
 }
 
 #include <gateway/gateway.api.c>
