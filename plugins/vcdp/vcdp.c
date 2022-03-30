@@ -342,7 +342,8 @@ vcdp_bihash_add_del_inline_with_hash_24_8 (clib_bihash_24_8_t *h,
 					   clib_bihash_kv_24_8_t *kv, u64 hash,
 					   u8 is_add)
 {
-  return clib_bihash_add_del_inline_with_hash_24_8 (h, kv, hash, is_add, 0, 0);
+  return clib_bihash_add_del_inline_with_hash_24_8 (h, kv, hash, is_add, 0, 0,
+						    0, 0);
 }
 
 int
@@ -350,7 +351,8 @@ vcdp_bihash_add_del_inline_with_hash_48_8 (clib_bihash_48_8_t *h,
 					   clib_bihash_kv_48_8_t *kv, u64 hash,
 					   u8 is_add)
 {
-  return clib_bihash_add_del_inline_with_hash_48_8 (h, kv, hash, is_add, 0, 0);
+  return clib_bihash_add_del_inline_with_hash_48_8 (h, kv, hash, is_add, 0, 0,
+						    0, 0);
 }
 
 VLIB_INIT_FUNCTION (vcdp_init);
