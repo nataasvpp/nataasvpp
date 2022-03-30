@@ -75,8 +75,45 @@ typedef struct
   u32 flow_id;
 } vcdp_handoff_trace_t;
 
+#ifdef __SSE4_1__
 #define u32x4_insert(v, x, i) (u32x4) _mm_insert_epi32 ((__m128i) (v), x, i)
-#define u8x8_shuffle(v, i)    (u8x8) _mm_shuffle_pi8 ((__m64) (v), (__m64) i)
+#else
+static_always_inline u32x4
+u32x4_insert (u32x4 v, u32 x, int i)
+{
+  u32x4 tmp = v;
+  tmp[i] = x;
+  return tmp;
+}
+#endif
+
+#ifdef __SSE3__
+#define u8x8_shuffle(v, i) (u8x8) _mm_shuffle_pi8 ((__m64) (v), (__m64) i)
+#elif defined(__clang__)
+static_always_inline u8x8
+u8x8_shuffle (u8x8 v, u8x8 i)
+{
+  u8x8 tmp = { 0 };
+  u16x8 tmp2;
+  tmp[0] = v[i[0] & 0x7];
+  tmp[1] = v[i[1] & 0x7];
+  tmp[2] = v[i[2] & 0x7];
+  tmp[3] = v[i[3] & 0x7];
+  tmp[4] = v[i[4] & 0x7];
+  tmp[5] = v[i[5] & 0x7];
+  tmp[6] = v[i[6] & 0x7];
+  tmp[7] = v[i[7] & 0x7];
+  tmp2 = __builtin_convertvector(i, u16x8);
+  tmp2 &= (u16x8){ 128, 128, 128, 128, 128, 128, 128, 128 };
+  tmp2 <<= 1;
+  tmp2 -= 1;
+  tmp2 = ~tmp2;
+  tmp &= __builtin_convertvector(tmp2, u8x8);
+  return tmp;
+}
+#else
+#define u8x8_shuffle(v, i) __builtin_shuffle ((u8x8) v, (u8x8) i)
+#endif
 
 #ifndef CLIB_HAVE_VEC256
 #define u32x8_splat(i) ((u32) (i) & (u32x8){ ~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0 })
@@ -94,6 +131,66 @@ typedef struct
   (u8x16) SHUFFLE ((u8x16) (v1), (u8x16) (v2), (u8x16) (i))
 #define u32x8_SHUFFLE(v1, v2, i)                                              \
   (u32x8) SHUFFLE ((u32x8) (v1), (u32x8) (v2), (u32x8) (i))
+
+#ifdef __SSE3__
+#define u8x16_shuffle_dynamic(v, i)                                           \
+  (u8x16) _mm_shuffle_epi8 ((__m128i) v, (__m128i) i)
+#elif defined(__clang__)
+static_always_inline u8x16
+u8x16_shuffle_dynamic (u8x16 v, u8x16 i)
+{
+  u8x16 tmp = { 0 };
+  u16x16 tmp2;
+  tmp[0] = v[i[0] & 0xf];
+  tmp[1] = v[i[1] & 0xf];
+  tmp[2] = v[i[2] & 0xf];
+  tmp[3] = v[i[3] & 0xf];
+  tmp[4] = v[i[4] & 0xf];
+  tmp[5] = v[i[5] & 0xf];
+  tmp[6] = v[i[6] & 0xf];
+  tmp[7] = v[i[7] & 0xf];
+  tmp[8] = v[i[8] & 0xf];
+  tmp[9] = v[i[9] & 0xf];
+  tmp[10] = v[i[10] & 0xf];
+  tmp[11] = v[i[11] & 0xf];
+  tmp[12] = v[i[12] & 0xf];
+  tmp[13] = v[i[13] & 0xf];
+  tmp[14] = v[i[14] & 0xf];
+  tmp[15] = v[i[15] & 0xf];
+  tmp2 = __builtin_convertvector(i, u16x16);
+  tmp2 &= (u16x16){ 128, 128, 128, 128, 128, 128, 128, 128,
+		    128, 128, 128, 128, 128, 128, 128, 128 };
+  tmp2 <<= 1;
+  tmp2 -= 1;
+  tmp2 = ~tmp2;
+  tmp &= __builtin_convertvector(tmp2, u8x16);
+  return tmp;
+}
+#else
+#define u8x16_shuffle_dynamic(v, i) __builtin_shuffle ((u8x16) v, (u8x16) i)
+#endif
+
+#ifdef __AVX2__
+#define u32x8_shuffle_dynamic(v, i)                                           \
+  (u32x8) _mm256_permutevar8x32_epi32 ((__m256i) v, (__m256i) i)
+#elif defined(__clang__)
+static_always_inline u32x8
+u32x8_shuffle_dynamic (u32x8 v, u32x8 i)
+{
+  u32x8 tmp = { 0 };
+  tmp[0] = v[i[0] & 0x7];
+  tmp[1] = v[i[1] & 0x7];
+  tmp[2] = v[i[2] & 0x7];
+  tmp[3] = v[i[3] & 0x7];
+  tmp[4] = v[i[4] & 0x7];
+  tmp[5] = v[i[5] & 0x7];
+  tmp[6] = v[i[6] & 0x7];
+  tmp[7] = v[i[7] & 0x7];
+  return tmp;
+}
+#else
+#define u32x8_shuffle_dynamic(v, i) __builtin_shuffle ((u32x8) v, (u32x8) i)
+#endif
 
 static const u8 l4_mask_bits[256] = {
   [IP_PROTOCOL_ICMP] = 16,     [IP_PROTOCOL_IGMP] = 8,
@@ -117,28 +214,34 @@ static const u64 icmp4_type_bitmask =
 
 /*ICMP echo and reply are types 128 & 129 */
 static const u64 icmp6_type_bitmask_128off = 0x3;
-static const u8x16 key_ip4_shuff_no_norm = { 0, 1, 2,  3,  16, 5,  16, 16,
-					     8, 9, 10, 11, 12, 13, 14, 15 };
 
-static const u8x16 key_ip4_shuff_norm = { 2,  3,  0,  1,  16, 5, 16, 16,
-					  12, 13, 14, 15, 8,  9, 10, 11 };
+#define KEY_IP4_SHUFF_NO_NORM                                                 \
+  0, 1, 2, 3, 16, 5, 16, 16, 8, 9, 10, 11, 12, 13, 14, 15
 
-static const u8x8 key_ip6_shuff_no_norm_A = { 0, 1, 2, 3, -1, -1, 6, -1 };
-static const u8x8 key_ip6_shuff_norm_A = { 2, 3, 0, 1, -1, -1, 6, -1 };
-static const u32x8 key_ip6_shuff_no_norm_B = { 0, 1, 2, 3, 4, 5, 6, 7 };
-static const u32x8 key_ip6_shuff_norm_B = { 4, 5, 6, 7, 0, 1, 2, 3 };
+#define KEY_IP4_SHUFF_NORM                                                    \
+  2, 3, 0, 1, 16, 5, 16, 16, 12, 13, 14, 15, 8, 9, 10, 11
 
-static const u8x16 src_ip4_byteswap_x2 = { 11, 10, 9, 8, 16, 16, 16, 16,
-					   11, 10, 9, 8, 16, 16, 16, 16 };
-static const u8x16 dst_ip4_byteswap_x2 = { 15, 14, 13, 12, 16, 16, 16, 16,
-					   15, 14, 13, 12, 16, 16, 16, 16 };
+#define KEY_IP6_SHUFF_NO_NORM_A 0, 1, 2, 3, -1, -1, 6, -1
+#define KEY_IP6_SHUFF_NORM_A	2, 3, 0, 1, -1, -1, 6, -1
+#define KEY_IP6_SHUFF_NO_NORM_B 0, 1, 2, 3, 4, 5, 6, 7
+#define KEY_IP6_SHUFF_NORM_B	4, 5, 6, 7, 0, 1, 2, 3
+#define SRC_IP4_BYTESWAP_X2                                                   \
+  11, 10, 9, 8, 16, 16, 16, 16, 11, 10, 9, 8, 16, 16, 16, 16
+#define DST_IP4_BYTESWAP_X2                                                   \
+  15, 14, 13, 12, 16, 16, 16, 16, 15, 14, 13, 12, 16, 16, 16, 16
+#define IP6_BYTESWAP 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+#define KEY_IP4_SWAP_ICMP                                                     \
+  2, 3, 0, 1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
+#define KEY_IP6_SWAP_ICMP 2, 3, 0, 1, -1, -1, -1, -1
+static const u8x16 key_ip4_shuff_no_norm = { KEY_IP4_SHUFF_NO_NORM };
 
-static const u8x16 ip6_byteswap = { 15, 14, 13, 12, 11, 10, 9, 8,
-				    7,	6,  5,	4,  3,	2,  1, 0 };
+static const u8x16 key_ip4_shuff_norm = { KEY_IP4_SHUFF_NORM };
 
-static const u8x16 key_ip4_swap_icmp = { 2,  3,	 0,  1,	 16, 16, 16, 16,
-					 16, 16, 16, 16, 16, 16, 16, 16 };
-static const u8x8 key_ip6_swap_icmp = { 2, 3, 0, 1, -1, -1, -1, -1 };
+static const u8x8 key_ip6_shuff_no_norm_A = { KEY_IP6_SHUFF_NO_NORM_A };
+static const u8x8 key_ip6_shuff_norm_A = { KEY_IP6_SHUFF_NORM_A };
+static const u32x8 key_ip6_shuff_no_norm_B = { KEY_IP6_SHUFF_NO_NORM_B };
+static const u32x8 key_ip6_shuff_norm_B = { KEY_IP6_SHUFF_NORM_B };
+static const u8x8 key_ip6_swap_icmp = { KEY_IP6_SWAP_ICMP };
 
 static_always_inline u8
 calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
@@ -162,8 +265,8 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
    * compare so result will hold all ones if we need to swap src and dst
    * signed vector type is used as */
-  norm = (((i64x2) u8x16_SHUFFLE (k, zero, src_ip4_byteswap_x2)) >
-	  ((i64x2) u8x16_SHUFFLE (k, zero, dst_ip4_byteswap_x2)));
+  norm = (((i64x2) u8x16_shuffle2 (k, zero, SRC_IP4_BYTESWAP_X2)) >
+	  ((i64x2) u8x16_shuffle2 (k, zero, DST_IP4_BYTESWAP_X2)));
 
   /* we only normalize tcp and udp, for other cases we
    * reset all bits to 0 */
@@ -190,12 +293,12 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     l4_hdr = *(u32 *) next_header & pow2_mask (l4_mask_bits[pr]);
   k = (u8x16) u32x4_insert (k, l4_hdr, 0);
 
-  k = u8x16_SHUFFLE (k, zero, swap);
+  k = u8x16_shuffle_dynamic (k, swap);
 
   /* Reshuffle for ICMP
      TODO: merge with fast path? */
   if (slow_path && pr == IP_PROTOCOL_ICMP)
-    k += u8x16_SHUFFLE (k, zero, key_ip4_swap_icmp);
+    k += u8x16_shuffle2 (k, zero, KEY_IP4_SWAP_ICMP);
   lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
   /* extract tcp flags */
@@ -230,7 +333,6 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
 {
   u8 pr;
   i64x2 norm, norm_reverse, zero = {};
-  u32x8 zero_8 = {};
   union
   {
     struct
@@ -270,8 +372,8 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
    * compare so result will hold all ones if we need to swap src and dst
    * signed vector type is used as */
-  src_ip6 = u8x16_SHUFFLE (k.as_u8x16[0], zero, ip6_byteswap);
-  dst_ip6 = u8x16_SHUFFLE (k.as_u8x16[1], zero, ip6_byteswap);
+  src_ip6 = u8x16_shuffle2 (k.as_u8x16[0], zero, IP6_BYTESWAP);
+  dst_ip6 = u8x16_shuffle2 (k.as_u8x16[1], zero, IP6_BYTESWAP);
   norm = (u64x2) src_ip6 > (u64x2) dst_ip6;
   norm_reverse = (u64x2) src_ip6 < (u64x2) dst_ip6;
   norm = i64x2_splat (norm[1] | (~norm_reverse[1] & norm[0]));
@@ -308,7 +410,7 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   k.as_u32x2 = u32x2_insert (k.as_u32x2, l4_hdr, 0);
 
   k.as_u8x8 = u8x8_shuffle (k.as_u8x8, swap_A);
-  k.as_u32x8 = u32x8_SHUFFLE (k.as_u32x8, zero_8, swap_B);
+  k.as_u32x8 = u32x8_shuffle_dynamic (k.as_u32x8, swap_B);
   /* Reshuffle for ICMP
      TODO: merge with fast path? */
   if (slow_path && pr == IP_PROTOCOL_ICMP6)
