@@ -163,9 +163,9 @@ typedef union
     u32 ip_addr_lo;
     u32 ip_addr_hi;
   };
-  u8x16 as_u8x16;
-  u32x4 as_u32x4;
-  u64x2 as_u64x2;
+  u8x16u as_u8x16;
+  u32x4u as_u32x4;
+  u64x2u as_u64x2;
 } __clib_packed vcdp_ip4_key_t;
 STATIC_ASSERT_SIZEOF (vcdp_ip4_key_t, 16);
 
