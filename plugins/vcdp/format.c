@@ -200,6 +200,7 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
 {
   u32 indent = format_get_indent (s);
   vcdp_main_t *vcdp = va_arg (*args, vcdp_main_t *);
+  vlib_main_t *vm = vlib_get_main ();
   u32 tenant_idx = va_arg (*args, u32);
   __clib_unused vcdp_tenant_t *tenant = va_arg (*args, vcdp_tenant_t *);
   counter_t ctr;
@@ -228,6 +229,15 @@ format_vcdp_tenant_extra (u8 *s, va_list *args)
   s = format (s, "%U%s: %d seconds\n", format_white_space, indent + 2, z,     \
 	      tenant->timeouts[VCDP_TIMEOUT_##x]);
   foreach_vcdp_timeout
+#undef _
+
+    s = format (s, "%U%s\n", format_white_space, indent,
+		"Configured Slowpath nodes:");
+#define _(sym, default, name)                                                 \
+  s = format (s, "%U%s: %U\n", format_white_space, indent + 2, name,          \
+	      format_vlib_node_name, vm,                                      \
+	      tenant->sp_node_indices[VCDP_SP_NODE_##sym]);
+  foreach_vcdp_sp_node
 #undef _
     return s;
 }
@@ -264,4 +274,19 @@ unformat_vcdp_service_bitmap (unformat_input_t *input, va_list *args)
       return 1;
     }
   return 0;
+}
+
+uword
+unformat_vcdp_sp_node (unformat_input_t *input, va_list *args)
+{
+  u32 *result = va_arg (*args, u32 *);
+#define _(sym, default, str)                                                  \
+  if (unformat (input, str))                                                  \
+    {                                                                         \
+      *result = VCDP_SP_NODE_##sym;                                           \
+      return 1;                                                               \
+    }
+  foreach_vcdp_sp_node
+#undef _
+    return 0;
 }

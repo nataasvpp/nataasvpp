@@ -239,6 +239,11 @@ static const u64 icmp6_type_bitmask_128off = 0x3;
 #define KEY_IP4_SWAP_ICMP                                                     \
   2, 3, 0, 1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16
 #define KEY_IP6_SWAP_ICMP 2, 3, 0, 1, -1, -1, -1, -1
+
+#define IP4_REASS_NEEDED_FLAGS                                                \
+  ((u16) IP4_HEADER_FLAG_MORE_FRAGMENTS | (u16) ((1 << 13) - 1))
+
+#define VCDP_LV_TO_SP ((u64) 0x1 << 63)
 static const u8x16 key_ip4_shuff_no_norm = { KEY_IP4_SHUFF_NO_NORM };
 
 static const u8x16 key_ip4_shuff_norm = { KEY_IP4_SHUFF_NORM };
@@ -260,13 +265,29 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   void *next_header;
   ip4_header_t *ip = vlib_buffer_get_current (b);
   u8 slowpath_needed;
+  u8 reass_needed;
+  u8 l4_from_reass = 0;
 
   /* load last 16 bytes of ip header into 128-bit register */
   k = *(u8x16u *) ((u8 *) ip + 4);
   pr = ip->protocol;
   next_header = ip4_next_header (ip);
-  slowpath_needed = pr == IP_PROTOCOL_ICMP; /*TODO: add fragmentation also
-   || (ip->flags_and_fragment_offset & IP4_HEADER_FLAG_MORE_FRAGMENTS);*/
+  reass_needed = !!(ip->flags_and_fragment_offset &
+		    clib_host_to_net_u16 (IP4_REASS_NEEDED_FLAGS));
+  slowpath_needed = pr == IP_PROTOCOL_ICMP || reass_needed;
+
+  if (slow_path && reass_needed &&
+      vcdp_buffer2 (b)->flags & VCDP_BUFFER_FLAG_REASSEMBLED)
+    {
+      /* This packet comes back from shallow virtual reassembly */
+      l4_from_reass = 1;
+    }
+  else if (slow_path && reass_needed)
+    {
+      /* Reassembly is needed and has not been done yet */
+      lookup_val[0] = (u64) VCDP_SP_NODE_REASS << 32 | VCDP_LV_TO_SP;
+      return slowpath_needed;
+    }
 
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
    * compare so result will hold all ones if we need to swap src and dst
@@ -276,7 +297,12 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
 
   /* we only normalize tcp and udp, for other cases we
    * reset all bits to 0 */
-  if (slow_path && pr == IP_PROTOCOL_ICMP)
+  if (slow_path && pr == IP_PROTOCOL_ICMP && l4_from_reass)
+    {
+      u8 type = vnet_buffer (b)->ip.reass.icmp_type_or_tcp_flags;
+      norm &= i64x2_splat ((1ULL << type) & icmp4_type_bitmask) != zero;
+    }
+  else if (slow_path && pr == IP_PROTOCOL_ICMP)
     {
       icmp46_header_t *icmp = next_header;
       u8 type = icmp->type;
@@ -292,7 +318,17 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
 
   /* overwrite first 4 bytes with first 0 - 4 bytes of l4 header */
   next_header = ip4_next_header (ip);
-  if (slow_path)
+  if (slow_path && l4_from_reass)
+    {
+      u16 src_port, dst_port;
+      src_port = vnet_buffer (b)->ip.reass.l4_src_port;
+      dst_port = vnet_buffer (b)->ip.reass.l4_dst_port;
+      l4_hdr = dst_port << 16 | src_port;
+      /* Mask seqnum field out for ICMP */
+      if (pr == IP_PROTOCOL_ICMP)
+	l4_hdr &= 0xff;
+    }
+  else if (slow_path)
     l4_hdr = ((u32 *) next_header + l4_offset_32w[pr])[0] &
 	     pow2_mask (l4_mask_bits[pr]);
   else
@@ -308,6 +344,9 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
   /* extract tcp flags */
+  if (slow_path && l4_from_reass && pr == IP_PROTOCOL_TCP)
+    vcdp_buffer2 (b)->tcp_flags =
+      vnet_buffer (b)->ip.reass.icmp_type_or_tcp_flags;
   if (pr == IP_PROTOCOL_TCP)
     vcdp_buffer (b)->tcp_flags = *(u8 *) next_header + 13;
   else
@@ -319,6 +358,22 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
   h[0] = clib_bihash_hash_24_8 ((clib_bihash_kv_24_8_t *) (skey));
+
+  if (slow_path && l4_from_reass)
+    {
+      /* Restore vcdp_buffer */
+      /* TODO: optimise save/restore ? */
+      vcdp_buffer (b)->flags = vcdp_buffer2 (b)->flags;
+      vcdp_buffer (b)->service_bitmap = vcdp_buffer2 (b)->service_bitmap;
+      vcdp_buffer (b)->tcp_flags = vcdp_buffer2 (b)->tcp_flags;
+      vcdp_buffer (b)->tenant_index = vcdp_buffer2 (b)->tenant_index;
+      
+      /*Clear*/
+      vcdp_buffer2 (b)->flags = 0;
+      vcdp_buffer2 (b)->service_bitmap = 0;
+      vcdp_buffer2 (b)->tcp_flags = 0;
+      vcdp_buffer2 (b)->tenant_index = 0;
+    }
 
   /* If slowpath needed == 1, we may have done a lot of useless work that will
    be overwritten, but we avoid too much branching in fastpath */
@@ -791,9 +846,12 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   u32 n_left = frame->n_vectors;
   u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
+  u32 to_sp[VLIB_FRAME_SIZE], n_to_sp = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
   u16 local_next_indices[VLIB_FRAME_SIZE];
+  u32 sp_node_indices[VLIB_FRAME_SIZE];
   vlib_buffer_t *local_bufs[VLIB_FRAME_SIZE];
+  vlib_buffer_t *to_sp_bufs[VLIB_FRAME_SIZE];
   u32 local_flow_indices[VLIB_FRAME_SIZE];
   VCDP_SESSION_IP46_KEYS_TYPE (VLIB_FRAME_SIZE) keys;
 
@@ -803,8 +861,16 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   u32 lengths[VLIB_FRAME_SIZE], *len = lengths;
   f64 time_now = vlib_time_now (vm);
-  /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
-   * flow_index */
+  /* lookup_vals contains:
+   * - (Phase 1) to_slow_path_node (1bit)
+		  ||| slow_path_node_index (31bits)
+   *              ||| zeros(31bits)
+   *              |||
+   *              ||| packet_dir (1bit)
+   *
+   * - (Phase 2) thread_index (32bits)||| flow_index (32bits)
+      OR same as Phase 1 if slow path
+      ASSUMPTION: thread index < 2^31 */
   u64 __attribute__ ((aligned (32))) lookup_vals[VLIB_FRAME_SIZE],
     *lv = lookup_vals;
   u16 hit_count = 0;
@@ -849,6 +915,9 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 	if (PREDICT_TRUE (n_left > 1))
 	  vlib_prefetch_buffer_header (b[1], STORE);
 
+	if (PREDICT_FALSE (lv[0] & VCDP_LV_TO_SP))
+	  goto next_pkt6;
+
 	clib_memcpy_fast (&kv.kv6.key, k6, 48);
 	if (clib_bihash_search_inline_with_hash_48_8 (&vcdp->table6, h[0],
 						      &kv.kv6))
@@ -872,6 +941,8 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 
 	b[0]->flow_id = lv[0] & (~(u32) 0);
 	len[0] = vlib_buffer_length_in_chain (vm, b[0]);
+
+      next_pkt6:
 	b += 1;
 	n_left -= 1;
 	k6 += 1;
@@ -887,6 +958,9 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 
 	if (PREDICT_TRUE (n_left > 1))
 	  vlib_prefetch_buffer_header (b[1], STORE);
+
+	if (PREDICT_FALSE (lv[0] & VCDP_LV_TO_SP))
+	  goto next_pkt4;
 
 	clib_memcpy_fast (&kv.kv4.key, k4, 24);
 	if (clib_bihash_search_inline_with_hash_24_8 (&vcdp->table4, h[0],
@@ -911,6 +985,8 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 
 	b[0]->flow_id = lv[0] & (~(u32) 0);
 	len[0] = vlib_buffer_length_in_chain (vm, b[0]);
+
+      next_pkt4:
 	b += 1;
 	n_left -= 1;
 	k4 += 1;
@@ -926,11 +1002,23 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   len = lengths;
   while (n_left)
     {
-      u32 flow_thread_index = vcdp_thread_index_from_lookup (lv[0]);
-      u32 flow_index = lv[0] & (~(u32) 0);
-      vlib_combined_counter_main_t *vcm =
-	&vcdp->per_thread_data[flow_thread_index]
-	   .per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP];
+      u32 flow_thread_index;
+      u32 flow_index;
+      vlib_combined_counter_main_t *vcm;
+
+      if (lv[0] & VCDP_LV_TO_SP)
+	{
+	  to_sp[n_to_sp] = bi[0];
+	  sp_node_indices[n_to_sp] = (lv[0] & ~(VCDP_LV_TO_SP)) >> 32;
+	  to_sp_bufs[n_to_sp] = b[0];
+	  n_to_sp++;
+	  goto next_packet2;
+	}
+
+      flow_thread_index = vcdp_thread_index_from_lookup (lv[0]);
+      flow_index = lv[0] & (~(u32) 0);
+      vcm = &vcdp->per_thread_data[flow_thread_index]
+	       .per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP];
       vlib_increment_combined_counter (vcm, thread_index, flow_index, 1,
 				       len[0]);
       if (flow_thread_index == thread_index)
@@ -948,7 +1036,7 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 	  thread_indices[n_remote] = flow_thread_index;
 	  n_remote++;
 	}
-
+    next_packet2:
       n_left -= 1;
       lv += 1;
       b += 1;
@@ -1002,6 +1090,54 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 				   n_local);
       vlib_node_increment_counter (vm, node->node_index,
 				   VCDP_LOOKUP_ERROR_LOCAL, n_local);
+    }
+
+  if (n_to_sp)
+    {
+      vlib_frame_t *f = NULL;
+      u32 *current_next_slot = NULL;
+      u32 current_left_to_next = 0;
+      u32 *current_to_sp = to_sp;
+      u32 *sp_node_index = sp_node_indices;
+      u32 last_node_index = VLIB_INVALID_NODE_INDEX;
+
+      b = to_sp_bufs;
+      n_left = n_to_sp;
+
+      while (n_left)
+	{
+	  u32 node_index;
+	  u16 tenant_idx;
+	  vcdp_tenant_t *tenant;
+
+	  tenant_idx = vcdp_buffer (b[0])->tenant_index;
+	  tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+	  node_index = tenant->sp_node_indices[sp_node_index[0]];
+
+	  if (PREDICT_FALSE (node_index != last_node_index) ||
+	      current_left_to_next == 0)
+	    {
+	      if (f != NULL)
+		vlib_put_frame_to_node (vm, last_node_index, f);
+	      f = vlib_get_frame_to_node (vm, node_index);
+	      f->frame_flags |= node->flags & VLIB_NODE_FLAG_TRACE;
+	      current_next_slot = vlib_frame_vector_args (f);
+	      current_left_to_next = VLIB_FRAME_SIZE;
+	      last_node_index = node_index;
+	    }
+
+	  current_next_slot[0] = current_to_sp[0];
+
+	  f->n_vectors += 1;
+	  current_to_sp += 1;
+	  b += 1;
+	  sp_node_index += 1;
+	  current_next_slot += 1;
+
+	  current_left_to_next -= 1;
+	  n_left -= 1;
+	}
+      vlib_put_frame_to_node (vm, last_node_index, f);
     }
 
   if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))

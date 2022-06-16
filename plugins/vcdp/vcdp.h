@@ -144,6 +144,19 @@ enum
   foreach_vcdp_session_key_flag
 #undef _
 };
+
+#define foreach_vcdp_sp_node                                                  \
+  _ (REASS, "error-drop", "sp-reassembly")                                    \
+  _ (IP6_NDP, "error-drop", "sp-ip6-ndp")
+
+enum
+{
+#define _(name, val, str) VCDP_SP_NODE_##name,
+  foreach_vcdp_sp_node
+#undef _
+    VCDP_N_SP_NODES
+};
+
 typedef union
 {
   struct
@@ -307,6 +320,7 @@ typedef struct
   u32 context_id;
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
+  u32 sp_node_indices[VCDP_N_SP_NODES];
 } vcdp_tenant_t;
 
 typedef struct
@@ -330,6 +344,10 @@ typedef struct
   /* per-thread data */
   vcdp_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
+
+  /* Shallow Virtual Reassembly */
+  u16 ip4_sv_reass_next_index;
+  u16 ip6_sv_reass_next_index;
 } vcdp_main_t;
 
 extern vcdp_main_t vcdp_main;
@@ -344,6 +362,7 @@ format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
+unformat_function_t unformat_vcdp_sp_node;
 
 static_always_inline u32
 vcdp_session_index_from_lookup (u64 val)
@@ -421,6 +440,9 @@ clib_error_t *vcdp_set_services (vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap,
 				 u8 direction);
 clib_error_t *vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id,
 				u32 timeout_idx, u32 timeout_val);
+
+clib_error_t *vcdp_set_sp_node (vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index,
+				u32 node_index);
 
 void vcdp_normalise_ip4_key (vcdp_session_t *session,
 			     vcdp_session_ip4_key_t *result, u8 key_idx);

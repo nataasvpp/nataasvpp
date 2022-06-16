@@ -26,6 +26,7 @@
 #include <vcdp/service.h>
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
+#include <vnet/ip/reass/ip4_sv_reass.h>
 
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
@@ -137,10 +138,14 @@ vcdp_init_main_if_needed (vcdp_main_t *vcdp)
 static clib_error_t *
 vcdp_init (vlib_main_t *vm)
 {
+  vcdp_main_t *vcdp = &vcdp_main;
   vlib_call_init_function (vm, vcdp_service_init);
   vcdp_service_next_indices_init (vm, vcdp_lookup_ip4_node.index);
   vcdp_service_next_indices_init (vm, vcdp_lookup_ip6_node.index);
   vcdp_service_next_indices_init (vm, vcdp_handoff_node.index);
+  vcdp->ip4_sv_reass_next_index =
+    ip4_sv_reass_custom_context_register_next_node (
+      vcdp_lookup_ip4_node.index);
   return 0;
 }
 
@@ -192,6 +197,20 @@ vcdp_tenant_init_timeouts (vcdp_tenant_t *tenant)
 #undef _
 }
 
+static void
+vcdp_tenant_init_sp_nodes (vcdp_tenant_t *tenant)
+{
+  vlib_main_t *vm = vlib_get_main ();
+  vlib_node_t *node;
+
+#define _(sym, default, str)                                                  \
+  node = vlib_get_node_by_name (vm, (u8 *) (default));                        \
+  tenant->sp_node_indices[VCDP_SP_NODE_##sym] = node->index;
+
+  foreach_vcdp_sp_node
+#undef _
+}
+
 clib_error_t *
 vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u32 context_id,
 		     u8 is_del)
@@ -213,6 +232,7 @@ vcdp_tenant_add_del (vcdp_main_t *vcdp, u32 tenant_id, u32 context_id,
 	  tenant->tenant_id = tenant_id;
 	  tenant->context_id = context_id;
 	  vcdp_tenant_init_timeouts (tenant);
+	  vcdp_tenant_init_sp_nodes (tenant);
 	  kv.key = tenant_id;
 	  kv.value = tenant_idx;
 	  clib_bihash_add_del_8_8 (&vcdp->tenant_idx_by_id, &kv, 1);
@@ -276,6 +296,21 @@ vcdp_set_timeout (vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx,
       0, "Can't configure timeout: tenant id %d not found", tenant_id);
   tenant = vcdp_tenant_at_index (vcdp, kv.value);
   tenant->timeouts[timeout_idx] = timeout_val;
+  return 0;
+}
+
+clib_error_t *
+vcdp_set_sp_node (vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index,
+		  u32 node_index)
+{
+  vcdp_init_main_if_needed (vcdp);
+  clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
+  vcdp_tenant_t *tenant;
+  if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+    return clib_error_return (
+      0, "Can't configure slow path node: tenant id %d not found", tenant_id);
+  tenant = vcdp_tenant_at_index (vcdp, kv.value);
+  tenant->sp_node_indices[sp_index] = node_index;
   return 0;
 }
 
