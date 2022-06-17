@@ -70,6 +70,17 @@ update_state_one_pkt (vcdp_tw_t *tw, vcdp_tenant_t *tenant,
     (void *) (data + (session->type == VCDP_SESSION_TYPE_IP4 ?
 			      sizeof (ip4_header_t) :
 			      sizeof (ip6_header_t)));
+  ip4_header_t *ip4 = (void *) data;
+
+  /* Ignore non first fragments */
+  if (session->type == VCDP_SESSION_TYPE_IP4 &&
+      ip4->flags_and_fragment_offset &
+	clib_host_to_net_u16 (IP4_HEADER_FLAG_MORE_FRAGMENTS - 1))
+    {
+      vcdp_next (b[0], to_next);
+      return;
+    }
+
   u8 flags = tcph->flags & VCDP_TCP_CHECK_TCP_FLAGS_MASK;
   u32 acknum = clib_net_to_host_u32 (tcph->ack_number);
   u32 seqnum = clib_net_to_host_u32 (tcph->seq_number);

@@ -367,7 +367,7 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
       vcdp_buffer (b)->service_bitmap = vcdp_buffer2 (b)->service_bitmap;
       vcdp_buffer (b)->tcp_flags = vcdp_buffer2 (b)->tcp_flags;
       vcdp_buffer (b)->tenant_index = vcdp_buffer2 (b)->tenant_index;
-      
+
       /*Clear*/
       vcdp_buffer2 (b)->flags = 0;
       vcdp_buffer2 (b)->service_bitmap = 0;
