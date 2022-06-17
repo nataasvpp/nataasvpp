@@ -216,10 +216,10 @@ static const u64 icmp4_type_bitmask =
 static const u64 icmp6_type_bitmask_128off = 0x3;
 
 #define KEY_IP4_SHUFF_NO_NORM                                                 \
-  0, 1, 2, 3, 16, 5, 16, 16, 8, 9, 10, 11, 12, 13, 14, 15
+  0, 1, 2, 3, -1, 5, -1, -1, 8, 9, 10, 11, 12, 13, 14, 15
 
 #define KEY_IP4_SHUFF_NORM                                                    \
-  2, 3, 0, 1, 16, 5, 16, 16, 12, 13, 14, 15, 8, 9, 10, 11
+  2, 3, 0, 1, -1, 5, -1, -1, 12, 13, 14, 15, 8, 9, 10, 11
 
 #define KEY_IP6_SHUFF_NO_NORM_A 0, 1, 2, 3, -1, -1, 6, -1
 #define KEY_IP6_SHUFF_NORM_A	2, 3, 0, 1, -1, -1, 6, -1
