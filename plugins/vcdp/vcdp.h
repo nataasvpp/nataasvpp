@@ -146,7 +146,8 @@ enum
 };
 
 #define foreach_vcdp_sp_node                                                  \
-  _ (REASS, "error-drop", "sp-reassembly")                                    \
+  _ (IP4_REASS, "error-drop", "sp-ip4-reassembly")                            \
+  _ (IP6_REASS, "error-drop", "sp-ip6-reassembly")                            \
   _ (IP6_NDP, "error-drop", "sp-ip6-ndp")
 
 enum

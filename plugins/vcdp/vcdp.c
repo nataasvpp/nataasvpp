@@ -27,6 +27,7 @@
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
 #include <vnet/ip/reass/ip4_sv_reass.h>
+#include <vnet/ip/reass/ip6_sv_reass.h>
 
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
@@ -146,6 +147,9 @@ vcdp_init (vlib_main_t *vm)
   vcdp->ip4_sv_reass_next_index =
     ip4_sv_reass_custom_context_register_next_node (
       vcdp_lookup_ip4_node.index);
+  vcdp->ip6_sv_reass_next_index =
+    ip6_sv_reass_custom_context_register_next_node (
+      vcdp_lookup_ip6_node.index);
   return 0;
 }
 

@@ -36,7 +36,7 @@ format_vcdp_lookup_sp_sv_reass_trace (u8 *s, va_list *args)
 
 #define foreach_vcdp_lookup_sp_sv_reass_next                                  \
   _ (IP4_SVR, "ip4-sv-reassembly-custom-context")                             \
-  _ (IP6_SVR, "error-drop")
+  _ (IP6_SVR, "ip6-sv-reassembly-custom-context")
 
 enum
 {
@@ -62,8 +62,8 @@ static char *vcdp_lookup_sp_sv_reass_error_strings[] = {
 };
 
 static_always_inline u32
-vcdp_lookup_ip4_sp_sv_reass_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
-				    vlib_frame_t *frame)
+vcdp_lookup_sp_sv_reass_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
+				vlib_frame_t *frame, bool is_ip6)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
@@ -83,13 +83,16 @@ vcdp_lookup_ip4_sp_sv_reass_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       vcdp_buffer2 (b[0])->tenant_index = vcdp_buffer (b[0])->tenant_index;
       vcdp_buffer2 (b[0])->flags = VCDP_BUFFER_FLAG_REASSEMBLED;
 
-      vnet_buffer (b[0])->ip.reass.next_index = vcdp->ip4_sv_reass_next_index;
+      vnet_buffer (b[0])->ip.reass.next_index =
+	is_ip6 ? vcdp->ip6_sv_reass_next_index : vcdp->ip4_sv_reass_next_index;
       b += 1;
       a += 1;
       n_left -= 1;
     }
   vlib_buffer_enqueue_to_single_next_with_aux (
-    vm, node, from, aux_data, VCDP_LOOKUP_SP_SV_REASS_NEXT_IP4_SVR,
+    vm, node, from, aux_data,
+    is_ip6 ? VCDP_LOOKUP_SP_SV_REASS_NEXT_IP6_SVR :
+		   VCDP_LOOKUP_SP_SV_REASS_NEXT_IP4_SVR,
     frame->n_vectors);
   return frame->n_vectors;
 }
@@ -97,11 +100,33 @@ vcdp_lookup_ip4_sp_sv_reass_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 VLIB_NODE_FN (vcdp_lookup_ip4_sp_sv_reass)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  return vcdp_lookup_ip4_sp_sv_reass_inline (vm, node, frame);
+  return vcdp_lookup_sp_sv_reass_inline (vm, node, frame, 0);
 }
 
 VLIB_REGISTER_NODE (vcdp_lookup_ip4_sp_sv_reass) = {
   .name = "vcdp-lookup-ip4-sp-sv-reass",
+  .vector_size = sizeof (u32),
+  .format_trace = format_vcdp_lookup_sp_sv_reass_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+
+  .n_errors = ARRAY_LEN (vcdp_lookup_sp_sv_reass_error_strings),
+  .error_strings = vcdp_lookup_sp_sv_reass_error_strings,
+  .next_nodes = {
+#define _(sym, str) [VCDP_LOOKUP_SP_SV_REASS_NEXT_##sym] = str,
+  foreach_vcdp_lookup_sp_sv_reass_next
+#undef _ 
+  },
+  .n_next_nodes = VCDP_LOOKUP_SP_SV_REASS_N_NEXT,
+};
+
+VLIB_NODE_FN (vcdp_lookup_ip6_sp_sv_reass)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_lookup_sp_sv_reass_inline (vm, node, frame, 1);
+}
+
+VLIB_REGISTER_NODE (vcdp_lookup_ip6_sp_sv_reass) = {
+  .name = "vcdp-lookup-ip6-sp-sv-reass",
   .vector_size = sizeof (u32),
   .format_trace = format_vcdp_lookup_sp_sv_reass_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,

@@ -285,7 +285,7 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   else if (slow_path && reass_needed)
     {
       /* Reassembly is needed and has not been done yet */
-      lookup_val[0] = (u64) VCDP_SP_NODE_REASS << 32 | VCDP_LV_TO_SP;
+      lookup_val[0] = (u64) VCDP_SP_NODE_IP4_REASS << 32 | VCDP_LV_TO_SP;
       return slowpath_needed;
     }
 
@@ -347,7 +347,7 @@ calc_key_v4 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   if (slow_path && l4_from_reass && pr == IP_PROTOCOL_TCP)
     vcdp_buffer2 (b)->tcp_flags =
       vnet_buffer (b)->ip.reass.icmp_type_or_tcp_flags;
-  if (pr == IP_PROTOCOL_TCP)
+  else if (pr == IP_PROTOCOL_TCP)
     vcdp_buffer (b)->tcp_flags = *(u8 *) next_header + 13;
   else
     vcdp_buffer (b)->tcp_flags = 0;
@@ -421,14 +421,17 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   u8 *data = vlib_buffer_get_current (b);
   ip6_header_t *ip = (void *) data;
   int slowpath_needed;
+  u8 ext_hdr = 0;
+  u8 l4_from_reass = 0;
 
   /* loads 40 bytes of ip6 header */
   k.as_u32x2 = *(u32x2u *) data;
   k.as_u32x8 = *(u32x8u *) (data + 8);
   pr = ip->protocol;
+  ext_hdr = ip6_ext_hdr (pr);
   next_header = ip6_next_header (ip);
-  slowpath_needed = pr == IP_PROTOCOL_ICMP6; /*TODO: add fragmentation also
-   || (ip->flags_and_fragment_offset & IP4_HEADER_FLAG_MORE_FRAGMENTS);*/
+
+  slowpath_needed = pr == IP_PROTOCOL_ICMP6 || ext_hdr;
 
   /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
    * compare so result will hold all ones if we need to swap src and dst
@@ -439,9 +442,43 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   norm_reverse = (u64x2) src_ip6 < (u64x2) dst_ip6;
   norm = i64x2_splat (norm[1] | (~norm_reverse[1] & norm[0]));
 
+  next_header = ip6_next_header (ip);
+
+  if (slow_path && vcdp_buffer2 (b)->flags & VCDP_BUFFER_FLAG_REASSEMBLED)
+    {
+      /* This packet comes back from shallow virtual reassembly */
+      l4_from_reass = 1;
+    }
+  if (slow_path && ext_hdr)
+    {
+      /* Parse the extension header chain and look for fragmentation */
+      ip6_ext_hdr_chain_t chain;
+      int res =
+	ip6_ext_header_walk (b, ip, IP_PROTOCOL_IPV6_FRAGMENTATION, &chain);
+      if (!l4_from_reass && res >= 0 &&
+	  chain.eh[res].protocol == IP_PROTOCOL_IPV6_FRAGMENTATION)
+	{
+	  /* Reassembly is needed and has not been done yet */
+	  lookup_val[0] = (u64) VCDP_SP_NODE_IP6_REASS << 32 | VCDP_LV_TO_SP;
+	  return slowpath_needed;
+	}
+      else
+	{
+	  next_header =
+	    ip6_ext_next_header_offset (ip, chain.eh[chain.length - 1].offset);
+	  pr = chain.eh[chain.length - 1].protocol;
+	}
+    }
+
   /* we only normalize tcp and udp, for other cases we
    * reset all bits to 0 */
-  if (slow_path && pr == IP_PROTOCOL_ICMP6)
+  if (slow_path && pr == IP_PROTOCOL_ICMP6 && l4_from_reass)
+    {
+      u8 type = vnet_buffer (b)->ip.reass.icmp_type_or_tcp_flags;
+      norm &= i64x2_splat ((1ULL << (type - 128)) &
+			   icmp6_type_bitmask_128off) != zero;
+    }
+  else if (slow_path && pr == IP_PROTOCOL_ICMP6)
     {
       icmp46_header_t *icmp = next_header;
       u8 type = icmp->type;
@@ -461,8 +498,17 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
     (key_ip6_shuff_norm_B - key_ip6_shuff_no_norm_B) & u32x8_splat (norm[0]);
 
   /* overwrite first 4 bytes with first 0 - 4 bytes of l4 header */
-  next_header = ip6_next_header (ip);
-  if (slow_path)
+  if (slow_path && l4_from_reass)
+    {
+      u16 src_port, dst_port;
+      src_port = vnet_buffer (b)->ip.reass.l4_src_port;
+      dst_port = vnet_buffer (b)->ip.reass.l4_dst_port;
+      l4_hdr = dst_port << 16 | src_port;
+      /* Mask seqnum field out for ICMP */
+      if (pr == IP_PROTOCOL_ICMP6)
+	l4_hdr &= 0xff;
+    }
+  else if (slow_path)
     l4_hdr = ((u32 *) next_header + l4_offset_32w[pr])[0] &
 	     pow2_mask (l4_mask_bits[pr]);
   else
@@ -479,7 +525,10 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   lookup_val[0] = ((u32x4) norm)[0] & 0x1;
 
   /* extract tcp flags */
-  if (pr == IP_PROTOCOL_TCP)
+  if (slow_path && l4_from_reass && pr == IP_PROTOCOL_TCP)
+    vcdp_buffer2 (b)->tcp_flags =
+      vnet_buffer (b)->ip.reass.icmp_type_or_tcp_flags;
+  else if (pr == IP_PROTOCOL_TCP)
     vcdp_buffer (b)->tcp_flags = *(u8 *) next_header + 13;
   else
     vcdp_buffer (b)->tcp_flags = 0;
@@ -491,7 +540,21 @@ calc_key_v6 (vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   clib_memset (skey->zeros, 0, sizeof (skey->zeros));
   /* calculate hash */
   h[0] = clib_bihash_hash_48_8 ((clib_bihash_kv_48_8_t *) (skey));
+  if (slow_path && l4_from_reass)
+    {
+      /* Restore vcdp_buffer */
+      /* TODO: optimise save/restore ? */
+      vcdp_buffer (b)->flags = vcdp_buffer2 (b)->flags;
+      vcdp_buffer (b)->service_bitmap = vcdp_buffer2 (b)->service_bitmap;
+      vcdp_buffer (b)->tcp_flags = vcdp_buffer2 (b)->tcp_flags;
+      vcdp_buffer (b)->tenant_index = vcdp_buffer2 (b)->tenant_index;
 
+      /*Clear*/
+      vcdp_buffer2 (b)->flags = 0;
+      vcdp_buffer2 (b)->service_bitmap = 0;
+      vcdp_buffer2 (b)->tcp_flags = 0;
+      vcdp_buffer2 (b)->tenant_index = 0;
+    }
   /* If slowpath needed == 1, we may have done a lot of useless work that will
    be overwritten, but we avoid too much branching in fastpath */
   return slowpath_needed;
