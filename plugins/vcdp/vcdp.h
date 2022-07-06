@@ -148,7 +148,10 @@ enum
 #define foreach_vcdp_sp_node                                                  \
   _ (IP4_REASS, "error-drop", "sp-ip4-reassembly")                            \
   _ (IP6_REASS, "error-drop", "sp-ip6-reassembly")                            \
-  _ (IP6_NDP, "error-drop", "sp-ip6-ndp")
+  _ (IP4_UNKNOWN_PROTO, "error-drop", "sp-ip4-unknown-proto")                 \
+  _ (IP6_UNKNOWN_PROTO, "error-drop", "sp-ip6-unknown-proto")                 \
+  _ (IP4_ICMP4_ERROR, "error-drop", "sp-ip4-icmp4-error")                     \
+  _ (IP6_ICMP6_ERROR, "error-drop", "sp-ip4-icmp6-error")
 
 enum
 {
@@ -322,6 +325,9 @@ typedef struct
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
   u32 sp_node_indices[VCDP_N_SP_NODES];
+  uword icmp4_lookup_next;
+  uword icmp6_lookup_next;
+
 } vcdp_tenant_t;
 
 typedef struct
@@ -335,6 +341,8 @@ typedef struct
   clib_bihash_48_8_t table6;
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
+  u32 icmp4_error_frame_queue_index;
+  u32 icmp6_error_frame_queue_index;
   u64 session_id_ctr_mask;
   vlib_simple_counter_main_t tenant_session_ctr[VCDP_TENANT_SESSION_N_COUNTER];
   vlib_combined_counter_main_t tenant_data_ctr[VCDP_TENANT_DATA_N_COUNTER];
@@ -353,6 +361,8 @@ typedef struct
 
 extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
+extern vlib_node_registration_t vcdp_lookup_ip4_icmp_node;
+extern vlib_node_registration_t vcdp_lookup_ip6_icmp_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
 extern vlib_node_registration_t vcdp_lookup_ip6_node;
 format_function_t format_vcdp_session;
