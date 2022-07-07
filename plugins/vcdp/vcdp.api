@@ -101,6 +101,26 @@ autoreply define vcdp_set_timeout
   u32 timeout_value;
 };
 
+autoreply define vcdp_set_sp_node
+{
+  u32 client_index;
+  u32 context;
+
+  u32 tenant_id;
+  vl_api_vcdp_sp_node_t sp_node;
+  u32 node_index;
+};
+
+autoreply define vcdp_set_icmp_error_node
+{
+  u32 client_index;
+  u32 context;
+
+  u32 tenant_id;
+  bool is_ip6;
+  u32 node_index;
+};
+
 /*
  * Local Variables:
  * eval: (c-set-style "gnu")

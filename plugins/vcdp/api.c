@@ -88,6 +88,36 @@ vl_api_vcdp_set_timeout_t_handler (vl_api_vcdp_set_timeout_t *mp)
   REPLY_MACRO (VL_API_VCDP_SET_TIMEOUT_REPLY);
 }
 
+static void
+vl_api_vcdp_set_sp_node_t_handler (vl_api_vcdp_set_sp_node_t *mp)
+{
+  vl_api_vcdp_set_sp_node_reply_t *rmp;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 tenant_id = clib_net_to_host_u32 (mp->tenant_id);
+  u8 sp_node = vcdp_api_sp_node (mp->sp_node);
+  u32 node_index = clib_net_to_host_u32 (mp->node_index);
+
+  clib_error_t *err = vcdp_set_sp_node (vcdp, tenant_id, sp_node, node_index);
+  int rv = err ? -1 : 0;
+  REPLY_MACRO (VL_API_VCDP_SET_SP_NODE_REPLY);
+}
+
+static void
+vl_api_vcdp_set_icmp_error_node_t_handler (
+  vl_api_vcdp_set_icmp_error_node_t *mp)
+{
+  vl_api_vcdp_set_icmp_error_node_reply_t *rmp;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 tenant_id = clib_net_to_host_u32 (mp->tenant_id);
+  u8 is_ip6 = mp->is_ip6;
+  u32 node_index = clib_net_to_host_u32 (mp->node_index);
+
+  clib_error_t *err =
+    vcdp_set_icmp_error_node (vcdp, tenant_id, is_ip6, node_index);
+  int rv = err ? -1 : 0;
+  REPLY_MACRO (VL_API_VCDP_SET_ICMP_ERROR_NODE_REPLY);
+}
+
 static vl_api_vcdp_session_state_t
 vcdp_session_state_encode (vcdp_session_state_t x)
 {

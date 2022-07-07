@@ -45,6 +45,34 @@ vcdp_session_type_encode (vcdp_session_type_t x)
     }
 };
 
+static_always_inline u8
+vcdp_api_sp_node (vl_api_vcdp_sp_node_t sp_node)
+{
+  switch (sp_node)
+    {
+    case VCDP_API_SP_NODE_IP4_REASS:
+      return VCDP_SP_NODE_IP4_REASS;
+
+    case VCDP_API_SP_NODE_IP6_REASS:
+      return VCDP_SP_NODE_IP6_REASS;
+
+    case VCDP_API_SP_NODE_IP4_UNKNOWN_PROTO:
+      return VCDP_SP_NODE_IP4_UNKNOWN_PROTO;
+
+    case VCDP_API_SP_NODE_IP6_UNKNOWN_PROTO:
+      return VCDP_SP_NODE_IP6_UNKNOWN_PROTO;
+
+    case VCDP_API_SP_NODE_IP4_ICMP4_ERROR:
+      return VCDP_SP_NODE_IP4_ICMP4_ERROR;
+
+    case VCDP_API_SP_NODE_IP6_ICMP6_ERROR:
+      return VCDP_SP_NODE_IP6_ICMP6_ERROR;
+
+    default:
+      return 0;
+    }
+}
+
 static_always_inline void
 vcdp_session_ip46_key_encode (vcdp_session_ip46_key_t *skey, ip46_type_t type,
 			      vl_api_vcdp_session_key_t *out)

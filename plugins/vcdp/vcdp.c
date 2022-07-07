@@ -322,6 +322,34 @@ vcdp_set_sp_node (vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index,
   return 0;
 }
 
+clib_error_t *
+vcdp_set_icmp_error_node (vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6,
+			  u32 node_index)
+{
+  vcdp_init_main_if_needed (vcdp);
+  vlib_main_t *vm = vlib_get_main ();
+  clib_bihash_kv_8_8_t kv = { .key = tenant_id, .value = 0 };
+  vcdp_tenant_t *tenant;
+  uword next_index;
+  if (clib_bihash_search_inline_8_8 (&vcdp->tenant_idx_by_id, &kv))
+    return clib_error_return (
+      0, "Can't configure icmp error node: tenant id %d not found", tenant_id);
+  tenant = vcdp_tenant_at_index (vcdp, kv.value);
+  if (is_ip6)
+    {
+      next_index =
+	vlib_node_add_next (vm, vcdp_lookup_ip6_icmp_node.index, node_index);
+      tenant->icmp6_lookup_next = next_index;
+    }
+  else
+    {
+      next_index =
+	vlib_node_add_next (vm, vcdp_lookup_ip4_icmp_node.index, node_index);
+      tenant->icmp4_lookup_next = next_index;
+    }
+  return 0;
+}
+
 void
 vcdp_normalise_ip4_key (vcdp_session_t *session,
 			vcdp_session_ip4_key_t *result, u8 key_idx)
