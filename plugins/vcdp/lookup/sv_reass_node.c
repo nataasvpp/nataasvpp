@@ -20,17 +20,17 @@
 
 typedef struct
 {
-
 } vcdp_lookup_sp_sv_reass_trace_t;
 
 static u8 *
 format_vcdp_lookup_sp_sv_reass_trace (u8 *s, va_list *args)
 {
   CLIB_UNUSED (vlib_main_t * vm) = va_arg (*args, vlib_main_t *);
-  CLIB_UNUSED (vlib_node_t * node) = va_arg (*args, vlib_node_t *);
+  vlib_node_t *node = va_arg (*args, vlib_node_t *);
   CLIB_UNUSED (vcdp_lookup_sp_sv_reass_trace_t * t) =
     va_arg (*args, vcdp_lookup_sp_sv_reass_trace_t *);
 
+  s = format (s, "%v: sent to svr node", node->name);
   return s;
 }
 
@@ -78,6 +78,11 @@ vcdp_lookup_sp_sv_reass_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   while (n_left)
     {
       a[0] = b[0]->flow_id;
+      if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
+	{
+	  vcdp_lookup_sp_sv_reass_trace_t *t =
+	    vlib_add_trace (vm, node, b[0], sizeof (*t));
+	}
 
       /* Save the tenant index */
       vcdp_buffer2 (b[0])->tenant_index = vcdp_buffer (b[0])->tenant_index;

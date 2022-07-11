@@ -57,11 +57,6 @@ typedef struct
 
 } vcdp_lookup_icmp_trace_t;
 
-typedef struct
-{
-
-} vcdp_handoff_icmp_trace_t;
-
 static u8 *
 format_vcdp_lookup_icmp_trace (u8 *s, va_list *args)
 {
@@ -69,7 +64,7 @@ format_vcdp_lookup_icmp_trace (u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_lookup_icmp_trace_t __clib_unused *t =
     va_arg (*args, vcdp_lookup_icmp_trace_t *);
-
+  s = format (s, "%v:", node->name);
   return s;
 }
 
@@ -86,6 +81,7 @@ vcdp_lookup_icmp_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
   u32 n_left = frame->n_vectors;
   u32 *bi = from;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
+  vlib_buffer_t *local_bufs[VLIB_FRAME_SIZE];
   i16 current_data[VLIB_FRAME_SIZE], *cd = current_data;
   VCDP_SESSION_IP46_KEYS_TYPE (VLIB_FRAME_SIZE) keys;
   vcdp_session_ip4_key_t *k4 = keys.keys4;
@@ -323,8 +319,8 @@ vcdp_lookup_icmp_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       uword n_left_local = n;
       lbi = local_buffer_indices;
       lhs = local_has_session;
-      vlib_get_buffers (vm, lbi, bufs, n);
-      b = bufs;
+      vlib_get_buffers (vm, lbi, local_bufs, n);
+      b = local_bufs;
       while (n_left_local)
 	{
 	  vcdp_session_t *session;
@@ -336,6 +332,7 @@ vcdp_lookup_icmp_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 	  lbi += 1;
 	  lhs += 1;
 	  n_left_local -= 1;
+	  b += 1;
 	}
       vlib_buffer_enqueue_to_next (vm, node, local_buffer_indices,
 				   local_next_indices, n);
@@ -348,6 +345,22 @@ vcdp_lookup_icmp_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 		      vcdp->icmp4_error_frame_queue_index,
       handoff_buffer_indices, handoff_thread_indices,
       hbi - handoff_buffer_indices, 1);
+
+  if (node->flags & VLIB_NODE_FLAG_TRACE)
+    {
+      n_left = frame->n_vectors;
+      b = bufs;
+      while (n_left)
+	{
+	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
+	    {
+	      vcdp_lookup_icmp_trace_t *t =
+		vlib_add_trace (vm, node, b[0], sizeof (*t));
+	    }
+	  b += 1;
+	  n_left -= 1;
+	}
+    }
 
   return frame->n_vectors;
 }
