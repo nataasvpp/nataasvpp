@@ -159,8 +159,8 @@ process_one_pkt (vlib_main_t *vm, vcdp_main_t *vcdp,
   b[0]->flags |=
     VNET_BUFFER_F_L2_HDR_OFFSET_VALID | VNET_BUFFER_F_L3_HDR_OFFSET_VALID;
   current_next[0] = type == ETHERNET_TYPE_IP4 ?
-		      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4 :
-		      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6;
+			    VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4 :
+			    VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6;
   vlib_increment_combined_counter (cm, thread_index, tenant_idx, 1,
 				   orig_len - off);
   vlib_buffer_advance (b[0], off);

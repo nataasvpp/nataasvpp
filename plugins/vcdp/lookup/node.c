@@ -67,6 +67,12 @@ typedef struct
   u32 sw_if_index;
   u64 hash;
   u32 flow_id;
+  union
+  {
+    vcdp_session_ip4_key_t k4;
+    vcdp_session_ip6_key_t k6;
+  };
+  u8 is_ip6;
 } vcdp_lookup_trace_t;
 
 typedef struct
@@ -1025,6 +1031,10 @@ vcdp_lookup_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
 		  t->next_index = ~0;
 		  in_remote++;
 		}
+	      if ((t->is_ip6 = is_ipv6))
+		clib_memcpy (&t->k6, &keys.keys6[i], sizeof (t->k6));
+	      else
+		clib_memcpy (&t->k4, &keys.keys4[i], sizeof (t->k4));
 	      bi++;
 	      b++;
 	      h++;
@@ -1114,9 +1124,12 @@ format_vcdp_lookup_trace (u8 *s, va_list *args)
 
   s = format (s,
 	      "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
-	      "flow-id %u (session %u, %s)",
+	      "flow-id %u (session %u, %s) key 0x%U",
 	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
-	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
+	      format_hex_bytes_no_wrap,
+	      t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
+	      t->is_ip6 ? sizeof (t->k6) : sizeof (t->k4));
   return s;
 }
 

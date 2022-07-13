@@ -157,7 +157,7 @@ vcdp_enable_disable_timer_expire_node (u8 is_disable)
 	vlib_get_node_by_name (vm, (u8 *) "vcdp-timer-expire");
       vlib_node_set_state (vm, node->index,
 			   is_disable ? VLIB_NODE_STATE_DISABLED :
-					VLIB_NODE_STATE_POLLING);
+					      VLIB_NODE_STATE_POLLING);
     }
 }
 

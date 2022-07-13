@@ -134,8 +134,8 @@ vcdp_geneve_input_inline (vlib_main_t *vm, vlib_node_runtime_t *node,
       ethtype = *(u16 *) (b[0]->data + b[0]->current_data + off + 20);
       ethtype = clib_net_to_host_u16 (ethtype);
       current_next[0] = ethtype == ETHERNET_TYPE_IP6 ?
-			  VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP6 :
-			  VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP4;
+				VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP6 :
+				VCDP_GENEVE_INPUT_NEXT_LOOKUP_IP4;
       off +=
 	8 /* geneve header no options */ + 14 /* ethernet header, no tag*/;
       vlib_buffer_advance (b[0], off);
