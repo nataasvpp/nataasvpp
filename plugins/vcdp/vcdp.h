@@ -33,7 +33,7 @@
 #include <vcdp/timer/timer.h>
 
 #define VCDP_LOG2_SESSIONS_PER_THREAD 19
-#define VCDP_LOG2_TENANTS	      10
+#define VCDP_LOG2_TENANTS	      15
 #define VCDP_SESSION_ID_TOTAL_BITS    64
 #define VCDP_SESSION_ID_EPOCH_N_BITS  16
 #define BIHASH_IP4_NUM_BUCKETS	      (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
