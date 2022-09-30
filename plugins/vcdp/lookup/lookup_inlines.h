@@ -290,7 +290,7 @@ calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
              pow2_mask(l4_mask_bits[pr]);
   else
     l4_hdr = *(u32 *) next_header & pow2_mask(l4_mask_bits[pr]);
-  k = (u8x16) u32x4_insert(k, l4_hdr, 0);
+  k = (u8x16) u32x4_insert((u32x4) k, l4_hdr, 0);
 
   k = u8x16_shuffle_dynamic(k, swap);
 

@@ -66,7 +66,7 @@ typedef struct {
   uword l4_csum_delta;
   session_version_t version;
 } nat_rewrite_data_t;
-STATIC_ASSERT_SIZEOF(nat_rewrite_data_t, 64);
+STATIC_ASSERT_SIZEOF(nat_rewrite_data_t, CLIB_CACHE_LINE_BYTES);
 
 typedef struct {
   nat_rewrite_data_t *flows; /* by flow_index */
