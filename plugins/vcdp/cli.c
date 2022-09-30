@@ -35,48 +35,43 @@
  */
 
 static clib_error_t *
-vcdp_tenant_add_del_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				vlib_cli_command_t *cmd)
-{
+vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                               vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
   u8 is_del = 0;
   u32 tenant_id = ~0;
   u32 context_id = ~0;
-  if (!unformat_user (input, unformat_line_input, line_input))
+  if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
-  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (line_input, "add %d", &tenant_id))
-	is_del = 0;
-      else if (unformat (line_input, "del %d", &tenant_id))
-	is_del = 1;
-      else if (unformat (line_input, "context %d", &context_id))
-	;
-      else
-	{
-	  err = unformat_parse_error (line_input);
-	  goto done;
-	}
-    }
-  if (tenant_id == ~0)
-    {
-      err = clib_error_return (0, "missing tenant id");
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "add %d", &tenant_id))
+      is_del = 0;
+    else if (unformat(line_input, "del %d", &tenant_id))
+      is_del = 1;
+    else if (unformat(line_input, "context %d", &context_id))
+      ;
+    else {
+      err = unformat_parse_error(line_input);
       goto done;
     }
+  }
+  if (tenant_id == ~0) {
+    err = clib_error_return(0, "missing tenant id");
+    goto done;
+  }
   if (context_id == ~0)
     context_id = tenant_id;
-  err = vcdp_tenant_add_del (vcdp, tenant_id, context_id, is_del);
+  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, is_del);
 done:
-  unformat_free (line_input);
+  unformat_free(line_input);
   return err;
 }
 
 static clib_error_t *
-vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			      vlib_cli_command_t *cmd)
-{
+vcdp_set_services_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                             vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -84,45 +79,39 @@ vcdp_set_services_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 bitmap = 0;
   u8 direction = ~0;
 
-  if (!unformat_user (input, unformat_line_input, line_input))
+  if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
-  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (line_input, "tenant %d", &tenant_id))
-	;
-      else if (unformat_user (line_input, unformat_vcdp_service_bitmap,
-			      &bitmap))
-	;
-      else if (unformat (line_input, "forward"))
-	direction = VCDP_FLOW_FORWARD;
-      else if (unformat (line_input, "reverse"))
-	direction = VCDP_FLOW_REVERSE;
-      else
-	{
-	  err = unformat_parse_error (line_input);
-	  goto done;
-	}
-    }
-  if (tenant_id == ~0)
-    {
-      err = clib_error_return (0, "missing tenant id");
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+    else if (unformat_user(line_input, unformat_vcdp_service_bitmap, &bitmap))
+      ;
+    else if (unformat(line_input, "forward"))
+      direction = VCDP_FLOW_FORWARD;
+    else if (unformat(line_input, "reverse"))
+      direction = VCDP_FLOW_REVERSE;
+    else {
+      err = unformat_parse_error(line_input);
       goto done;
     }
-  if (direction == (u8) ~0)
-    {
-      err = clib_error_return (0, "missing direction");
-      goto done;
-    }
-  vcdp_set_services (vcdp, tenant_id, bitmap, direction);
+  }
+  if (tenant_id == ~0) {
+    err = clib_error_return(0, "missing tenant id");
+    goto done;
+  }
+  if (direction == (u8) ~0) {
+    err = clib_error_return(0, "missing direction");
+    goto done;
+  }
+  vcdp_set_services(vcdp, tenant_id, bitmap, direction);
 done:
-  unformat_free (line_input);
+  unformat_free(line_input);
   return err;
 }
 
 static clib_error_t *
-vcdp_set_timeout_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			     vlib_cli_command_t *cmd)
-{
+vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                            vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -130,44 +119,39 @@ vcdp_set_timeout_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 timeout_idx = ~0;
   u32 timeout_val = ~0;
 
-  if (!unformat_user (input, unformat_line_input, line_input))
+  if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
-  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (line_input, "tenant %d", &tenant_id))
-	;
-#define _(x, y, z)                                                            \
-  else if (unformat (line_input, z " %d", &timeout_val)) timeout_idx =        \
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+#define _(x, y, z)                                                             \
+  else if (unformat(line_input, z " %d", &timeout_val)) timeout_idx =          \
     VCDP_TIMEOUT_##x;
-      foreach_vcdp_timeout
+    foreach_vcdp_timeout
 #undef _
-	else
-      {
-	err = unformat_parse_error (line_input);
-	goto done;
-      }
-    }
-  if (tenant_id == ~0)
-    {
-      err = clib_error_return (0, "missing tenant id");
+      else {
+      err = unformat_parse_error(line_input);
       goto done;
     }
-  if (timeout_idx == ~0)
-    {
-      err = clib_error_return (0, "missing timeout");
-      goto done;
-    }
+  }
+  if (tenant_id == ~0) {
+    err = clib_error_return(0, "missing tenant id");
+    goto done;
+  }
+  if (timeout_idx == ~0) {
+    err = clib_error_return(0, "missing timeout");
+    goto done;
+  }
 
-  err = vcdp_set_timeout (vcdp, tenant_id, timeout_idx, timeout_val);
+  err = vcdp_set_timeout(vcdp, tenant_id, timeout_idx, timeout_val);
 done:
-  unformat_free (line_input);
+  unformat_free(line_input);
   return err;
 }
 
 static clib_error_t *
-vcdp_set_sp_node_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			     vlib_cli_command_t *cmd)
-{
+vcdp_set_sp_node_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                            vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -175,49 +159,43 @@ vcdp_set_sp_node_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 sp_idx = ~0;
   u32 node_index = ~0;
 
-  if (!unformat_user (input, unformat_line_input, line_input))
+  if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
-  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (line_input, "tenant %d", &tenant_id))
-	;
-      else if (unformat (line_input, "node %U", unformat_vlib_node, vm,
-			 &node_index))
-	;
-      else if (unformat (line_input, "%U", unformat_vcdp_sp_node, &sp_idx))
-	;
-      else
-	{
-	  err = unformat_parse_error (line_input);
-	  goto done;
-	}
-    }
-  if (tenant_id == ~0)
-    {
-      err = clib_error_return (0, "missing tenant id");
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+    else if (unformat(line_input, "node %U", unformat_vlib_node, vm,
+                      &node_index))
+      ;
+    else if (unformat(line_input, "%U", unformat_vcdp_sp_node, &sp_idx))
+      ;
+    else {
+      err = unformat_parse_error(line_input);
       goto done;
     }
-  if (node_index == ~0)
-    {
-      err = clib_error_return (0, "missing node");
-      goto done;
-    }
-  if (sp_idx == ~0)
-    {
-      err = clib_error_return (0, "missing slow-path");
-      goto done;
-    }
+  }
+  if (tenant_id == ~0) {
+    err = clib_error_return(0, "missing tenant id");
+    goto done;
+  }
+  if (node_index == ~0) {
+    err = clib_error_return(0, "missing node");
+    goto done;
+  }
+  if (sp_idx == ~0) {
+    err = clib_error_return(0, "missing slow-path");
+    goto done;
+  }
 
-  err = vcdp_set_sp_node (vcdp, tenant_id, sp_idx, node_index);
+  err = vcdp_set_sp_node(vcdp, tenant_id, sp_idx, node_index);
 done:
-  unformat_free (line_input);
+  unformat_free(line_input);
   return err;
 }
 
 static clib_error_t *
-vcdp_set_icmp_error_node_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				     vlib_cli_command_t *cmd)
-{
+vcdp_set_icmp_error_node_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                                    vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -225,52 +203,46 @@ vcdp_set_icmp_error_node_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 node_index = ~0;
   u8 ip46 = 0;
 
-  if (!unformat_user (input, unformat_line_input, line_input))
+  if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
-  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (line_input, "tenant %d", &tenant_id))
-	;
-      else if (unformat (line_input, "node %U", unformat_vlib_node, vm,
-			 &node_index))
-	;
-      else if (unformat (line_input, "ip4"))
-	ip46 = 1;
-      else if (unformat (line_input, "ip6"))
-	ip46 = 2;
-      else
-	{
-	  err = unformat_parse_error (line_input);
-	  goto done;
-	}
-    }
-  if (tenant_id == ~0)
-    {
-      err = clib_error_return (0, "missing tenant id");
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+    else if (unformat(line_input, "node %U", unformat_vlib_node, vm,
+                      &node_index))
+      ;
+    else if (unformat(line_input, "ip4"))
+      ip46 = 1;
+    else if (unformat(line_input, "ip6"))
+      ip46 = 2;
+    else {
+      err = unformat_parse_error(line_input);
       goto done;
     }
-  if (node_index == ~0)
-    {
-      err = clib_error_return (0, "missing node");
-      goto done;
-    }
-  if (ip46 == 0)
-    {
-      err = clib_error_return (0, "missing adress family");
-      goto done;
-    }
+  }
+  if (tenant_id == ~0) {
+    err = clib_error_return(0, "missing tenant id");
+    goto done;
+  }
+  if (node_index == ~0) {
+    err = clib_error_return(0, "missing node");
+    goto done;
+  }
+  if (ip46 == 0) {
+    err = clib_error_return(0, "missing adress family");
+    goto done;
+  }
 
-  err = vcdp_set_icmp_error_node (vcdp, tenant_id, ip46 - 1, node_index);
+  err = vcdp_set_icmp_error_node(vcdp, tenant_id, ip46 - 1, node_index);
 
 done:
-  unformat_free (line_input);
+  unformat_free(line_input);
   return err;
 }
 
 static clib_error_t *
-vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
-			       vlib_cli_command_t *cmd)
-{
+vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                              vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -280,102 +252,86 @@ vcdp_show_sessions_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 thread_index;
   u32 tenant_id = ~0;
   u8 first;
-  f64 now = vlib_time_now (vm);
-  if (unformat_user (input, unformat_line_input, line_input))
-    {
-      while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-	{
-	  if (unformat (line_input, "tenant %d", &tenant_id))
-	    ;
-	  else
-	    {
-	      err = unformat_parse_error (line_input);
-	      break;
-	    }
-	}
-      unformat_free (line_input);
+  f64 now = vlib_time_now(vm);
+  if (unformat_user(input, unformat_line_input, line_input)) {
+    while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+      if (unformat(line_input, "tenant %d", &tenant_id))
+        ;
+      else {
+        err = unformat_parse_error(line_input);
+        break;
+      }
     }
+    unformat_free(line_input);
+  }
 
   if (!err)
-    vec_foreach_index (thread_index, vcdp->per_thread_data)
-      {
-	ptd = vec_elt_at_index (vcdp->per_thread_data, thread_index);
-	first = 1;
-	table_t session_table_ = {}, *session_table = &session_table_;
-	u32 n = 0;
-	table_add_header_col (session_table, 10, "id", "tenant", "index",
-			      "type", "proto", "context", "ingress", "egress",
-			      "state", "TTL(s)");
-	pool_foreach (session, ptd->sessions)
-	  {
-	    tenant = vcdp_tenant_at_index (vcdp, session->tenant_idx);
-	    if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
-	      continue;
-	    if (first)
-	      {
-		first = 0;
-		table_format_title (session_table,
-				    "Thread #%d:", thread_index);
-	      }
-	    n = vcdp_table_format_insert_session (
-	      session_table, n, session - ptd->sessions, session,
-	      tenant->tenant_id, now);
-	  }
-	if (!first)
-	  vlib_cli_output (vm, "%U", format_table, session_table);
-	table_free (session_table);
+    vec_foreach_index (thread_index, vcdp->per_thread_data) {
+      ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+      first = 1;
+      table_t session_table_ = {}, *session_table = &session_table_;
+      u32 n = 0;
+      table_add_header_col(session_table, 10, "id", "tenant", "index", "type",
+                           "proto", "context", "ingress", "egress", "state",
+                           "TTL(s)");
+      pool_foreach (session, ptd->sessions) {
+        tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
+        if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
+          continue;
+        if (first) {
+          first = 0;
+          table_format_title(session_table, "Thread #%d:", thread_index);
+        }
+        n = vcdp_table_format_insert_session(session_table, n,
+                                             session - ptd->sessions, session,
+                                             tenant->tenant_id, now);
       }
+      if (!first)
+        vlib_cli_output(vm, "%U", format_table, session_table);
+      table_free(session_table);
+    }
 
   return err;
 }
 
 static clib_error_t *
-vcdp_show_session_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				     vlib_cli_command_t *cmd)
-{
+vcdp_show_session_detail_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                                    vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd;
-  clib_bihash_kv_8_8_t kv = { 0 };
+  clib_bihash_kv_8_8_t kv = {0};
   u32 thread_index;
-  f64 now = vlib_time_now (vm);
+  f64 now = vlib_time_now(vm);
   u32 session_index;
   u64 session_id;
-  if (unformat_user (input, unformat_line_input, line_input))
-    {
-      if (unformat_check_input (line_input) == UNFORMAT_END_OF_INPUT ||
-	  unformat (line_input, "0x%X", sizeof (session_id), &session_id) == 0)
-	err = unformat_parse_error (line_input);
-      unformat_free (line_input);
-    }
-  else
-    err = clib_error_return (0, "No session id provided");
+  if (unformat_user(input, unformat_line_input, line_input)) {
+    if (unformat_check_input(line_input) == UNFORMAT_END_OF_INPUT ||
+        unformat(line_input, "0x%X", sizeof(session_id), &session_id) == 0)
+      err = unformat_parse_error(line_input);
+    unformat_free(line_input);
+  } else
+    err = clib_error_return(0, "No session id provided");
 
-  if (!err)
-    {
-      kv.key = session_id;
-      if (!clib_bihash_search_inline_8_8 (&vcdp->session_index_by_id, &kv))
-	{
-	  thread_index = vcdp_thread_index_from_lookup (kv.value);
-	  session_index = vcdp_session_index_from_lookup (kv.value);
-	  ptd = vec_elt_at_index (vcdp->per_thread_data, thread_index);
-	  vlib_cli_output (vm, "%U", format_vcdp_session_detail, ptd,
-			   session_index, now);
-	}
-      else
-	{
-	  err =
-	    clib_error_return (0, "Session id 0x%llx not found", session_id);
-	}
+  if (!err) {
+    kv.key = session_id;
+    if (!clib_bihash_search_inline_8_8(&vcdp->session_index_by_id, &kv)) {
+      thread_index = vcdp_thread_index_from_lookup(kv.value);
+      session_index = vcdp_session_index_from_lookup(kv.value);
+      ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_index,
+                      now);
+    } else {
+      err = clib_error_return(0, "Session id 0x%llx not found", session_id);
     }
+  }
   return err;
 }
 
 static clib_error_t *
-vcdp_show_tenant_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
-				    vlib_cli_command_t *cmd)
-{
+vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                                   vlib_cli_command_t *cmd) {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -383,91 +339,83 @@ vcdp_show_tenant_detail_command_fn (vlib_main_t *vm, unformat_input_t *input,
   u32 tenant_id = ~0;
   u16 tenant_idx;
   u8 detail = 0;
-  if (unformat_user (input, unformat_line_input, line_input))
-    {
-      while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
-	{
-	  if (unformat (line_input, "%d detail", &tenant_id))
-	    detail = 1;
-	  else if (unformat (line_input, "%d", &tenant_id))
-	    ;
-	  else
-	    {
-	      err = unformat_parse_error (line_input);
-	      break;
-	    }
-	}
-      unformat_free (line_input);
+  if (unformat_user(input, unformat_line_input, line_input)) {
+    while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+      if (unformat(line_input, "%d detail", &tenant_id))
+        detail = 1;
+      else if (unformat(line_input, "%d", &tenant_id))
+        ;
+      else {
+        err = unformat_parse_error(line_input);
+        break;
+      }
     }
+    unformat_free(line_input);
+  }
   if (err)
     return err;
 
-  pool_foreach_index (tenant_idx, vcdp->tenants)
-    {
-      tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+  pool_foreach_index (tenant_idx, vcdp->tenants) {
+    tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
-      if (tenant_id != ~0 && tenant->tenant_id != tenant_id)
-	continue;
+    if (tenant_id != ~0 && tenant->tenant_id != tenant_id)
+      continue;
 
-      vlib_cli_output (vm, "Tenant %d", tenant->tenant_id);
-      vlib_cli_output (vm, "  %U", format_vcdp_tenant, vcdp, tenant_idx,
-		       tenant);
-      if (detail)
-	vlib_cli_output (vm, "  %U", format_vcdp_tenant_extra, vcdp,
-			 tenant_idx, tenant);
-    }
+    vlib_cli_output(vm, "Tenant %d", tenant->tenant_id);
+    vlib_cli_output(vm, "  %U", format_vcdp_tenant, vcdp, tenant_idx, tenant);
+    if (detail)
+      vlib_cli_output(vm, "  %U", format_vcdp_tenant_extra, vcdp, tenant_idx,
+                      tenant);
+  }
 
   return err;
 }
 
-VLIB_CLI_COMMAND (vcdp_tenant_add_del_command, static) = {
+VLIB_CLI_COMMAND(vcdp_tenant_add_del_command, static) = {
   .path = "vcdp tenant",
   .short_help = "vcdp tenant <add|del> <tenant-id> context <context-id>",
   .function = vcdp_tenant_add_del_command_fn,
 };
 
-VLIB_CLI_COMMAND (vcdp_set_services_command, static) = {
+VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {
   .path = "set vcdp services",
   .short_help = "set vcdp services tenant <tenant-id>"
-		" [SERVICE_NAME]+ <forward|reverse>",
+                " [SERVICE_NAME]+ <forward|reverse>",
   .function = vcdp_set_services_command_fn,
 };
 
-VLIB_CLI_COMMAND (show_vcdp_sessions_command, static) = {
+VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
   .path = "show vcdp session-table",
   .short_help = "show vcdp session-table [tenant <tenant-id>]",
   .function = vcdp_show_sessions_command_fn,
 };
 
-VLIB_CLI_COMMAND (show_vcdp_detail_command, static) = {
+VLIB_CLI_COMMAND(show_vcdp_detail_command, static) = {
   .path = "show vcdp session-detail",
   .short_help = "show vcdp session-detail 0x<session-id>",
   .function = vcdp_show_session_detail_command_fn,
 };
 
-VLIB_CLI_COMMAND (show_vcdp_tenant, static) = {
+VLIB_CLI_COMMAND(show_vcdp_tenant, static) = {
   .path = "show vcdp tenant",
   .short_help = "show vcdp tenant [<tenant-id> [detail]]",
   .function = vcdp_show_tenant_detail_command_fn,
 };
 
-VLIB_CLI_COMMAND (vcdp_set_timeout_command, static) = {
-  .path = "set vcdp timeout",
-  .short_help = "set vcdp timeout tenant <tenant-id>"
-		" <timeout-name> <timeout-value>",
-  .function = vcdp_set_timeout_command_fn
-};
+VLIB_CLI_COMMAND(vcdp_set_timeout_command,
+                 static) = {.path = "set vcdp timeout",
+                            .short_help = "set vcdp timeout tenant <tenant-id>"
+                                          " <timeout-name> <timeout-value>",
+                            .function = vcdp_set_timeout_command_fn};
 
-VLIB_CLI_COMMAND (vcdp_set_sp_node_command, static) = {
-  .path = "set vcdp sp-node",
-  .short_help = "set vcdp sp-node tenant <tenant-id>"
-		" <sp-name> node <node-name>",
-  .function = vcdp_set_sp_node_command_fn
-};
+VLIB_CLI_COMMAND(vcdp_set_sp_node_command,
+                 static) = {.path = "set vcdp sp-node",
+                            .short_help = "set vcdp sp-node tenant <tenant-id>"
+                                          " <sp-name> node <node-name>",
+                            .function = vcdp_set_sp_node_command_fn};
 
-VLIB_CLI_COMMAND (vcdp_set_icmp_error_node_command, static) = {
+VLIB_CLI_COMMAND(vcdp_set_icmp_error_node_command, static) = {
   .path = "set vcdp icmp-error-node",
   .short_help = "set vcdp icmp-error-node tenant <tenant-id>"
-		" <ip4|ip6> node <node-name>",
-  .function = vcdp_set_icmp_error_node_command_fn
-};
+                " <ip4|ip6> node <node-name>",
+  .function = vcdp_set_icmp_error_node_command_fn};

@@ -30,33 +30,29 @@
 
 #include <vcdp/vcdp.h>
 
-#define foreach_gw_tenant_flag                                                \
-  _ (OUTPUT_DATA_SET, "output-data-set", 0)                                   \
-  _ (STATIC_MAC, "static-mac", 1)
+#define foreach_gw_tenant_flag                                                 \
+  _(OUTPUT_DATA_SET, "output-data-set", 0)                                     \
+  _(STATIC_MAC, "static-mac", 1)
 
-typedef enum
-{
+typedef enum {
 #define _(a, b, c) GW_TENANT_F_##a = (1 << (c)),
   foreach_gw_tenant_flag
 #undef _
 } gw_tenant_flags_t;
 
-typedef struct
-{
+typedef struct {
   /* Here goes the geneve rewrite */
   session_version_t session_version;
   u16 encap_size;
   u8 encap_data[124];
 } gw_geneve_output_data_t;
-STATIC_ASSERT (sizeof (gw_geneve_output_data_t) == 128, "");
+STATIC_ASSERT(sizeof(gw_geneve_output_data_t) == 128, "");
 
-typedef struct
-{
+typedef struct {
   gw_geneve_output_data_t *output; /* by flow_index */
 } gw_per_thread_data_t;
 
-typedef struct
-{
+typedef struct {
   u32 output_tenant_id;
   u32 flags;
 
@@ -70,8 +66,7 @@ typedef struct
 
 } gw_tenant_t;
 
-typedef struct
-{
+typedef struct {
   /* pool of tenants */
   gw_tenant_t *tenants;
 
@@ -80,16 +75,14 @@ typedef struct
   u16 msg_id_base;
 } gw_main_t;
 
-typedef struct
-{
+typedef struct {
   int rv;
   clib_error_t *err;
   u32 sw_if_index;
   u8 enable_disable;
 } gw_enable_disable_geneve_input_args_t;
 
-typedef struct
-{
+typedef struct {
   int rv;
   clib_error_t *err;
   u32 tenant_id;
@@ -107,14 +100,14 @@ typedef struct
 extern gw_main_t gateway_main;
 
 static_always_inline gw_tenant_t *
-gw_tenant_at_index (gw_main_t *gm, u32 idx)
-{
-  return vec_elt_at_index (gm->tenants, idx);
+gw_tenant_at_index(gw_main_t *gm, u32 idx) {
+  return vec_elt_at_index(gm->tenants, idx);
 }
 
 void
-gw_enable_disable_geneve_input (gw_enable_disable_geneve_input_args_t *args);
-void gw_set_geneve_output (gw_set_geneve_output_args_t *args);
+gw_enable_disable_geneve_input(gw_enable_disable_geneve_input_args_t *args);
+void
+gw_set_geneve_output(gw_set_geneve_output_args_t *args);
 
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 

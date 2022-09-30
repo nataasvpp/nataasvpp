@@ -17,58 +17,51 @@
 #include <vcdp_services/nat/nat.h>
 
 static u8 *
-format_vcdp_nat_rewrite_SADDR (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "%U", format_ip4_address, &rewrite->rewrite.saddr);
+format_vcdp_nat_rewrite_SADDR(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "%U", format_ip4_address, &rewrite->rewrite.saddr);
   return s;
 }
 
 static u8 *
-format_vcdp_nat_rewrite_SPORT (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "%u", clib_net_to_host_u16 (rewrite->rewrite.sport));
+format_vcdp_nat_rewrite_SPORT(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "%u", clib_net_to_host_u16(rewrite->rewrite.sport));
   return s;
 }
 
 static u8 *
-format_vcdp_nat_rewrite_DADDR (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "%U", format_ip4_address, &rewrite->rewrite.daddr);
+format_vcdp_nat_rewrite_DADDR(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "%U", format_ip4_address, &rewrite->rewrite.daddr);
   return s;
 }
 static u8 *
-format_vcdp_nat_rewrite_DPORT (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "%u", clib_net_to_host_u16 (rewrite->rewrite.dport));
+format_vcdp_nat_rewrite_DPORT(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "%u", clib_net_to_host_u16(rewrite->rewrite.dport));
   return s;
 }
 static u8 *
-format_vcdp_nat_rewrite_ICMP_ID (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "%u", rewrite->rewrite.icmp_id);
+format_vcdp_nat_rewrite_ICMP_ID(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "%u", rewrite->rewrite.icmp_id);
   return s;
 }
 static u8 *
-format_vcdp_nat_rewrite_TXFIB (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-  s = format (s, "fib-index %u", rewrite->rewrite.fib_index);
+format_vcdp_nat_rewrite_TXFIB(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+  s = format(s, "fib-index %u", rewrite->rewrite.fib_index);
   return s;
 }
 
 u8 *
-format_vcdp_nat_rewrite (u8 *s, va_list *args)
-{
-  nat_rewrite_data_t *rewrite = va_arg (*args, nat_rewrite_data_t *);
-#define _(sym, x, str)                                                        \
-  if (rewrite->ops & NAT_REWRITE_OP_##sym)                                    \
-    s = format (s, "rewrite %s (to %U),", str, format_vcdp_nat_rewrite_##sym, \
-		rewrite);
+format_vcdp_nat_rewrite(u8 *s, va_list *args) {
+  nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
+#define _(sym, x, str)                                                         \
+  if (rewrite->ops & NAT_REWRITE_OP_##sym)                                     \
+    s = format(s, "rewrite %s (to %U),", str, format_vcdp_nat_rewrite_##sym,   \
+               rewrite);
   foreach_nat_rewrite_op
 #undef _
     // if (s && s[vec_len (s) - 1] == ',') vec_resize (s, vec_len (s) - 1);

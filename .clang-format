@@ -1,13 +1,14 @@
 # Minimal clang-format version is 11
 
-BasedOnStyle: GNU
-UseTab: Always
+BasedOnStyle: LLVM
+UseTab: Never
 SpaceAfterCStyleCast: true
 SortIncludes: false
 AlignConsecutiveMacros: true
 BreakBeforeTernaryOperators: false
 BreakBeforeBinaryOperators: None
 ContinuationIndentWidth: 2
+AlwaysBreakAfterReturnType: All
 
 ForEachMacros:
   - 'clib_bitmap_foreach'
