@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "vnet.h": "c",
+        "nat.h": "c",
+        "service.h": "c",
+        "hash.h": "c",
+        "tunnel.h": "c",
+        "ip_types_api.h": "c"
+    },
+    "cmake.configureSettings": {
+        "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
+    },
+}
