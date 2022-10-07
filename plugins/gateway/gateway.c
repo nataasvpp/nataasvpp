@@ -36,21 +36,26 @@ gateway_init(vlib_main_t *vm) {
   return 0;
 }
 
-void
-gw_enable_disable_geneve_input(gw_enable_disable_geneve_input_args_t *args) {
+int
+gw_interface_input_enable(u32 sw_if_index, u32 tenant_id) {
   gw_main_t *gm = &gateway_main;
   int rv = 0;
   gateway_init_main_if_needed(gm);
-  rv =
-    vnet_feature_enable_disable("ip4-unicast", "vcdp-geneve-input",
-                                args->sw_if_index, args->enable_disable, 0, 0);
-  args->rv = rv;
-  if (rv)
-    args->err = clib_error_return(
-      0, "Failed vnet_feature_enable_disable with error %d : %U", rv,
-      format_vnet_api_errno, rv);
-  else
-    args->err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
+  u16 *config;
+
+  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
+    return -1;
+
+  vec_validate(gm->tenants, kv.value);
+  vec_validate(gm->tenant_idx_by_sw_if_idx, sw_if_index);
+  config = gm->tenant_idx_by_sw_if_idx + sw_if_index;
+  config[0] = kv.value;
+
+  rv = vnet_feature_enable_disable("ip4-unicast", "vcdp-input", sw_if_index, 1,
+                                   0, 0);
+  return rv;
 }
 
 void

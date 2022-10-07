@@ -13,6 +13,9 @@
 
 #include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_BINARY_DIR})
+
 add_vpp_library(vcdp
   SOURCES
   vcdp/lookup/node.c
@@ -83,6 +86,12 @@ add_vpp_plugin(vcdp_gateway
   gateway/api.c
   gateway/geneve_input/node.c
   gateway/geneve_output/node.c
+  gateway/interface.c
+
+  tunnel/tunnel.c
+  tunnel/cli.c
+  tunnel/api.c
+  tunnel/node.c
 
   MULTIARCH_SOURCES
   vcdp_services/tcp-check/node.c
@@ -95,7 +104,17 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
+  tunnel/tunnel.api
 
   LINK_LIBRARIES
   vcdp
 )
+
+find_library(VPPINFRA_LIBRARY vppinfra HINTS /usr/lib/x86_64-linux-gnu)
+#VPP_LIBRARY_DIR
+add_compile_options(-Werror -Wall)
+message(STATUS "foo include dir: ${VPP_LIBRARY_DIR}")
+add_executable(test_tunnel tunnel/test.c tunnel/tunnel.c )
+target_link_libraries(test_tunnel ${VPPINFRA_LIBRARY})
+add_test(NAME test_tunnel
+         COMMAND test_tunnel)

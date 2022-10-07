@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright(c) 2022 Cisco Systems, Inc.
+
+option version = "0.0.1";
+
+import "vnet/ip/ip_types.api";
+//import "vnet/ethernet/ethernet_types.api";
+//import "vnet/interface_types.api";
+
+enum vcdp_tunnel_method : u8
+{
+  VCDP_TUNNEL_VXLAN_DUMMY_L2 = 0,
+  VCDP_TUNNEL_GENEVE_L3 = 1,
+};
+
+autoreply define vcdp_tunnel_create
+{
+  // header
+  u32 client_index;
+  u32 context;
+
+  string tunnel_id[36]; // UUID
+  string name[64];
+  vl_api_vcdp_tunnel_method_t method;
+  vl_api_address_t src;
+  vl_api_address_t dst;
+  u16 src_port; // 0 == any
+  u16 dst_port;
+  u16 mtu;
+  // "vxlan_id": 1124,
+};
+
+autoreply define vcdp_tunnel_delete
+{
+  // header
+  u32 client_index;
+  u32 context;
+
+  string tunnel_id[36]; // UUID
+};

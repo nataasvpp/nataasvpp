@@ -25,6 +25,7 @@ set(VPP_SANITIZE_ADDR_OPTIONS
   CACHE
   STRING "Address sanitizer arguments"
 )
+add_compile_options(-Werror -Wall)
 
 if (VPP_ENABLE_SANITIZE_ADDR)
   add_compile_options(-fsanitize=address)
@@ -32,5 +33,7 @@ if (VPP_ENABLE_SANITIZE_ADDR)
   set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address ${CMAKE_EXE_LINKER_FLAGS}")
   set(CMAKE_SHARED_LINKER_FLAGS "-fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS}")
 endif (VPP_ENABLE_SANITIZE_ADDR)
+
+include(CTest)
 
 add_subdirectory(plugins)

@@ -61,6 +61,9 @@ typedef struct {
   /* per-thread data */
   gw_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
+
+  u16 *tenant_idx_by_sw_if_idx; /* vec */
+
 } gw_main_t;
 
 typedef struct {
@@ -94,6 +97,8 @@ gw_tenant_at_index(gw_main_t *gm, u32 idx) {
 
 void
 gw_enable_disable_geneve_input(gw_enable_disable_geneve_input_args_t *args);
+int gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
+
 void
 gw_set_geneve_output(gw_set_geneve_output_args_t *args);
 
