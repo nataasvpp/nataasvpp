@@ -53,7 +53,7 @@ static vlib_error_desc_t vcdp_tunnel_input_error_counters[] = {
 
 
 // Graph node for VXLAN and Geneve tunnel decap
-VLIB_NODE_FN(vcdp_tunnel_vxlan_input_node)
+VLIB_NODE_FN(vcdp_tunnel_input_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
   u32 n_left_from, *from;
   u16 nexts[VLIB_FRAME_SIZE] = {0}, *next = nexts;

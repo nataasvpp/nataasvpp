@@ -419,3 +419,39 @@ VLIB_CLI_COMMAND(vcdp_set_icmp_error_node_command, static) = {
   .short_help = "set vcdp icmp-error-node tenant <tenant-id>"
                 " <ip4|ip6> node <node-name>",
   .function = vcdp_set_icmp_error_node_command_fn};
+
+/*
+ * Display the set of available services.
+ */
+static clib_error_t *
+vcdp_show_services_command_fn(vlib_main_t *vm, unformat_input_t *input,
+                              vlib_cli_command_t *cmd)
+{
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  vcdp_service_registration_t **services = sm->services;
+  vcdp_service_registration_t *service;
+  char **p;
+  vlib_cli_output (vm, "Available services:");
+
+  for (uword i = 0; i < vec_len(services); i++) {
+    service = vec_elt_at_index(services, i)[0];
+	  vlib_cli_output (vm, "  %s%s", service->node_name, service->is_terminal ? " (T)": "");
+    p = service->runs_before;
+    while (*p) {
+      vlib_cli_output(vm, "     %s (B)", *p);
+      p++;
+    }
+    p = service->runs_after;
+    while (*p) {
+      vlib_cli_output(vm, "     %s (A)", *p);
+      p++;
+    }
+  }
+  return 0;
+}
+
+VLIB_CLI_COMMAND (vcdp_show_services_command, static) = {
+  .path = "show vcdp services",
+  .short_help = "show vcdp services [verbose]",
+  .function = vcdp_show_services_command_fn,
+};
