@@ -121,6 +121,9 @@ done:
   return err;
 }
 
+/*
+ * Attach tunnel decap processing to an interface.
+ */
 VLIB_CLI_COMMAND(vcdp_tunnel_enable_command, static) = {
   .path = "set vcdp gateway tunnel",
   .short_help = "set vcdp gateway tunnel <ifname>",
@@ -186,6 +189,9 @@ done:
   return err;
 }
 
+/*
+ * Define a tunnel
+ */
 VLIB_CLI_COMMAND(vcdp_tunnel_command, static) = {
   .path = "set vcdp tunnel",
   .short_help = "set vcdp tunnel id <id> tenant <tenant-id> method <geneve-l3|vxlan-dummy-l2> src "

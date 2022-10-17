@@ -396,6 +396,88 @@ vcdp_session_n_keys(vcdp_session_t *session) {
     return 1;
 }
 
+static_always_inline int
+vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
+                           vcdp_tenant_t *tenant, u16 tenant_idx,
+                           u32 thread_index, f64 time_now, void *k, u64 *h,
+                           u64 *lookup_val, int is_ipv6) {
+  vcdp_bihash_kv46_t kv = {};
+  clib_bihash_kv_8_8_t kv2;
+  u64 value;
+  u8 proto;
+  vcdp_session_t *session;
+  u32 session_idx;
+  u32 pseudo_flow_idx;
+  u64 session_id;
+  pool_get(ptd->sessions, session);
+  session_idx = session - ptd->sessions;
+  pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
+  value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
+  ;
+  if (is_ipv6) {
+    clib_memcpy_fast(&kv.kv6.key, k, sizeof(kv.kv6.key));
+    kv.kv6.value = value;
+    proto = ((vcdp_session_ip6_key_t *) k)->ip6_key.proto;
+    if (clib_bihash_add_del_48_8(&vcdp->table6, &kv.kv6, 2)) {
+      /* colision - remote thread created same entry */
+      pool_put(ptd->sessions, session);
+      return 1;
+    }
+    session->type = VCDP_SESSION_TYPE_IP6;
+    session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6;
+  } else {
+    clib_memcpy_fast(&kv.kv4.key, k, sizeof(kv.kv4.key));
+    kv.kv4.value = value;
+    proto = ((vcdp_session_ip4_key_t *) k)->ip4_key.proto;
+    if (clib_bihash_add_del_24_8(&vcdp->table4, &kv.kv4, 2)) {
+      /* colision - remote thread created same entry */
+      pool_put(ptd->sessions, session);
+      return 1;
+    }
+    session->type = VCDP_SESSION_TYPE_IP4;
+    session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
+  }
+  session->session_version += 1;
+  session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) |
+               ptd->session_id_template;
+  ptd->session_id_ctr +=
+    2; /* two at a time, because last bit is reserved for direction */
+  session->session_id = session_id;
+  session->tenant_idx = tenant_idx;
+  session->state = VCDP_SESSION_STATE_FSOL;
+  kv2.key = session_id;
+  kv2.value = value;
+  clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
+  clib_memcpy_fast(session->bitmaps, tenant->bitmaps, sizeof(session->bitmaps));
+  if (is_ipv6)
+    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key6, k,
+                     sizeof(session->keys[0].key6));
+  else
+    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key4, k,
+                     sizeof(session->keys[0].key4));
+  session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
+  session->proto = proto;
+
+  vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
+                           tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
+
+  lookup_val[0] ^= value;
+  /* Bidirectional counter zeroing */
+  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
+                             lookup_val[0]);
+  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
+                             lookup_val[0] | 0x1);
+  vlib_increment_simple_counter(
+    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
+    thread_index, tenant_idx, 1);
+  return 0;
+}
+
+int
+vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id,
+                    u32 thread_index, u32 tenant_index, u32 *session_index,
+                    int is_ipv6);
+
 clib_error_t *
 vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id,
                     u8 is_del);

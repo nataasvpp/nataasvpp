@@ -239,6 +239,9 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     tenant_idx = vcdp_buffer(b[0])->tenant_index;
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     tenant = vec_elt_at_index(nat->tenants, tenant_idx);
+    ASSERT(tenant != 0 && "Tenant not configured");
+    ip4_header_t *inner_ip = (ip4_header_t *) vlib_buffer_get_current(b[0]);
+    clib_warning("SP INNER PACKET: %U", format_ip4_header, inner_ip);
 
     // nat_slow_path_process_one (tenant, nat_rewrites, session, to_next, b);
     nat_slow_path_process_one(vcdp, ptd, im->fib_index_by_sw_if_index,

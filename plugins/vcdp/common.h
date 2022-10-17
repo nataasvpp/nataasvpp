@@ -1,7 +1,5 @@
-// Copyright(c) 2022 Cisco Systems, Inc.
-
-#ifndef included_vcdp_common_h
-#define included_vcdp_common_h
+#ifndef __included_vcdp_common_h__
+#define __included_vcdp_common_h__
 
 #include <vnet/vnet.h>
 
@@ -24,7 +22,6 @@ typedef struct {
   u16 tenant_index;
   u8 flags;
   u8 tcp_flags;
-  u32 rx_id;
 } vcdp_buffer_opaque_t;
 
 STATIC_ASSERT(sizeof(vcdp_buffer_opaque_t) <=

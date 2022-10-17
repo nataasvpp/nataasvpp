@@ -1,4 +1,17 @@
-// Copyright(c) 2022 Cisco Systems, Inc.
+/*
+ * Copyright (c) 2015 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
@@ -11,7 +24,6 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
-
 #define foreach_vcdp_lookup_error                                              \
   _(MISS, "flow miss")                                                         \
   _(LOCAL, "local flow")                                                       \
@@ -74,96 +86,19 @@ typedef struct {
 } vcdp_handoff_trace_t;
 
 static_always_inline int
-vcdp_create_session(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-                    vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
-                    f64 time_now, void *k, u64 *h, u64 *lookup_val,
-                    int is_ipv6) {
-  vcdp_bihash_kv46_t kv = {};
-  clib_bihash_kv_8_8_t kv2;
-  u64 value;
-  u8 proto;
-  vcdp_session_t *session;
-  u32 session_idx;
-  u32 pseudo_flow_idx;
-  u64 session_id;
-  pool_get(ptd->sessions, session);
-  session_idx = session - ptd->sessions;
-  pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
-  value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
-  ;
-  if (is_ipv6) {
-    clib_memcpy_fast(&kv.kv6.key, k, sizeof(kv.kv6.key));
-    kv.kv6.value = value;
-    proto = ((vcdp_session_ip6_key_t *) k)->ip6_key.proto;
-    if (clib_bihash_add_del_48_8(&vcdp->table6, &kv.kv6, 2)) {
-      /* collision - remote thread created same entry */
-      pool_put(ptd->sessions, session);
-      return 1;
-    }
-    session->type = VCDP_SESSION_TYPE_IP6;
-    session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6;
-  } else {
-    clib_memcpy_fast(&kv.kv4.key, k, sizeof(kv.kv4.key));
-    kv.kv4.value = value;
-    proto = ((vcdp_session_ip4_key_t *) k)->ip4_key.proto;
-    if (clib_bihash_add_del_24_8(&vcdp->table4, &kv.kv4, 2)) {
-      /* collision - remote thread created same entry */
-      pool_put(ptd->sessions, session);
-      return 1;
-    }
-    session->type = VCDP_SESSION_TYPE_IP4;
-    session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
-  }
-  session->session_version += 1;
-  session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) |
-               ptd->session_id_template;
-  ptd->session_id_ctr +=
-    2; /* two at a time, because last bit is reserved for direction */
-  session->session_id = session_id;
-  session->tenant_idx = tenant_idx;
-  session->state = VCDP_SESSION_STATE_FSOL;
-  kv2.key = session_id;
-  kv2.value = value;
-  clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
-  clib_memcpy_fast(session->bitmaps, tenant->bitmaps, sizeof(session->bitmaps));
-  if (is_ipv6)
-    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key6, k,
-                     sizeof(session->keys[0].key6));
-  else
-    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key4, k,
-                     sizeof(session->keys[0].key4));
-  session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
-  session->proto = proto;
-
-  vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
-                           tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
-
-  lookup_val[0] ^= value;
-  /* Bidirectional counter zeroing */
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
-                             lookup_val[0]);
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
-                             lookup_val[0] | 0x1);
-  vlib_increment_simple_counter(
-    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
-    thread_index, tenant_idx, 1);
-  return 0;
-}
-
-static_always_inline int
 vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                        vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
                        f64 time_now, void *k, u64 *h, u64 *lookup_val) {
-  return vcdp_create_session(vcdp, ptd, tenant, tenant_idx, thread_index,
-                             time_now, k, h, lookup_val, 0);
+  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
+                                    time_now, k, h, lookup_val, 0);
 }
 
 static_always_inline int
 vcdp_create_session_v6(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                        vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
                        f64 time_now, void *k, u64 *h, u64 *lookup_val) {
-  return vcdp_create_session(vcdp, ptd, tenant, tenant_idx, thread_index,
-                             time_now, k, h, lookup_val, 1);
+  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
+                                    time_now, k, h, lookup_val, 1);
 }
 
 static_always_inline u8
@@ -177,32 +112,36 @@ vcdp_lookup_four_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
     clib_prefetch_load(pb[0]->data);
   }
 
-  slowpath_needed |= calc_key_v4(b[0], b[0]->flow_id, k + 0, lookup_val + 0,
-                                 h + 0, l4_hdr_offset + 0, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0,
+                     l4_hdr_offset + 0, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[1]);
     clib_prefetch_load(pb[1]->data);
   }
 
-  slowpath_needed |= calc_key_v4(b[1], b[1]->flow_id, k + 1, lookup_val + 1,
-                                 h + 1, l4_hdr_offset + 1, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v4(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1,
+                     l4_hdr_offset + 1, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[2]);
     clib_prefetch_load(pb[2]->data);
   }
 
-  slowpath_needed |= calc_key_v4(b[2], b[2]->flow_id, k + 2, lookup_val + 2,
-                                 h + 2, l4_hdr_offset + 2, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v4(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2,
+                     l4_hdr_offset + 2, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[3]);
     clib_prefetch_load(pb[3]->data);
   }
 
-  slowpath_needed |= calc_key_v4(b[3], b[3]->flow_id, k + 3, lookup_val + 3,
-                                 h + 3, l4_hdr_offset + 3, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v4(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3,
+                     l4_hdr_offset + 3, slowpath);
   return slowpath_needed;
 }
 
@@ -217,32 +156,36 @@ vcdp_lookup_four_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
     clib_prefetch_load(pb[0]->data);
   }
 
-  slowpath_needed |= calc_key_v6(b[0], b[0]->flow_id, k + 0, lookup_val + 0,
-                                 h + 0, l4_hdr_offset + 0, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0,
+                     l4_hdr_offset + 0, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[1]);
     clib_prefetch_load(pb[1]->data);
   }
 
-  slowpath_needed |= calc_key_v6(b[1], b[1]->flow_id, k + 1, lookup_val + 1,
-                                 h + 1, l4_hdr_offset + 1, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v6(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1,
+                     l4_hdr_offset + 1, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[2]);
     clib_prefetch_load(pb[2]->data);
   }
 
-  slowpath_needed |= calc_key_v6(b[2], b[2]->flow_id, k + 2, lookup_val + 2,
-                                 h + 2, l4_hdr_offset + 2, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v6(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2,
+                     l4_hdr_offset + 2, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[3]);
     clib_prefetch_load(pb[3]->data);
   }
 
-  slowpath_needed |= calc_key_v6(b[3], b[3]->flow_id, k + 3, lookup_val + 3,
-                                 h + 3, l4_hdr_offset + 3, slowpath);
+  slowpath_needed |=
+    vcdp_calc_key_v6(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3,
+                     l4_hdr_offset + 3, slowpath);
   return slowpath_needed;
 }
 
@@ -288,8 +231,8 @@ vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv,
   }
 
   while (n_left > 0) {
-    if (calc_key_v4(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0,
-                    l4_hdr_offset + 0, slowpath) &&
+    if (vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0,
+                         l4_hdr_offset + 0, slowpath) &&
         !slowpath)
       return n_left;
 
@@ -337,8 +280,8 @@ vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv,
   }
 
   while (n_left > 0) {
-    if (calc_key_v6(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0, l4_hdr_offset,
-                    slowpath) &&
+    if (vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0,
+                         l4_hdr_offset, slowpath) &&
         !slowpath)
       return n_left;
 
@@ -504,7 +447,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
                                                    &kv.kv4)) {
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-        /* if there is collision, we just reiterate */
+        /* if there is colision, we just reiterate */
         if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index,
                                    time_now, k4, h, lv)) {
           vlib_node_increment_counter(vm, node->node_index,
@@ -775,7 +718,7 @@ format_vcdp_lookup_trace(u8 *s, va_list *args) {
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_lookup_trace_t *t = va_arg(*args, vcdp_lookup_trace_t *);
 
-  if (t->is_sp)
+  if (!t->is_sp)
     s = format(s,
                "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
                "flow-id %u (session %u, %s) key 0x%U",

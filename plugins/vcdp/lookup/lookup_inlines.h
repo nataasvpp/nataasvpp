@@ -1,7 +1,20 @@
-// Copyright(c) 2022 Cisco Systems, Inc.
+/*
+ * Copyright (c) 2022 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#ifndef included_lookup_inlines_h
-#define included_lookup_inlines_h
+#ifndef __included_lookup_inlines_h__
+#define __included_lookup_inlines_h__
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
 #include <vnet/ethernet/ethernet.h>
@@ -188,10 +201,9 @@ static const u32x8 key_ip6_shuff_no_norm_B = {KEY_IP6_SHUFF_NO_NORM_B};
 static const u32x8 key_ip6_shuff_norm_B = {KEY_IP6_SHUFF_NORM_B};
 static const u8x8 key_ip6_swap_icmp = {KEY_IP6_SWAP_ICMP};
 
-// TODO: Side effects galore!
 static_always_inline u8
-calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
-            u64 *lookup_val, u64 *h, i16 *l4_hdr_offset, u8 slow_path) {
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
+                 u64 *lookup_val, u64 *h, i16 *l4_hdr_offset, u8 slow_path) {
   u8 pr;
   i64x2 norm, zero = {};
   u8x16 k, swap;
@@ -332,8 +344,8 @@ u32x2_insert(u32x2 x, u32 y, uword idx) {
 }
 
 static_always_inline u8
-calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
-            u64 *lookup_val, u64 *h, i16 *l4_hdr_offset, u8 slow_path) {
+vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
+                 u64 *lookup_val, u64 *h, i16 *l4_hdr_offset, u8 slow_path) {
   u8 pr;
   i64x2 norm, norm_reverse, zero = {};
   union {
@@ -507,4 +519,4 @@ calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   return slowpath_needed;
 }
 
-#endif /* included_lookup_inlines_h */
+#endif /* __included_lookup_inlines_h__ */

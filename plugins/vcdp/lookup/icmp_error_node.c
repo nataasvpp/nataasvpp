@@ -98,7 +98,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       cd[0] = b[0]->current_data;
       b[0]->current_data =
         vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
-      calc_key_v4(b[0], b[0]->flow_id, k4, lv, h, l4o, 1);
+      vcdp_calc_key_v4(b[0], b[0]->flow_id, k4, lv, h, l4o, 1);
       b[0]->current_data = cd[0];
 
       cd += 1;
@@ -115,7 +115,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       cd[0] = b[0]->current_data;
       b[0]->current_data =
         vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
-      calc_key_v6(b[0], b[0]->flow_id, k6, lv, h, l4o, 1);
+      vcdp_calc_key_v6(b[0], b[0]->flow_id, k6, lv, h, l4o, 1);
       b[0]->current_data = cd[0];
 
       cd += 1;

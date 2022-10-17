@@ -27,6 +27,8 @@ typedef struct {
     u16 sport;
     u16 dport;
     u16 mtu;
+    u8 *rewrite;
+    u16 encap_size;
 } vcdp_tunnel_t;
 
 typedef struct {
@@ -66,7 +68,7 @@ extern vcdp_main2_t vcdp_main2;
 extern vcdp_tunnel_main_t vcdp_tunnel_main;
 
 clib_error_t *vcdp_tunnel_init(vlib_main_t *vm);
-vcdp_tunnel_t *vcdp_tunnel_lookup(char *);
+vcdp_tunnel_t *vcdp_tunnel_lookup_by_uuid(char *);
 int vcdp_tunnel_create(char *tunnel_id, u32 tenant, vcdp_tunnel_method_t method,
                    ip_address_t *src, ip_address_t *dst, u16 sport, u16 dport,
                    u16 mtu);
@@ -74,5 +76,6 @@ int vcdp_session_static_lookup(u32 context_id, ip4_address_t src, ip4_address_t 
                            u8 proto, u16 sport, u16 dport, u64 *value);
 int vcdp_tunnel_delete(char *tunnel_id);
 int vcdp_tunnel_enable_disable_input(u32 sw_if_index, bool is_enable);
+vcdp_tunnel_t *vcdp_tunnel_get(u32 index);
 
 #endif

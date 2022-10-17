@@ -110,11 +110,15 @@ add_vpp_plugin(vcdp_gateway
   vcdp
 )
 
-find_library(VPPINFRA_LIBRARY vppinfra HINTS /usr/lib/x86_64-linux-gnu)
-#VPP_LIBRARY_DIR
-add_compile_options(-Werror -Wall)
-message(STATUS "foo include dir: ${VPP_LIBRARY_DIR}")
-add_executable(test_tunnel tunnel/test.c tunnel/tunnel.c )
-target_link_libraries(test_tunnel ${VPPINFRA_LIBRARY})
-add_test(NAME test_tunnel
-         COMMAND test_tunnel)
+# find_library(VPPINFRA_LIBRARY vppinfra)
+# find_library(VLIB_LIBRARY vlib)
+# #VPP_LIBRARY_DIR
+# add_compile_options(-Werror -Wall)
+# message(STATUS "foo include dir: ${VPP_LIBRARY_DIR}")
+# message(STATUS "foo include dir: ${VPPINFRA_LIBRARY}")
+# message(STATUS "foo include dir: ${VLIB_LIBRARY}")
+# #set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
+# add_executable(test_tunnel tunnel/test.c tunnel/test_stubs.c tunnel/tunnel.c tunnel/node.c)
+# target_link_libraries(test_tunnel vcdp ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
+# add_test(NAME test_tunnel
+#          COMMAND test_tunnel)

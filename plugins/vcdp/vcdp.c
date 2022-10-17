@@ -23,6 +23,7 @@
 #include <vppinfra/bihash_template.c>
 
 #include <vcdp/vcdp.h>
+#include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/service.h>
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
@@ -313,6 +314,29 @@ vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6,
     tenant->icmp4_lookup_next = next_index;
   }
   return 0;
+}
+
+int
+vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id,
+                    u32 thread_index, u32 tenant_index, u32 *session_index,
+                    int is_ipv6) {
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_session_ip4_key_t k4 = {};
+  u64 lookup_val = 0, h = 0;
+  i16 l4_hdr_offset = 0;
+  u8 slow_path = 0;
+  vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_index);
+  vcdp_per_thread_data_t *ptd =
+    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  f64 time_now = vlib_time_now(vm);
+
+  vcdp_calc_key_v4(b, context_id, &k4, &lookup_val, &h, &l4_hdr_offset,
+                   slow_path);
+  int err =
+    vcdp_create_session_inline(vcdp, ptd, tenant, tenant_index, thread_index,
+                               time_now, &k4, &h, &lookup_val, is_ipv6);
+  *session_index = vcdp_session_index_from_lookup(lookup_val);
+  return err;
 }
 
 void

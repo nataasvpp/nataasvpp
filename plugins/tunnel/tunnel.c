@@ -2,8 +2,11 @@
 
 // Interface-less tunnels.
 
+#include <arpa/inet.h>
 #include "tunnel.h"
 #include <vppinfra/bihash_template.c>
+#include <vnet/adj/adj_nbr.h>
+#include <vnet/vxlan/vxlan_packet.h>
 
 vcdp_tunnel_main_t vcdp_tunnel_main;
 uword *uuid_hash;
@@ -31,10 +34,12 @@ make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst,
 
 vcdp_main2_t vcdp_main2;
 
+// Create a new session.
+// The fields must be in big-endian.
 int
 vcdp_session_static_add(u32 context_id, ip4_address_t src, ip4_address_t dst,
                         u8 proto, u16 sport, u16 dport) {
-  vcdp_session_ip4_key_t key;
+  vcdp_session_ip4_key_t key = {0};
   vcdp_main2_t *vm = &vcdp_main2;
 
   clib_bihash_kv_24_8_t kv = {};
@@ -54,6 +59,8 @@ vcdp_session_static_add(u32 context_id, ip4_address_t src, ip4_address_t dst,
 
   clib_memcpy_fast(&kv.key, &key, sizeof(kv.key));
   kv.value = value;
+  clib_warning("adding key %U", format_bihash_kvp_24_8, &kv);
+  clib_warning("adding key: %U %U %d %d", format_ip4_address, &src, format_ip4_address, &dst, sport, dport);
 
   // proto = ((vcdp_session_ip4_key_t *) k)->ip4_key.proto;
   if (clib_bihash_add_del_24_8(&vm->table4, &kv, 2)) {
@@ -70,12 +77,15 @@ vcdp_session_static_add(u32 context_id, ip4_address_t src, ip4_address_t dst,
 int
 vcdp_session_static_lookup(u32 context_id, ip4_address_t src, ip4_address_t dst,
                            u8 proto, u16 sport, u16 dport, u64 *value) {
-  vcdp_session_ip4_key_t key;
+  vcdp_session_ip4_key_t key = {0};
   vcdp_main2_t *vm = &vcdp_main2;
   clib_bihash_kv_24_8_t kv, v;
   make_static_key_v4(context_id, src, dst, proto, sport, dport, &key);
 
   clib_memcpy(&kv.key, &key, sizeof(kv.key));
+
+  clib_warning("looking up key %U", format_bihash_kvp_24_8, &kv);
+  clib_warning("looking key: %U %U %d %d", format_ip4_address, &src, format_ip4_address, &dst, sport, dport);
 
   if (!clib_bihash_search_24_8 (&vm->table4, &kv, &v)) {
     *value = v.value;
@@ -92,7 +102,7 @@ vcdp_session_static_delete()
 }
 
 vcdp_tunnel_t *
-vcdp_tunnel_lookup (char *uuid)
+vcdp_tunnel_lookup_by_uuid (char *uuid)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
 
@@ -103,18 +113,59 @@ vcdp_tunnel_lookup (char *uuid)
   return pool_elt_at_index(tm->tunnels, p[0]);
 }
 
+vcdp_tunnel_t *
+vcdp_tunnel_get(u32 index) {
+  return pool_elt_at_index(vcdp_tunnel_main.tunnels, index);
+}
+
+static u8 *
+vcdp_vxlan_dummy_l2_build_rewrite (vcdp_tunnel_t *t)
+{
+  ip4_header_t *ip;
+  udp_header_t *udp;
+  vxlan_header_t *vxlan;
+  ethernet_header_t *ethernet;
+  u8 *rewrite = 0;
+
+  u16 encap_len = sizeof(ip4_header_t) + sizeof(udp_header_t) + sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
+  vec_validate(rewrite, encap_len - 1);
+  ip = (ip4_header_t *) rewrite;
+  udp = (udp_header_t *) ip + 1;
+  vxlan = (vxlan_header_t *) udp + 1;
+  ethernet = (ethernet_header_t *) vxlan + 1;
+
+  ip->ip_version_and_header_length = 0x45;
+  ip->ttl = 64;
+  ip->protocol = IP_PROTOCOL_UDP;
+
+  /* fixup ip4/udp header length and checksum after-the-fact */
+  ip->src_address.as_u32 = t->src.ip.ip4.as_u32;
+  ip->dst_address.as_u32 = t->dst.ip.ip4.as_u32;
+  ip->checksum = 0;
+
+  udp->checksum = 0;
+  udp->src_port = t->dport;
+  udp->dst_port = t->sport;
+  udp->length = 0;
+
+  vnet_set_vni_and_flags(vxlan, t->tenant_id);
+  ethernet->type = ETHERNET_TYPE_IP4;
+
+  return (rewrite);
+}
+
 int
 vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
                    ip_address_t *src, ip_address_t *dst, u16 sport, u16 dport,
                    u16 mtu) {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
-  vcdp_tunnel_t *t = vcdp_tunnel_lookup(tunnel_id);
+  vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
   if (t) {
     return -1;
   }
 
   // check input
-  if (!tunnel_id || tenant_id == ~0)
+  if (!tunnel_id)
     return -1;
 
   size_t uuid_len = strnlen_s(tunnel_id, sizeof(t->tunnel_id));
@@ -128,7 +179,8 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
   // Check for duplicate in session table
   int rv;
   u64 value;
-  rv = vcdp_session_static_lookup(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, 0, dport, &value);
+  // Swap src and dst to match the lookup on decap
+  rv = vcdp_session_static_lookup(0, dst->ip.ip4, src->ip.ip4, IP_PROTOCOL_UDP, htons(dport), 0, &value);
   if (rv == 0) {
     return -1;
   }
@@ -147,8 +199,7 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
   hash_set(uuid_hash, tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
-  rv = vcdp_session_static_add(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, 0, dport);
-  // TODO: Need to add service chain!!!! Or next node index.
+  rv = vcdp_session_static_add(0, dst->ip.ip4, src->ip.ip4, IP_PROTOCOL_UDP, htons(dport), 0);
 
   if (rv != 0) {
     // error rollback
@@ -156,6 +207,12 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
     hash_unset(uuid_hash, tunnel_id);
   }
 
+  t->rewrite = vcdp_vxlan_dummy_l2_build_rewrite(t);
+
+  // Add tenant
+
+  clib_error_t *err = vcdp_tenant_add_del(&vcdp_main, tenant_id, ~0, false);
+  if (err) rv = -1;
   return rv;
 }
 
@@ -163,7 +220,7 @@ int
 vcdp_tunnel_delete(char *tunnel_id)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
-  vcdp_tunnel_t *t = vcdp_tunnel_lookup(tunnel_id);
+  vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
   if (t == 0) {
     return -1;
   }

@@ -97,3 +97,23 @@ VLIB_PLUGIN_REGISTER() = {
   .version = VCDP_GW_PLUGIN_BUILD_VER,
   .description = "vCDP Gateway Plugin",
 };
+
+// TODO: TO BE DELETED
+void
+gw_enable_disable_geneve_input (gw_enable_disable_geneve_input_args_t *args)
+{
+  gw_main_t *gm = &gateway_main;
+  int rv = 0;
+  gateway_init_main_if_needed (gm);
+  rv = vnet_feature_enable_disable ("ip4-unicast", "vcdp-geneve-input",
+                                    args->sw_if_index, args->enable_disable, 0,
+                                    0);
+  args->rv = rv;
+  if (rv)
+    args->err = clib_error_return (
+      0, "Failed vnet_feature_enable_disable with error %d : %U", rv,
+      format_vnet_api_errno, rv);
+  else
+    args->err = 0;
+}
+
