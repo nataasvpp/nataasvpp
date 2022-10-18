@@ -81,8 +81,6 @@ nat_fastpath_process_one(nat_rewrite_data_t *nat_session,
   icmp46_header_t *icmp;
   u16 *icmp_id;
 
-  clib_warning("FP INNER PACKET: %U", format_ip4_header, ip4);
-
   if (session->session_version != nat_session->version) {
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
@@ -178,9 +176,6 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
     session = vcdp_session_at_index(ptd, session_idx);
     nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id);
-
-    ip4_header_t *inner_ip = (ip4_header_t *) vlib_buffer_get_current(b[0]);
-    clib_warning("FPP INNER PACKET: %U", format_ip4_header, inner_ip);
 
     nat_fastpath_process_one(nat_rewrite, session, to_next, b, is_terminal);
     n_left -= 1;

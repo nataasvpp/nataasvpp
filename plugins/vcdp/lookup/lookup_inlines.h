@@ -223,7 +223,7 @@ vcdp_calc_key_v4 (vlib_buffer_t *b, u32 context_id,
   pr = ip->protocol;
   next_header = ip4_next_header (ip);
   l4_hdr_offset[0] = (u8 *) next_header - b->data;
-  clib_warning("OLE doing lookup with context %d", context_id);
+
   reass_needed = !!(ip->flags_and_fragment_offset &
 		    clib_host_to_net_u16 (IP4_REASS_NEEDED_FLAGS));
   tcp_or_udp = pr == IP_PROTOCOL_TCP || pr == IP_PROTOCOL_UDP;
