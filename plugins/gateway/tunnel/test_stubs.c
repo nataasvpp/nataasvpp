@@ -1,6 +1,7 @@
 // Copyright(c) 2022 Cisco Systems, Inc.
 
 #include <vlib/vlib.h>
+#include <vcdp/vcdp.h>
 
 extern u16 NEXT_PASSTHROUGH;
 
@@ -37,4 +38,10 @@ void os_exit(int code) {}
 u8 *format_ip4_address(u8 *s, va_list *args) {
     u8 *a = va_arg(*args, u8 *);
     return format(s, "%d.%d.%d.%d", a[0], a[1], a[2], a[3]);
+}
+
+vcdp_tenant_t *
+vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
+{
+  return 0;
 }

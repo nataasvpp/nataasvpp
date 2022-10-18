@@ -4,14 +4,14 @@
 #include "tunnel.h"
 #include <assert.h>
 #include <vcdp/service.h>
+#include <arpa/inet.h>
 
-extern vcdp_main2_t vcdp_main2;
 vnet_feature_main_t feature_main;
 vcdp_service_main_t vcdp_service_main;
 vcdp_main_t vcdp_main;
 
 static int
-session_walk(clib_bihash_kv_24_8_t *kvp, void *arg) {
+session_walk(clib_bihash_kv_16_8_t *kvp, void *arg) {
   printf("Walking sessions table %lx\n", kvp->value);
   return 1;
 }
@@ -93,7 +93,7 @@ vlib_buffer_t *test_vlib_get_buffer(u32 bi) {
 #include "node.h"
 
 // Test tunnel-input
-static int
+int
 test_tunnel_input(vlib_main_t *vm) {
   u32 node_index = vlib_register_node(vm, &vcdp_tunnel_input_node, "%s",
                                       vcdp_tunnel_input_node.name);
@@ -138,6 +138,11 @@ main(int argc, char **argv) {
   assert(t != 0 && "lookup on table");
   printf("Found a tunnel: %s\n", t->tunnel_id);
 
+  u64 value;
+  rv = vcdp_tunnel_lookup(0, src.ip.ip4, dst.ip.ip4, 17, htons(4278), 0, &value);
+
+  assert(rv == 0 && "Lookup by session parameters");
+
   rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst,
                           0, 4278, 0);
 
@@ -154,9 +159,9 @@ main(int argc, char **argv) {
   assert(t == 0 && "verify tunnel deleted");
 
   // dump session table
-  clib_bihash_foreach_key_value_pair_24_8(&vcdp_main2.table4, session_walk, 0);
+  clib_bihash_foreach_key_value_pair_16_8(&vcdp_tunnel_main.tunnels_hash, session_walk, 0);
 
-  test_tunnel_input(vm);
+  //test_tunnel_input(vm);
 
   return 0;
 }

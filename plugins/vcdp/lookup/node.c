@@ -88,9 +88,9 @@ typedef struct {
 static_always_inline int
 vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                        vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
-                       f64 time_now, void *k, u64 *h, u64 *lookup_val) {
+                       f64 time_now, void *k, u64 *h, u64 *lookup_val, u32 rx_id) {
   return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                    time_now, k, h, lookup_val, 0);
+                                    time_now, k, h, lookup_val, 0, rx_id);
 }
 
 static_always_inline int
@@ -98,7 +98,7 @@ vcdp_create_session_v6(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                        vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
                        f64 time_now, void *k, u64 *h, u64 *lookup_val) {
   return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                    time_now, k, h, lookup_val, 1);
+                                    time_now, k, h, lookup_val, 1, 0 /* NO v6 */);
 }
 
 static_always_inline u8
@@ -449,7 +449,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
         /* if there is colision, we just reiterate */
         if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                   time_now, k4, h, lv)) {
+                                   time_now, k4, h, lv, vcdp_buffer(b[0])->rx_id)) {
           vlib_node_increment_counter(vm, node->node_index,
                                       VCDP_LOOKUP_ERROR_COLLISION, 1);
           continue;

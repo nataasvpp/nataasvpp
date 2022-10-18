@@ -77,48 +77,40 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/format.c
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
-  vcdp_services/nat/external_input_node.c
+  # vcdp_services/nat/external_input_node.c
 
   dummy/dot1q.c
 
   gateway/gateway.c
   gateway/cli.c
   gateway/api.c
-  gateway/geneve_input/node.c
-  gateway/geneve_output/node.c
   gateway/interface.c
-
-  tunnel/tunnel.c
-  tunnel/cli.c
-  tunnel/api.c
-  tunnel/node.c
+  gateway/tunnel/tunnel.c
+  gateway/tunnel/node.c
 
   MULTIARCH_SOURCES
   vcdp_services/tcp-check/node.c
   vcdp_services/l4-lifecycle/node.c
-  gateway/geneve_input/node.c
-  gateway/geneve_output/node.c
   dummy/dot1q.c
 
   API_FILES
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
-  tunnel/tunnel.api
 
   LINK_LIBRARIES
   vcdp
 )
 
-# find_library(VPPINFRA_LIBRARY vppinfra)
-# find_library(VLIB_LIBRARY vlib)
-# #VPP_LIBRARY_DIR
-# add_compile_options(-Werror -Wall)
-# message(STATUS "foo include dir: ${VPP_LIBRARY_DIR}")
-# message(STATUS "foo include dir: ${VPPINFRA_LIBRARY}")
-# message(STATUS "foo include dir: ${VLIB_LIBRARY}")
-# #set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
-# add_executable(test_tunnel tunnel/test.c tunnel/test_stubs.c tunnel/tunnel.c tunnel/node.c)
-# target_link_libraries(test_tunnel vcdp ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
-# add_test(NAME test_tunnel
-#          COMMAND test_tunnel)
+find_library(VPPINFRA_LIBRARY vppinfra)
+find_library(VLIB_LIBRARY vlib)
+#VPP_LIBRARY_DIR
+add_compile_options(-Werror -Wall)
+message(STATUS "foo include dir: ${VPP_LIBRARY_DIR}")
+message(STATUS "foo include dir: ${VPPINFRA_LIBRARY}")
+message(STATUS "foo include dir: ${VLIB_LIBRARY}")
+#set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
+add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/test_stubs.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
+target_link_libraries(test_tunnel ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
+add_test(NAME test_tunnel
+         COMMAND test_tunnel)

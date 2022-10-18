@@ -316,6 +316,7 @@ vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6,
   return 0;
 }
 
+// TODO: Is this used?
 int
 vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id,
                     u32 thread_index, u32 tenant_index, u32 *session_index,
@@ -334,7 +335,7 @@ vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id,
                    slow_path);
   int err =
     vcdp_create_session_inline(vcdp, ptd, tenant, tenant_index, thread_index,
-                               time_now, &k4, &h, &lookup_val, is_ipv6);
+                               time_now, &k4, &h, &lookup_val, is_ipv6, vcdp_buffer(b)->rx_id);
   *session_index = vcdp_session_index_from_lookup(lookup_val);
   return err;
 }
@@ -403,6 +404,20 @@ vcdp_bihash_add_del_inline_with_hash_48_8(clib_bihash_48_8_t *h,
                                           u8 is_add) {
   return clib_bihash_add_del_inline_with_hash_48_8(h, kv, hash, is_add, 0, 0, 0,
                                                    0);
+}
+
+vcdp_tenant_t *
+vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  clib_bihash_kv_8_8_t kv = {.key = tenant_id};
+
+  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
+    /* Not found */
+    return 0;
+  }
+  *tenant_idx = kv.value;
+  return vcdp_tenant_at_index(&vcdp_main, *tenant_idx);
 }
 
 VLIB_INIT_FUNCTION(vcdp_init);

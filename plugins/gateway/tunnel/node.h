@@ -14,18 +14,18 @@
 #include "tunnel.h"
 
 typedef struct {
-  u32 next_index;
-  u32 sw_if_index;
-} vcdp_tunnel_input_trace_t;
+  bool is_encap;
+  u32 tunnel_index;
+  u16 tenant_index;
+} vcdp_tunnel_trace_t;
 
 static inline u8 *
-format_vcdp_tunnel_input_trace(u8 *s, va_list *args) {
+format_vcdp_tunnel_trace(u8 *s, va_list *args) {
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
-  vcdp_tunnel_input_trace_t *t = va_arg(*args, vcdp_tunnel_input_trace_t *);
+  vcdp_tunnel_trace_t *t = va_arg(*args, vcdp_tunnel_trace_t *);
 
-  s = format(s, "tunnel-input: sw_if_index %d, next index %d\n", t->sw_if_index,
-             t->next_index);
+  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d", t->is_encap ? "encap" : "decap", t->tunnel_index, t->tenant_index);
   return s;
 }
 
@@ -49,26 +49,21 @@ typedef enum {
     VCDP_TUNNEL_INPUT_N_ERROR,
 } vcdp_tunnel_input_error_t;
 
-vlib_error_desc_t vcdp_tunnel_input_error_counters[] = {
-#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
-  foreach_vcdp_tunnel_input_error
-#undef _
-};
-
 // Graph node for VXLAN and Geneve tunnel decap
-static inline uword vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+static inline uword
+vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
   u32 n_left_from, *from;
   u16 nexts[VLIB_FRAME_SIZE] = {0}, *next = nexts;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_tenant_t *tenant;
-  u16 tenant_idx;
+  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0}, *tunnel_idx = tunnel_indicies; // Used only for tracing
+  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0}, *tenant_idx = tenant_indicies; // Used only for tracing
 
   from = vlib_frame_vector_args(frame);
   n_left_from = frame->n_vectors;
   vlib_get_buffers(vm, from, b, n_left_from);
 
   while (n_left_from > 0) {
-    clib_warning("OLE received packet %d", vlib_buffer_length_in_chain(vm, b[0]));
     /* By default pass packet to next node in the feature chain */
     vnet_feature_next_u16(next, b[0]);
 
@@ -84,17 +79,18 @@ static inline uword vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_run
     udp_header_t *udp = ip4_next_header(ip);
     u32 context_id = 0;
     u64 value;
-    int rv = vcdp_session_static_lookup(context_id, ip->src_address,
-                                        ip->dst_address, ip->protocol,
-                                        0, udp->dst_port, &value);
+    int rv =
+      vcdp_tunnel_lookup(context_id, ip->dst_address, ip->src_address,
+                                ip->protocol, 0, udp->dst_port, &value);
     if (rv != 0) {
-        clib_warning("SESSION STATIC LOOKUP FAILED");
-        goto next;
+      // Silently ignore lookup failures, might not have been a tunnel packet.
+      goto next;
     }
 
     vcdp_tunnel_t *t = pool_elt_at_index(vcdp_tunnel_main.tunnels, value);
     u16 bytes_to_inner_ip;
     u32 vni;
+    *tunnel_idx = value;
 
     switch (t->method) {
 
@@ -141,26 +137,19 @@ static inline uword vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_run
 
     // Two choices. Either a tunnel can be hardcoded with a tenant or the VNI is
     // used as tenant id. ignoring VNI for NATaaS / SWG integration
-    clib_bihash_kv_8_8_t kv = {};
-    vcdp_main_t *vcdp = &vcdp_main;
-    kv.key = t->tenant_id == ~0 ? (u64) vni : t->tenant_id;
-    ASSERT(vcdp->tenant_idx_by_id.buckets != 0);
-    if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
-      /* Not found */
+    u32 tenant_id = t->tenant_id == ~0 ? (u64) vni : t->tenant_id;
+    tenant = vcdp_tenant_get_by_id(tenant_id, tenant_idx);
+    if (!tenant) {
       next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
       goto next;
     }
-    tenant_idx = kv.value;
 
-    /* Store tenant_id as flow_id (to simplify the future lookup) */
-    tenant = vcdp_tenant_at_index(&vcdp_main, tenant_idx);
+    /* Store context_id as flow_id (to simplify the future lookup) */
     b[0]->flow_id = tenant->context_id;
 
     vlib_buffer_advance(b[0], bytes_to_inner_ip);
-    ip4_header_t *inner_ip = (ip4_header_t *) vlib_buffer_get_current(b[0]);
-    clib_warning("INNER PACKET: %U", format_ip4_header, inner_ip);
-    vcdp_buffer(b[0])->tenant_index = tenant_idx;
-    // vcdp_buffer(b[0])->rx_id = value;
+    vcdp_buffer(b[0])->tenant_index = *tenant_idx;
+    vcdp_buffer(b[0])->rx_id = value; // Store tunnel index in buffer
 
     next[0] = VCDP_TUNNEL_INPUT_NEXT_IP4_LOOKUP;
 
@@ -168,9 +157,31 @@ static inline uword vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_run
     next += 1;
     n_left_from -= 1;
     b += 1;
+    tunnel_idx += 1;
+    tenant_idx += 1;
   }
 
   vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
+
+  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
+    int i;
+    b = bufs;
+    tunnel_idx = tunnel_indicies;
+    tenant_idx = tenant_indicies;
+    for (i = 0; i < frame->n_vectors; i++) {
+      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
+        vcdp_tunnel_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        t->is_encap = false;
+        t->tunnel_index = tunnel_idx[0];
+        t->tenant_index = tenant_idx[0];
+        b++;
+        tunnel_idx++;
+        tenant_idx++;
+      } else
+        break;
+    }
+  }
+
   return frame->n_vectors;
 }
 
@@ -179,17 +190,6 @@ typedef struct {
   u32 next_index;
   u32 sw_if_index;
 } vcdp_tunnel_output_trace_t;
-
-static inline u8 *
-format_vcdp_tunnel_output_trace(u8 *s, va_list *args) {
-  CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
-  CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
-  vcdp_tunnel_output_trace_t *t = va_arg(*args, vcdp_tunnel_output_trace_t *);
-
-  s = format(s, "tunnel-output: sw_if_index %d, next index %d\n",
-             t->sw_if_index, t->next_index);
-  return s;
-}
 
 // Next nodes
 typedef enum {
@@ -211,12 +211,6 @@ typedef enum {
     VCDP_TUNNEL_OUTPUT_N_ERROR,
 } vcdp_tunnel_output_error_t;
 
-vlib_error_desc_t vcdp_tunnel_output_error_counters[] = {
-#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
-  foreach_vcdp_tunnel_output_error
-#undef _
-};
-
 static void
 vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b) {
   ip4_header_t *ip;
@@ -226,20 +220,20 @@ vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b) {
 
   ip->length = clib_host_to_net_u16(vlib_buffer_length_in_chain(vm, b));
   ip->checksum = ip4_header_checksum(ip);
-  udp = (udp_header_t *) ip + 1;
+  udp = (udp_header_t *) (ip + 1);
   udp->length = ip->length - sizeof(ip4_header_t);
   // TODO: udp->src_port = ip4_compute_flow_hash (b);
 }
 
-static inline uword vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+static inline uword 
+vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
-  // gw_main_t *gm = &gateway_main;
-  // vcdp_main_t *vcdp = &vcdp_main;
-  // vcdp_tunnel_main_t *vcdp_tm = &vcdp_tunnel_main;
-  // u32 thread_index = vm->thread_index;
+  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0}, *tunnel_idx = tunnel_indicies; // Used only for tracing
+  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0}, *tenant_idx = tenant_indicies; // Used only for tracing
 
-  // vcdp_per_thread_data_t *vptd =
-  //   vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 thread_index = vm->thread_index;
+  vcdp_per_thread_data_t *vptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 *from = vlib_frame_vector_args(frame);
@@ -248,54 +242,57 @@ static inline uword vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_ru
   vlib_get_buffers(vm, from, bufs, n_left);
 
   while (n_left > 0) {
-    // u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    // vcdp_session_t *session = vcdp_session_at_index(vptd, session_idx);
-    vcdp_tunnel_t *t = vcdp_tunnel_get(vcdp_buffer(b[0])->tenant_index);
+    u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    vcdp_session_t *session = vcdp_session_at_index(vptd, session_idx);
+    vcdp_tunnel_t *t = vcdp_tunnel_get(session->rx_id);
+    tunnel_idx[0] = session->rx_id;
+    tenant_idx[0] = session->tenant_idx;
     if (t == 0) {
       to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_DROP;
       goto done;
     }
-    u8 *data;
-    // u16 orig_len = vlib_buffer_length_in_chain(vm, b[0]);
     b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID |
                     VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
-    vnet_buffer(b[0])->oflags |=
-      VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
+    vnet_buffer(b[0])->oflags |= VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
     vlib_buffer_advance(b[0], -t->encap_size);
-    data = vlib_buffer_get_current(b[0]);
+    ip4_header_t *ip = vlib_buffer_get_current(b[0]);
     vnet_buffer(b[0])->l3_hdr_offset = b[0]->current_data;
     vnet_buffer(b[0])->l4_hdr_offset = b[0]->current_data + sizeof(ip4_header_t);
-    clib_memcpy_fast(data, t->rewrite, t->encap_size);
+    clib_memcpy_fast(ip, t->rewrite, t->encap_size);
     vcdp_vxlan_dummy_l2_fixup(vm, b[0]);
-
     to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP;
 
   done:
     to_next++;
     b++;
     n_left--;
+    tunnel_idx += 1;
+    tenant_idx += 1;
+
   }
 
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
-#if 0
+
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
-    n_left = frame->n_vectors;
     b = bufs;
-    for (i = 0; i < n_left; i++) {
+    tunnel_idx = tunnel_indicies;
+    tenant_idx = tenant_indicies;
+    for (i = 0; i < frame->n_vectors; i++) {
+      // TODO: Add more details
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_tunnel_output_trace_t *t =
-          vlib_add_trace(vm, node, b[0], sizeof(*t));
-        t->flow_id = b[0]->flow_id;
-        t->encap_size = gptd->output[b[0]->flow_id].encap_size;
-        clib_memcpy_fast(t->encap_data, gptd->output[b[0]->flow_id].encap_data,
-                         gptd->output[b[0]->flow_id].encap_size);
+        vcdp_tunnel_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        t->is_encap = true;
+        t->tunnel_index = tunnel_idx[0];
+        t->tenant_index = tenant_idx[0];
         b++;
+        tunnel_idx++;
+        tenant_idx++;
       } else
         break;
     }
   }
-#endif
+
   return frame->n_vectors;
 }
 

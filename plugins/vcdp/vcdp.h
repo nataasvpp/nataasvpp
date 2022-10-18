@@ -267,7 +267,8 @@ typedef struct {
   u8 pseudo_dir[VCDP_SESSION_N_KEY];
   u8 type; /* see vcdp_session_type_t */
   u8 key_flags;
-  u8 unused1[28];
+  u8 unused1[24];
+  u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
 STATIC_ASSERT_SIZEOF(vcdp_session_t, 256);
 
@@ -287,8 +288,8 @@ typedef struct {
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
   u32 sp_node_indices[VCDP_N_SP_NODES];
-  uword icmp4_lookup_next;
-  uword icmp6_lookup_next;
+  uword icmp4_lookup_next; // TODO: Remove?
+  uword icmp6_lookup_next; // TODO: Remove?
 
 } vcdp_tenant_t;
 
@@ -387,6 +388,8 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx) {
   return pool_elt_at_index(vcdpm->tenants, idx);
 }
 
+vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
+
 static_always_inline u8
 vcdp_session_n_keys(vcdp_session_t *session) {
   if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 |
@@ -400,7 +403,7 @@ static_always_inline int
 vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                            vcdp_tenant_t *tenant, u16 tenant_idx,
                            u32 thread_index, f64 time_now, void *k, u64 *h,
-                           u64 *lookup_val, int is_ipv6) {
+                           u64 *lookup_val, int is_ipv6, u32 rx_id) {
   vcdp_bihash_kv46_t kv = {};
   clib_bihash_kv_8_8_t kv2;
   u64 value;
@@ -444,6 +447,8 @@ vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
+  session->rx_id = rx_id;
+
   session->state = VCDP_SESSION_STATE_FSOL;
   kv2.key = session_id;
   kv2.value = value;

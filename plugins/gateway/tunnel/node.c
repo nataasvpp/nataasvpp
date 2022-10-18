@@ -3,7 +3,6 @@
 #include <vlib/vlib.h>
 #include <vcdp/service.h>
 #include <vnet/feature/feature.h>
-
 #include "node.h"
 
 // Graph node for VXLAN and Geneve tunnel decap
@@ -12,10 +11,16 @@ VLIB_NODE_FN(vcdp_tunnel_input_node)
   return vcdp_tunnel_input_node_inline(vm, node, frame);
 }
 
+vlib_error_desc_t vcdp_tunnel_input_error_counters[] = {
+#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
+  foreach_vcdp_tunnel_input_error
+#undef _
+};
+
 VLIB_REGISTER_NODE(vcdp_tunnel_input_node) = {
   .name = "vcdp-tunnel-input",
   .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tunnel_input_trace,
+  .format_trace = format_vcdp_tunnel_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
   .n_errors = VCDP_TUNNEL_INPUT_N_ERROR,
@@ -41,10 +46,16 @@ VLIB_NODE_FN(vcdp_tunnel_output_node)
   return vcdp_tunnel_output_node_inline(vm, node, frame);
 }
 
+vlib_error_desc_t vcdp_tunnel_output_error_counters[] = {
+#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
+  foreach_vcdp_tunnel_output_error
+#undef _
+};
+
 VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {
   .name = "vcdp-tunnel-output",
   .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tunnel_output_trace,
+  .format_trace = format_vcdp_tunnel_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
   .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
