@@ -68,11 +68,13 @@ class TestNATaaS(VppTestCase):
 
 
     def test_vxlan(self):
-        """VXLAN decap"""
+        """VXLAN gateway through NAT"""
         # Create tunnel
         tenant=0
         dport=4789
         dport2=4790
+        vrf=0
+
         self.vapi.cli(f'vcdp tenant add {tenant} context 0')
         self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {tenant}")
 
@@ -82,7 +84,7 @@ class TestNATaaS(VppTestCase):
         self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
         self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
         self.vapi.cli("vcdp nat alloc-pool add 4242 1.1.1.1")
-        self.vapi.cli("set vcdp nat snat tenant 0 outside-tenant 0 table 0 alloc-pool 4242")
+        self.vapi.cli(f"set vcdp nat snat tenant {tenant} outside-tenant {tenant} table {vrf} alloc-pool 4242")
         print(self.vapi.cli("show interface features pg0"))
 
         # Send a VXLAN packet and validate that is passes through the service chain and is natively forwarded
@@ -113,14 +115,10 @@ class TestNATaaS(VppTestCase):
         pkt_to_send = Ether(src=self.pg1.remote_mac, dst=self.pg1.local_mac) / reply
 
         # encapsulate and send packet back through NAT
-        try:
-            rx = self.send_and_expect(self.pg1, pkt_to_send, self.pg0)
-            print('PACKET FROM NAT')
-            rx[0].show2()
-        except:
-            pass
+        rx = self.send_and_expect(self.pg1, pkt_to_send, self.pg0)
+        print('PACKET FROM NAT')
+        rx[0].show2()
         print(self.vapi.cli("show vcdp session-table"))
-
 
 
 if __name__ == "__main__":

@@ -65,7 +65,6 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/format.c
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
-  # vcdp_services/nat/external_input_node.c
 
   dummy/dot1q.c
 

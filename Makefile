@@ -39,19 +39,16 @@ install-release: $(release_build_dir)
 run run-release debug debug-release:
 	@make -C $(VPP_DIR) STARTUP_DIR=$(PWD) $@
 
+test-debug: $(debug_build_dir)
+	@make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins TEST=nataas $@
+test: $(release_build_dir)
+	@make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(release_build_dir)/lib/vpp_plugins TEST=nataas $@
+
 clean:
 	@rm -rf $(build_dir)
 
 fixstyle:
 	@for i in plugins/*/*.[ch] plugins/*/*/*.[ch] ; do clang-format -i $$i; done
-#	@find . -regex '\./gateway/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
-#	@find . -regex '\./vcdp/.*\.[ch]' -print | while read i; do clang-format -i $$i; done
-
-.PHONY: ctags
-ctags:
-	@find . $(VPP_DIR) -name \*.[chS] > ctags.files
-	@ctags --totals --tag-relative -L ctags.files
-	@rm ctags.files
 
 .PHONY: compdb
 compdb:
@@ -71,10 +68,11 @@ help:
 	@echo " install-release      - install release binaries"
 	@echo " run                  - run debug binary"
 	@echo " run-release          - run release binary"
+	@echo " test                 - run feature tests on release binary"
+	@echo " test-debug           - run feature tests on debug binary"
 	@echo " debug                - run debug binary with debugger"
 	@echo " debug-release        - run release binary with debugger"
 	@echo " clean                - wipe all build products"
-	@echo " ctags                - (re)generate ctags database"
 	@echo " compdb               - (re)generate compile_commands.json"
 	@echo ""
 	@echo "Make Arguments:"

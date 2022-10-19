@@ -5,7 +5,6 @@
 
 #include <vlib/vlib.h>
 #include <vnet/ip/ip_types.h>
-#include <gateway/gateway.api_types.h>
 #include <vppinfra/hash.h>
 #include <vcdp/vcdp.h>
 
@@ -13,11 +12,11 @@
 
 #define VCDP_TUNNELS_NUM_BUCKETS 1024
 
-// typedef enum {
-//     VCDP_TUNNEL_VXLAN_DUMMY_L2,
-//     VCDP_TUNNEL_GENEVE_L3,
-// } vcdp_tunnel_method_t;
-typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
+typedef enum {
+    VCDP_TUNNEL_VXLAN_DUMMY_L2,
+    VCDP_TUNNEL_GENEVE_L3,
+} vcdp_tunnel_method_t;
+//typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
 
 typedef struct {
   char tunnel_id[36];
