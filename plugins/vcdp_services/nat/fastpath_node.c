@@ -7,8 +7,8 @@
 
 #define foreach_vcdp_nat_fastpath_error _(DROP, "drop")
 
-#define foreach_vcdp_nat_terminal_next                                         \
-  _(DROP, "error-drop")                                                        \
+#define foreach_vcdp_nat_terminal_next                                                                                 \
+  _(DROP, "error-drop")                                                                                                \
   _(IP4_LOOKUP, "ip4-lookup")
 
 typedef enum {
@@ -37,17 +37,16 @@ typedef struct {
 } vcdp_nat_fastpath_trace_t;
 
 static u8 *
-format_vcdp_nat_fastpath_trace(u8 *s, va_list *args) {
+format_vcdp_nat_fastpath_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_nat_fastpath_trace_t *t = va_arg(*args, vcdp_nat_fastpath_trace_t *);
   nat_main_t *nm = &nat_main;
   nat_per_thread_data_t *ptd = vec_elt_at_index(nm->ptd, t->thread_index);
   nat_rewrite_data_t *rewrite = vec_elt_at_index(ptd->flows, t->flow_id);
-  s = format(s, "vcdp-nat-fastpath: flow-id %u (session %u, %s) rewrite: %U\n",
-             t->flow_id, t->flow_id >> 1,
-             t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_nat_rewrite,
-             rewrite);
+  s = format(s, "vcdp-nat-fastpath: flow-id %u (session %u, %s) rewrite: %U\n", t->flow_id, t->flow_id >> 1,
+             t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_nat_rewrite, rewrite);
 
   return s;
 }
@@ -55,9 +54,9 @@ format_vcdp_nat_fastpath_trace(u8 *s, va_list *args) {
 VCDP_SERVICE_DECLARE(drop)
 
 static_always_inline void
-nat_fastpath_process_one(nat_rewrite_data_t *nat_session,
-                         vcdp_session_t *session, u16 *to_next,
-                         vlib_buffer_t **b, u8 is_terminal) {
+nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b,
+                         u8 is_terminal)
+{
   u8 *data = vlib_buffer_get_current(b[0]);
   u8 proto = nat_session->rewrite.proto;
   u32 ops;
@@ -141,15 +140,14 @@ end_of_packet:
 }
 
 static_always_inline u16
-vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
-                         vlib_frame_t *frame, u8 is_terminal) {
+vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, u8 is_terminal)
+{
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   vcdp_session_t *session;
   u32 session_idx;
@@ -176,8 +174,7 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     n_left = frame->n_vectors;
     for (i = 0; i < n_left; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_nat_fastpath_trace_t *t =
-          vlib_add_trace(vm, node, b[0], sizeof(*t));
+        vcdp_nat_fastpath_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
         t->flow_id = b[0]->flow_id;
         t->thread_index = thread_index;
         b++;
@@ -189,56 +186,53 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
 }
 
 VLIB_NODE_FN(vcdp_nat_early_rewrite_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_nat_fastpath_inline(vm, node, frame, 0);
 }
 
 VLIB_NODE_FN(vcdp_nat_late_rewrite_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_nat_fastpath_inline(vm, node, frame, 1);
 }
 
-VLIB_REGISTER_NODE(vcdp_nat_early_rewrite_node) = {
-  .name = "vcdp-nat-early-rewrite",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_nat_fastpath_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_nat_early_rewrite_node) = {.name = "vcdp-nat-early-rewrite",
+                                                   .vector_size = sizeof(u32),
+                                                   .format_trace = format_vcdp_nat_fastpath_trace,
+                                                   .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
-  .error_strings = vcdp_nat_fastpath_error_strings,
-  .sibling_of = "vcdp-lookup-ip4"
+                                                   .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
+                                                   .error_strings = vcdp_nat_fastpath_error_strings,
+                                                   .sibling_of = "vcdp-lookup-ip4"
 
 };
 
-VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
-  .name = "vcdp-nat-late-rewrite",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_nat_fastpath_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {.name = "vcdp-nat-late-rewrite",
+                                                  .vector_size = sizeof(u32),
+                                                  .format_trace = format_vcdp_nat_fastpath_trace,
+                                                  .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
-  .error_strings = vcdp_nat_fastpath_error_strings,
-  .n_next_nodes = VCDP_NAT_TERMINAL_N_NEXT,
-  .next_nodes =
-    {
+                                                  .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
+                                                  .error_strings = vcdp_nat_fastpath_error_strings,
+                                                  .n_next_nodes = VCDP_NAT_TERMINAL_N_NEXT,
+                                                  .next_nodes =
+                                                    {
 #define _(n, x) [VCDP_NAT_TERMINAL_NEXT_##n] = x,
-      foreach_vcdp_nat_terminal_next
+                                                      foreach_vcdp_nat_terminal_next
 #undef _
-    }
+                                                    }
 
 };
 
 VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle",
-                              "vcdp-tcp-check", "vcdp-nat-output"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-output"),
   .is_terminal = 1};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
   .runs_before = VCDP_SERVICES("vcdp-geneve-output"),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle",
-                              "vcdp-tcp-check"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0};
-  

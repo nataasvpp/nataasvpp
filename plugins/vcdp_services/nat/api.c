@@ -15,22 +15,21 @@
 #include <vlibapi/api_helper_macros.h>
 
 static void
-vl_api_vcdp_nat_set_external_interface_t_handler(
-  vl_api_vcdp_nat_set_external_interface_t *mp) {
+vl_api_vcdp_nat_set_external_interface_t_handler(vl_api_vcdp_nat_set_external_interface_t *mp)
+{
   nat_main_t *nat = &nat_main;
   u32 sw_if_index = clib_net_to_host_u32(mp->sw_if_index);
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u8 unset = mp->is_disable;
-  clib_error_t *err =
-    nat_external_interface_set_tenant(nat, sw_if_index, tenant_id, unset);
+  clib_error_t *err = nat_external_interface_set_tenant(nat, sw_if_index, tenant_id, unset);
   int rv = err ? -1 : 0;
   vl_api_vcdp_nat_set_external_interface_reply_t *rmp;
   REPLY_MACRO(VL_API_VCDP_NAT_SET_EXTERNAL_INTERFACE_REPLY);
 }
 
 static void
-vl_api_vcdp_nat_alloc_pool_add_del_t_handler(
-  vl_api_vcdp_nat_alloc_pool_add_del_t *mp) {
+vl_api_vcdp_nat_alloc_pool_add_del_t_handler(vl_api_vcdp_nat_alloc_pool_add_del_t *mp)
+{
   nat_main_t *nat = &nat_main;
   u32 alloc_pool_id = clib_net_to_host_u32(mp->alloc_pool_id);
   u8 is_del = mp->is_del;
@@ -50,7 +49,8 @@ vl_api_vcdp_nat_alloc_pool_add_del_t_handler(
 }
 
 static void
-vl_api_vcdp_nat_snat_set_unset_t_handler(vl_api_vcdp_nat_snat_set_unset_t *mp) {
+vl_api_vcdp_nat_snat_set_unset_t_handler(vl_api_vcdp_nat_snat_set_unset_t *mp)
+{
   nat_main_t *nat = &nat_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u32 outside_tenant_id = clib_net_to_host_u32(mp->outside_tenant_id);
@@ -61,15 +61,15 @@ vl_api_vcdp_nat_snat_set_unset_t_handler(vl_api_vcdp_nat_snat_set_unset_t *mp) {
   int rv;
   vl_api_vcdp_nat_alloc_pool_add_del_reply_t *rmp;
 
-  err = nat_tenant_set_snat(nat, tenant_id, outside_tenant_id, table_id,
-                            alloc_pool_id, unset);
+  err = nat_tenant_set_snat(nat, tenant_id, outside_tenant_id, table_id, alloc_pool_id, unset);
   rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY);
 }
 
 #include <vcdp_services/nat/nat.api.c>
 static clib_error_t *
-vcdp_nat_api_hookup(vlib_main_t *vm) {
+vcdp_nat_api_hookup(vlib_main_t *vm)
+{
   nat_main_t *nat = &nat_main;
   nat->msg_id_base = setup_message_id_table();
   return 0;

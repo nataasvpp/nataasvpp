@@ -23,42 +23,42 @@ typedef struct {
 
 extern vcdp_service_main_t vcdp_service_main;
 
-#define VCDP_SERVICE_DECLARE(x)                                                \
-  extern u8 vcdp_service_index_in_bitmap_##x;                                  \
+#define VCDP_SERVICE_DECLARE(x)                                                                                        \
+  extern u8 vcdp_service_index_in_bitmap_##x;                                                                          \
   extern u32 vcdp_service_mask_##x;
 
 #define VCDP_SERVICE_MASK(x)  vcdp_service_mask_##x
 #define VCDP_SERVICE_INDEX(x) vcdp_service_index_in_bitmap_##x
 
 #ifndef CLIB_MARCH_VARIANT
-#define VCDP_SERVICE_DEFINE(x)                                                 \
-  static vcdp_service_registration_t vcdp_service_registration_##x;            \
-  static void __vcdp_service_add_registration_##x(void)                        \
-    __attribute__((__constructor__));                                          \
-  u8 vcdp_service_index_in_bitmap_##x;                                         \
-  u32 vcdp_service_mask_##x;                                                   \
-  static void __vcdp_service_add_registration_##x(void) {                      \
-    vcdp_service_main_t *sm = &vcdp_service_main;                              \
-    vcdp_service_registration_t *r = &vcdp_service_registration_##x;           \
-    r->next = sm->next_service;                                                \
-    sm->next_service = r;                                                      \
-    r->index_in_bitmap = &vcdp_service_index_in_bitmap_##x;                    \
-    r->service_mask = &vcdp_service_mask_##x;                                  \
-  }                                                                            \
+#define VCDP_SERVICE_DEFINE(x)                                                                                         \
+  static vcdp_service_registration_t vcdp_service_registration_##x;                                                    \
+  static void __vcdp_service_add_registration_##x(void) __attribute__((__constructor__));                              \
+  u8 vcdp_service_index_in_bitmap_##x;                                                                                 \
+  u32 vcdp_service_mask_##x;                                                                                           \
+  static void __vcdp_service_add_registration_##x(void)                                                                \
+  {                                                                                                                    \
+    vcdp_service_main_t *sm = &vcdp_service_main;                                                                      \
+    vcdp_service_registration_t *r = &vcdp_service_registration_##x;                                                   \
+    r->next = sm->next_service;                                                                                        \
+    sm->next_service = r;                                                                                              \
+    r->index_in_bitmap = &vcdp_service_index_in_bitmap_##x;                                                            \
+    r->service_mask = &vcdp_service_mask_##x;                                                                          \
+  }                                                                                                                    \
   static vcdp_service_registration_t vcdp_service_registration_##x
 #else
-#define VCDP_SERVICE_DEFINE(x)                                                 \
-  VCDP_SERVICE_DECLARE(x);                                                     \
-  static vcdp_service_registration_t __clib_unused                             \
-    unused_vcdp_service_registration_##x
+#define VCDP_SERVICE_DEFINE(x)                                                                                         \
+  VCDP_SERVICE_DECLARE(x);                                                                                             \
+  static vcdp_service_registration_t __clib_unused unused_vcdp_service_registration_##x
 
 #endif
 
-#define VCDP_SERVICES(...)                                                     \
+#define VCDP_SERVICES(...)                                                                                             \
   (char *[]) { __VA_ARGS__, 0 }
 
 static_always_inline void
-vcdp_next(vlib_buffer_t *b, u16 *next_index) {
+vcdp_next(vlib_buffer_t *b, u16 *next_index)
+{
   u32 bmp = vcdp_buffer(b)->service_bitmap;
   u8 first = __builtin_ffs(bmp);
   ASSERT(first != 0);

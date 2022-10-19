@@ -24,8 +24,8 @@
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
 
-#define foreach_vcdp_lookup_icmp_error                                         \
-  _(NO_SESSION, "no session")                                                  \
+#define foreach_vcdp_lookup_icmp_error                                                                                 \
+  _(NO_SESSION, "no session")                                                                                          \
   _(INVALID_INNER_PKT, "invalid inner packet")
 
 typedef enum {
@@ -55,22 +55,21 @@ typedef struct {
 } vcdp_lookup_icmp_trace_t;
 
 static u8 *
-format_vcdp_lookup_icmp_trace(u8 *s, va_list *args) {
+format_vcdp_lookup_icmp_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
-  vcdp_lookup_icmp_trace_t __clib_unused *t =
-    va_arg(*args, vcdp_lookup_icmp_trace_t *);
+  vcdp_lookup_icmp_trace_t __clib_unused *t = va_arg(*args, vcdp_lookup_icmp_trace_t *);
   s = format(s, "%v:", node->name);
   return s;
 }
 
 static_always_inline uword
-vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
-                        vlib_frame_t *frame, u8 is_ipv6) {
+vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, u8 is_ipv6)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
@@ -96,8 +95,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     while (n_left) {
       /* Advance the current buffer */
       cd[0] = b[0]->current_data;
-      b[0]->current_data =
-        vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
+      b[0]->current_data = vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
       vcdp_calc_key_v4(b[0], b[0]->flow_id, k4, lv, h, l4o, 1);
       b[0]->current_data = cd[0];
 
@@ -113,8 +111,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     while (n_left) {
       /* Advance the current buffer */
       cd[0] = b[0]->current_data;
-      b[0]->current_data =
-        vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
+      b[0]->current_data = vnet_buffer(b[0])->l4_hdr_offset + 8 /* ICMP header + unused field */;
       vcdp_calc_key_v6(b[0], b[0]->flow_id, k6, lv, h, l4o, 1);
       b[0]->current_data = cd[0];
 
@@ -146,8 +143,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       clib_bihash_kv_24_8_t kv4;
 
       if (lv[0] & VCDP_LV_TO_SP) {
-        vlib_node_increment_counter(
-          vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_INVALID_INNER_PKT, 1);
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_INVALID_INNER_PKT, 1);
         lbi[0] = bi[0];
         lni[0] = VCDP_LOOKUP_ICMP_NEXT_DROP;
         lhs[0] = false;
@@ -161,8 +157,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       clib_memcpy(&kv4.key, k4, 24);
       if (clib_bihash_search_inline_with_hash_24_8(&vcdp->table4, h[0], &kv4)) {
         /* TODO: not drop? */
-        vlib_node_increment_counter(vm, node->node_index,
-                                    VCDP_LOOKUP_ICMP_ERROR_NO_SESSION, 1);
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_NO_SESSION, 1);
         lbi[0] = bi[0];
         lni[0] = VCDP_LOOKUP_ICMP_NEXT_DROP;
         lhs[0] = false;
@@ -218,8 +213,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       clib_bihash_kv_48_8_t kv6;
 
       if (lv[0] & VCDP_LV_TO_SP) {
-        vlib_node_increment_counter(
-          vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_INVALID_INNER_PKT, 1);
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_INVALID_INNER_PKT, 1);
         lbi[0] = bi[0];
         lni[0] = VCDP_LOOKUP_ICMP_NEXT_DROP;
         lhs[0] = false;
@@ -233,8 +227,7 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       clib_memcpy(&kv6.key, k6, 48);
       if (clib_bihash_search_inline_with_hash_48_8(&vcdp->table6, h[0], &kv6)) {
         /* TODO: not drop? */
-        vlib_node_increment_counter(vm, node->node_index,
-                                    VCDP_LOOKUP_ICMP_ERROR_NO_SESSION, 1);
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ICMP_ERROR_NO_SESSION, 1);
         lbi[0] = bi[0];
         lni[0] = VCDP_LOOKUP_ICMP_NEXT_DROP;
         lhs[0] = false;
@@ -302,25 +295,20 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       n_left_local -= 1;
       b += 1;
     }
-    vlib_buffer_enqueue_to_next(vm, node, local_buffer_indices,
-                                local_next_indices, n);
+    vlib_buffer_enqueue_to_next(vm, node, local_buffer_indices, local_next_indices, n);
   }
 
   if (hbi - handoff_buffer_indices)
-    vlib_buffer_enqueue_to_thread(
-      vm, node,
-      is_ipv6 ? vcdp->icmp6_error_frame_queue_index :
-                vcdp->icmp4_error_frame_queue_index,
-      handoff_buffer_indices, handoff_thread_indices,
-      hbi - handoff_buffer_indices, 1);
+    vlib_buffer_enqueue_to_thread(vm, node,
+                                  is_ipv6 ? vcdp->icmp6_error_frame_queue_index : vcdp->icmp4_error_frame_queue_index,
+                                  handoff_buffer_indices, handoff_thread_indices, hbi - handoff_buffer_indices, 1);
 
   if (node->flags & VLIB_NODE_FLAG_TRACE) {
     n_left = frame->n_vectors;
     b = bufs;
     while (n_left) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_lookup_icmp_trace_t *t =
-          vlib_add_trace(vm, node, b[0], sizeof(*t));
+        vcdp_lookup_icmp_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
       }
       b += 1;
       n_left -= 1;
@@ -331,43 +319,43 @@ vcdp_lookup_icmp_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_icmp_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_lookup_icmp_inline(vm, node, frame, 0 /* is ipv6 */);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip6_icmp_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_lookup_icmp_inline(vm, node, frame, 1 /* is ipv6 */);
 }
 
-VLIB_REGISTER_NODE(vcdp_lookup_ip4_icmp_node) = {
-  .name = "vcdp-lookup-ip4-icmp",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_lookup_icmp_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_lookup_ip4_icmp_node) = {.name = "vcdp-lookup-ip4-icmp",
+                                                 .vector_size = sizeof(u32),
+                                                 .format_trace = format_vcdp_lookup_icmp_trace,
+                                                 .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_lookup_icmp_error_strings),
-  .error_strings = vcdp_lookup_icmp_error_strings,
-  .next_nodes =
-    {
+                                                 .n_errors = ARRAY_LEN(vcdp_lookup_icmp_error_strings),
+                                                 .error_strings = vcdp_lookup_icmp_error_strings,
+                                                 .next_nodes =
+                                                   {
 #define _(a, b) [VCDP_LOOKUP_ICMP_NEXT_##a] = (b),
-      foreach_vcdp_lookup_icmp_next
+                                                     foreach_vcdp_lookup_icmp_next
 #undef _
-    },
-  .n_next_nodes = VCDP_LOOKUP_ICMP_N_NEXT};
+                                                   },
+                                                 .n_next_nodes = VCDP_LOOKUP_ICMP_N_NEXT};
 
-VLIB_REGISTER_NODE(vcdp_lookup_ip6_icmp_node) = {
-  .name = "vcdp-lookup-ip6-icmp",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_lookup_icmp_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_lookup_ip6_icmp_node) = {.name = "vcdp-lookup-ip6-icmp",
+                                                 .vector_size = sizeof(u32),
+                                                 .format_trace = format_vcdp_lookup_icmp_trace,
+                                                 .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_lookup_icmp_error_strings),
-  .error_strings = vcdp_lookup_icmp_error_strings,
-  .next_nodes =
-    {
+                                                 .n_errors = ARRAY_LEN(vcdp_lookup_icmp_error_strings),
+                                                 .error_strings = vcdp_lookup_icmp_error_strings,
+                                                 .next_nodes =
+                                                   {
 #define _(a, b) [VCDP_LOOKUP_ICMP_NEXT_##a] = (b),
-      foreach_vcdp_lookup_icmp_next
+                                                     foreach_vcdp_lookup_icmp_next
 #undef _
-    },
-  .n_next_nodes = VCDP_LOOKUP_ICMP_N_NEXT};
+                                                   },
+                                                 .n_next_nodes = VCDP_LOOKUP_ICMP_N_NEXT};

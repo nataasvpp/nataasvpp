@@ -20,12 +20,14 @@ typedef struct {
 } vcdp_tunnel_trace_t;
 
 static inline u8 *
-format_vcdp_tunnel_trace(u8 *s, va_list *args) {
+format_vcdp_tunnel_trace(u8 *s, va_list *args)
+{
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
   vcdp_tunnel_trace_t *t = va_arg(*args, vcdp_tunnel_trace_t *);
 
-  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d", t->is_encap ? "encap" : "decap", t->tunnel_index, t->tenant_index);
+  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d", t->is_encap ? "encap" : "decap", t->tunnel_index,
+             t->tenant_index);
   return s;
 }
 
@@ -36,9 +38,9 @@ typedef enum {
   VCDP_TUNNEL_INPUT_N_NEXT
 } vcdp_tunnel_input_next_t;
 
-#define foreach_vcdp_tunnel_input_error                                        \
-  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")        \
-  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                               \
+#define foreach_vcdp_tunnel_input_error                                                                                \
+  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")                                                \
+  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                                                                       \
   _(NOT_IP, not_ip, INFO, "not ip packet")
 
 // Error counters
@@ -51,13 +53,16 @@ typedef enum {
 
 // Graph node for VXLAN and Geneve tunnel decap
 static inline uword
-vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   u32 n_left_from, *from;
   u16 nexts[VLIB_FRAME_SIZE] = {0}, *next = nexts;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_tenant_t *tenant;
-  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0}, *tunnel_idx = tunnel_indicies; // Used only for tracing
-  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0}, *tenant_idx = tenant_indicies; // Used only for tracing
+  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0},
+      *tunnel_idx = tunnel_indicies; // Used only for tracing
+  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0},
+      *tenant_idx = tenant_indicies; // Used only for tracing
 
   from = vlib_frame_vector_args(frame);
   n_left_from = frame->n_vectors;
@@ -71,17 +76,14 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     // No support for reassembly so pass-through for non-first fragments
     ip4_header_t *ip = (ip4_header_t *) vlib_buffer_get_current(b[0]);
     u16 min_lookup_bytes = ip4_header_bytes(ip) + sizeof(udp_header_t);
-    if (vlib_buffer_has_space(b[0], min_lookup_bytes) == 0 ||
-        ip4_is_fragment(ip)) {
+    if (vlib_buffer_has_space(b[0], min_lookup_bytes) == 0 || ip4_is_fragment(ip)) {
       goto next;
     }
 
     udp_header_t *udp = ip4_next_header(ip);
     u32 context_id = 0;
     u64 value;
-    int rv =
-      vcdp_tunnel_lookup(context_id, ip->dst_address, ip->src_address,
-                                ip->protocol, 0, udp->dst_port, &value);
+    int rv = vcdp_tunnel_lookup(context_id, ip->dst_address, ip->src_address, ip->protocol, 0, udp->dst_port, &value);
     if (rv != 0) {
       // Silently ignore lookup failures, might not have been a tunnel packet.
       goto next;
@@ -95,8 +97,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     switch (t->method) {
 
     case VCDP_TUNNEL_GENEVE_L3:
-      bytes_to_inner_ip =
-        ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(geneve_header_t);
+      bytes_to_inner_ip = ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(geneve_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
         goto next;
@@ -114,8 +115,8 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
       break;
 
     case VCDP_TUNNEL_VXLAN_DUMMY_L2:
-      bytes_to_inner_ip = ip4_header_bytes(ip) + sizeof(udp_header_t) +
-                          sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
+      bytes_to_inner_ip =
+        ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
         goto next;
@@ -198,9 +199,9 @@ typedef enum {
   VCDP_TUNNEL_OUTPUT_N_NEXT
 } vcdp_tunnel_output_next_t;
 
-#define foreach_vcdp_tunnel_output_error                                       \
-  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")        \
-  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                               \
+#define foreach_vcdp_tunnel_output_error                                                                               \
+  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")                                                \
+  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                                                                       \
   _(NOT_IP, not_ip, INFO, "not ip packet")
 
 // Error counters
@@ -212,7 +213,8 @@ typedef enum {
 } vcdp_tunnel_output_error_t;
 
 static void
-vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b) {
+vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b)
+{
   ip4_header_t *ip;
   udp_header_t *udp;
 
@@ -225,11 +227,14 @@ vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b) {
   // TODO: udp->src_port = ip4_compute_flow_hash (b);
 }
 
-static inline uword 
-vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+static inline uword
+vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
-  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0}, *tunnel_idx = tunnel_indicies; // Used only for tracing
-  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0}, *tenant_idx = tenant_indicies; // Used only for tracing
+  u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0},
+      *tunnel_idx = tunnel_indicies; // Used only for tracing
+  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0},
+      *tenant_idx = tenant_indicies; // Used only for tracing
 
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -251,8 +256,7 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
       to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_DROP;
       goto done;
     }
-    b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID |
-                    VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
+    b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID | VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
     vnet_buffer(b[0])->oflags |= VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
     vlib_buffer_advance(b[0], -t->encap_size);
     ip4_header_t *ip = vlib_buffer_get_current(b[0]);
@@ -268,7 +272,6 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     n_left--;
     tunnel_idx += 1;
     tenant_idx += 1;
-
   }
 
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);

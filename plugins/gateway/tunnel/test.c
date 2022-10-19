@@ -11,20 +11,21 @@ vcdp_service_main_t vcdp_service_main;
 vcdp_main_t vcdp_main;
 
 static int
-session_walk(clib_bihash_kv_16_8_t *kvp, void *arg) {
+session_walk(clib_bihash_kv_16_8_t *kvp, void *arg)
+{
   printf("Walking sessions table %lx\n", kvp->value);
   return 1;
 }
 
 /* Synthetic value for vnet_feature_next  */
-u16 NEXT_PASSTHROUGH=4242;
+u16 NEXT_PASSTHROUGH = 4242;
 
 u32 *results_bi = 0; /* global vector of result buffers */
 u16 *results_next = 0;
 
-
 static int
-fill_packets(vlib_main_t *vm, vlib_buffer_t *b, int n, char *test) {
+fill_packets(vlib_main_t *vm, vlib_buffer_t *b, int n, char *test)
+{
   b->flags |= VLIB_BUFFER_IS_TRACED;
 
   ip4_header_t *ip = (ip4_header_t *) vlib_buffer_get_current(b);
@@ -59,44 +60,50 @@ u32 *buffers_vector = 0;
 vlib_node_runtime_t *node;
 extern vlib_node_registration_t vcdp_tunnel_input_node;
 
-int vcdp_tunnel_input_node_fn (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame);
-static u32 *buffer_init(u32 *vector, int count) {
-    int i;
-    for (i = 0; i < count; i++) {
-        vec_add1(vector, i);
-    }
-    return vector;
+int
+vcdp_tunnel_input_node_fn(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame);
+static u32 *
+buffer_init(u32 *vector, int count)
+{
+  int i;
+  for (i = 0; i < count; i++) {
+    vec_add1(vector, i);
+  }
+  return vector;
 }
 
 /* Gather output packets */
 #define vlib_buffer_enqueue_to_next test_vlib_buffer_enqueue_to_next
-void test_vlib_buffer_enqueue_to_next(vlib_main_t *vm,
-                                      vlib_node_runtime_t *node, u32 *buffers,
-                                      u16 *nexts, uword count) {
-    vec_add(results_next, nexts, count);
-    vec_add(results_bi, buffers, count);
+void
+test_vlib_buffer_enqueue_to_next(vlib_main_t *vm, vlib_node_runtime_t *node, u32 *buffers, u16 *nexts, uword count)
+{
+  vec_add(results_next, nexts, count);
+  vec_add(results_bi, buffers, count);
 }
 
 #define vlib_get_buffers test_vlib_get_buffers
-void test_vlib_get_buffers(vlib_main_t *vm, u32 *bi, vlib_buffer_t **b,
-                           int count) {
-    int i;
-    for (i = 0; i < count; i++) {
-        b[i] = (vlib_buffer_t *)&buffers[bi[i]];
-    }
+void
+test_vlib_get_buffers(vlib_main_t *vm, u32 *bi, vlib_buffer_t **b, int count)
+{
+  int i;
+  for (i = 0; i < count; i++) {
+    b[i] = (vlib_buffer_t *) &buffers[bi[i]];
+  }
 }
 
-vlib_buffer_t *test_vlib_get_buffer(u32 bi) {
-    return (vlib_buffer_t *)&buffers[bi];
+vlib_buffer_t *
+test_vlib_get_buffer(u32 bi)
+{
+  return (vlib_buffer_t *) &buffers[bi];
 }
 /* Must be included here to allow the above functions to override */
 #include "node.h"
 
 // Test tunnel-input
 int
-test_tunnel_input(vlib_main_t *vm) {
-  u32 node_index = vlib_register_node(vm, &vcdp_tunnel_input_node, "%s",
-                                      vcdp_tunnel_input_node.name);
+test_tunnel_input(vlib_main_t *vm)
+{
+  u32 node_index = vlib_register_node(vm, &vcdp_tunnel_input_node, "%s", vcdp_tunnel_input_node.name);
   node = vlib_node_get_runtime(vm, node_index);
   assert(node);
 
@@ -113,10 +120,12 @@ test_tunnel_input(vlib_main_t *vm) {
   // Validate results
   return 0;
 }
-clib_error_t *vlib_stats_init (vlib_main_t *vm);
+clib_error_t *
+vlib_stats_init(vlib_main_t *vm);
 
 int
-main(int argc, char **argv) {
+main(int argc, char **argv)
+{
   clib_mem_init(0, 3ULL << 30);
   vlib_main_init();
   vlib_main_t *vm = vlib_get_first_main();
@@ -130,8 +139,7 @@ main(int argc, char **argv) {
   // Create tunnel
   ip_address_t src = {.version = AF_IP4, .ip.ip4 = {{1}}};
   ip_address_t dst = {.version = AF_IP4, .ip.ip4 = {{1}}};
-  int rv = vcdp_tunnel_create("tunnel1", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src,
-                              &dst, 0, 4278, 0);
+  int rv = vcdp_tunnel_create("tunnel1", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0);
 
   assert(rv == 0 && "creating tunnel");
   t = vcdp_tunnel_lookup_by_uuid("tunnel1");
@@ -143,13 +151,11 @@ main(int argc, char **argv) {
 
   assert(rv == 0 && "Lookup by session parameters");
 
-  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst,
-                          0, 4278, 0);
+  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0);
 
   assert(rv == -1 && "creating duplicate tunnel");
 
-  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst,
-                          0, 4279, 0);
+  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4279, 0);
 
   assert(rv == 0 && "creating tunnel 2");
 
@@ -161,7 +167,7 @@ main(int argc, char **argv) {
   // dump session table
   clib_bihash_foreach_key_value_pair_16_8(&vcdp_tunnel_main.tunnels_hash, session_walk, 0);
 
-  //test_tunnel_input(vm);
+  // test_tunnel_input(vm);
 
   return 0;
 }

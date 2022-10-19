@@ -45,26 +45,26 @@ typedef struct {
 } sample_terminal_trace_t;
 
 static u8 *
-format_sample_terminal_trace(u8 *s, va_list *args) {
+format_sample_terminal_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   sample_terminal_trace_t *t = va_arg(*args, sample_terminal_trace_t *);
 
-  s = format(s, "sample-terminal-drop: flow-id %u (session %u, %s)", t->flow_id,
-             t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format(s, "sample-terminal-drop: flow-id %u (session %u, %s)", t->flow_id, t->flow_id >> 1,
+             t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 
 VLIB_NODE_FN(sample_terminal_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
 
-  vlib_buffer_enqueue_to_single_next(vm, node, from, SAMPLE_TERMINAL_NEXT_DROP,
-                                     n_left);
-  vlib_node_increment_counter(vm, node->node_index, SAMPLE_TERMINAL_ERROR_DROP,
-                              n_left);
+  vlib_buffer_enqueue_to_single_next(vm, node, from, SAMPLE_TERMINAL_NEXT_DROP, n_left);
+  vlib_node_increment_counter(vm, node->node_index, SAMPLE_TERMINAL_ERROR_DROP, n_left);
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
     vlib_get_buffers(vm, from, bufs, n_left);
@@ -102,26 +102,25 @@ typedef struct {
 } sample_non_terminal_trace_t;
 
 static u8 *
-format_sample_non_terminal_trace(u8 *s, va_list *args) {
+format_sample_non_terminal_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   sample_non_terminal_trace_t *t = va_arg(*args, sample_non_terminal_trace_t *);
 
-  s = format(
-    s, "sample-non-terminal: flow-id %u (session %u, %s) new_state: %U",
-    t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
-    format_vcdp_session_state, t->new_state);
+  s = format(s, "sample-non-terminal: flow-id %u (session %u, %s) new_state: %U", t->flow_id, t->flow_id >> 1,
+             t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_session_state, t->new_state);
   return s;
 }
 
 VLIB_NODE_FN(sample_non_terminal_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_main_t *vcdp = &vcdp_main;
 
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 *from = vlib_frame_vector_args(frame);
@@ -154,8 +153,7 @@ VLIB_NODE_FN(sample_non_terminal_node)
     b = bufs;
     for (int i = 0; i < n_left; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        sample_non_terminal_trace_t *t =
-          vlib_add_trace(vm, node, b[0], sizeof(*t));
+        sample_non_terminal_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
         u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
         vcdp_session_t *session = vcdp_session_at_index(ptd, session_idx);
         u16 state = session->state;
@@ -173,22 +171,21 @@ VLIB_NODE_FN(sample_non_terminal_node)
 /* This service is a terminal service, i.e., its next nodes are outside
    of vcdp (here for example, error-drop) */
 
-VLIB_REGISTER_NODE(sample_terminal_node) = {
-  .name = "sample-terminal",
-  .vector_size = sizeof(u32),
-  .format_trace = format_sample_terminal_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(sample_terminal_node) = {.name = "sample-terminal",
+                                            .vector_size = sizeof(u32),
+                                            .format_trace = format_sample_terminal_trace,
+                                            .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(sample_terminal_error_strings),
-  .error_strings = sample_terminal_error_strings,
+                                            .n_errors = ARRAY_LEN(sample_terminal_error_strings),
+                                            .error_strings = sample_terminal_error_strings,
 
-  .n_next_nodes = SAMPLE_TERMINAL_N_NEXT,
-  .next_nodes =
-    {
+                                            .n_next_nodes = SAMPLE_TERMINAL_N_NEXT,
+                                            .next_nodes =
+                                              {
 #define _(n, x) [SAMPLE_TERMINAL_NEXT_##n] = x,
-      foreach_sample_terminal_next
+                                                foreach_sample_terminal_next
 #undef _
-    }
+                                              }
 
 };
 
@@ -213,8 +210,7 @@ VLIB_REGISTER_NODE(sample_non_terminal_node) = {
 
 };
 
-VCDP_SERVICE_DEFINE(sample_non_terminal) = {
-  .node_name = "sample-non-terminal",
-  .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop"),
-  .is_terminal = 0};
+VCDP_SERVICE_DEFINE(sample_non_terminal) = {.node_name = "sample-non-terminal",
+                                            .runs_before = VCDP_SERVICES(0),
+                                            .runs_after = VCDP_SERVICES("vcdp-drop"),
+                                            .is_terminal = 0};

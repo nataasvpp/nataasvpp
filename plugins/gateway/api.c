@@ -18,9 +18,9 @@
 
 // NOT IMPLEMENTED
 static void
-vl_api_vcdp_tunnel_create_t_handler(
-  vl_api_vcdp_tunnel_create_t *mp) {
-    gw_main_t *gw = &gateway_main;
+vl_api_vcdp_tunnel_create_t_handler(vl_api_vcdp_tunnel_create_t *mp)
+{
+  gw_main_t *gw = &gateway_main;
   vl_api_vcdp_tunnel_create_reply_t *rmp;
   int rv = 0;
   REPLY_MACRO(VL_API_VCDP_TUNNEL_CREATE_REPLY);
@@ -28,9 +28,9 @@ vl_api_vcdp_tunnel_create_t_handler(
 
 // NOT IMPLEMENTED
 static void
-vl_api_vcdp_tunnel_delete_t_handler(
-  vl_api_vcdp_tunnel_delete_t *mp) {
-gw_main_t *gw = &gateway_main;
+vl_api_vcdp_tunnel_delete_t_handler(vl_api_vcdp_tunnel_delete_t *mp)
+{
+  gw_main_t *gw = &gateway_main;
   vl_api_vcdp_tunnel_delete_reply_t *rmp;
   int rv = 0;
   REPLY_MACRO(VL_API_VCDP_TUNNEL_DELETE_REPLY);
@@ -38,7 +38,8 @@ gw_main_t *gw = &gateway_main;
 
 #include <gateway/gateway.api.c>
 static clib_error_t *
-vcdp_gateway_api_hookup(vlib_main_t *vm) {
+vcdp_gateway_api_hookup(vlib_main_t *vm)
+{
   gw_main_t *gw = &gateway_main;
   gw->msg_id_base = setup_message_id_table();
   return 0;

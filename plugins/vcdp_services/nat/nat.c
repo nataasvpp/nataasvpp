@@ -5,8 +5,8 @@
 #include <vppinfra/pool.h>
 
 clib_error_t *
-nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index,
-                                  u32 tenant_id, u8 unset) {
+nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index, u32 tenant_id, u8 unset)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   vnet_main_t *vnm = vnet_get_main();
@@ -20,23 +20,19 @@ nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index,
   config = nat->tenant_idx_by_sw_if_idx + sw_if_index;
 
   if (config[0] == NAT_INVALID_TENANT_IDX && unset)
-    return clib_error_return(
-      0, "Outside tenant %d is not configured on interface %U", tenant_id,
-      format_vnet_sw_if_index_name, vnm, sw_if_index);
-
-  if (config[0] != NAT_INVALID_TENANT_IDX && !unset)
-    return clib_error_return(0, "Interface %U is already configured",
+    return clib_error_return(0, "Outside tenant %d is not configured on interface %U", tenant_id,
                              format_vnet_sw_if_index_name, vnm, sw_if_index);
 
+  if (config[0] != NAT_INVALID_TENANT_IDX && !unset)
+    return clib_error_return(0, "Interface %U is already configured", format_vnet_sw_if_index_name, vnm, sw_if_index);
+
   if (!unset) {
-    vnet_feature_enable_disable("ip4-unicast", "nat-external-input",
-                                sw_if_index, 1, 0, 0);
+    vnet_feature_enable_disable("ip4-unicast", "nat-external-input", sw_if_index, 1, 0, 0);
     config[0] = kv.value;
   }
 
   else {
-    vnet_feature_enable_disable("ip4-unicast", "nat-external-input",
-                                sw_if_index, 0, 0, 0);
+    vnet_feature_enable_disable("ip4-unicast", "nat-external-input", sw_if_index, 0, 0, 0);
     config[0] = NAT_INVALID_TENANT_IDX;
   }
 
@@ -44,17 +40,15 @@ nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index,
 }
 
 clib_error_t *
-nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
-                       ip4_address_t *addr) {
+nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del, ip4_address_t *addr)
+{
   u16 alloc_pool_idx;
   uword *val = hash_get(nat->alloc_pool_idx_by_id, alloc_pool_id);
 
   if (!val && is_del)
-    return clib_error_return(0, "Allocation pool %d does not exist",
-                             alloc_pool_id);
+    return clib_error_return(0, "Allocation pool %d does not exist", alloc_pool_id);
   if (val && !is_del)
-    return clib_error_return(0, "Existing allocation pool with id %d",
-                             alloc_pool_id);
+    return clib_error_return(0, "Existing allocation pool with id %d", alloc_pool_id);
 
   if (is_del) {
     pool_put_index(nat->alloc_pool, val[0]);
@@ -81,12 +75,11 @@ nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
 }
 
 clib_error_t *
-nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id,
-                    u32 table_id, u32 alloc_pool_id, u8 unset) {
+nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id, u32 table_id, u32 alloc_pool_id, u8 unset)
+{
   ip4_main_t *im = &ip4_main;
   uword *fib_index = hash_get(im->fib_index_by_table_id, table_id);
-  uword *out_alloc_pool_idx =
-    hash_get(nat->alloc_pool_idx_by_id, alloc_pool_id);
+  uword *out_alloc_pool_idx = hash_get(nat->alloc_pool_idx_by_id, alloc_pool_id);
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   vcdp_main_t *vcdp = &vcdp_main;
   nat_tenant_t *tenant;
@@ -136,7 +129,8 @@ nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id,
 }
 
 static clib_error_t *
-nat_init(vlib_main_t *vm) {
+nat_init(vlib_main_t *vm)
+{
   nat_main_t *nat = &nat_main;
   nat_per_thread_data_t *ptd;
   uword n_threads = vlib_get_n_threads();
@@ -151,7 +145,8 @@ nat_init(vlib_main_t *vm) {
 VLIB_INIT_FUNCTION(nat_init);
 
 clib_error_t *
-nat_add_del_sw_interface(vnet_main_t *vnm, u32 sw_if_index, u32 is_add) {
+nat_add_del_sw_interface(vnet_main_t *vnm, u32 sw_if_index, u32 is_add)
+{
   nat_main_t *nat = &nat_main;
   uword old_size = vec_len(nat->tenant_idx_by_sw_if_idx);
   if (sw_if_index >= old_size) {

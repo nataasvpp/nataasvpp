@@ -11,11 +11,11 @@ typedef struct {
 } vcdp_dummy_dot1q_input_trace_t;
 
 static u8 *
-format_vcdp_dummy_dot1q_input_trace(u8 *s, va_list *args) {
+format_vcdp_dummy_dot1q_input_trace(u8 *s, va_list *args)
+{
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
-  CLIB_UNUSED(vcdp_dummy_dot1q_input_trace_t * t) =
-    va_arg(*args, vcdp_dummy_dot1q_input_trace_t *);
+  CLIB_UNUSED(vcdp_dummy_dot1q_input_trace_t * t) = va_arg(*args, vcdp_dummy_dot1q_input_trace_t *);
 
   /*s = format (s, "snort-enq: sw_if_index %d, next index %d\n",
      t->sw_if_index, t->next_index);*/
@@ -23,8 +23,8 @@ format_vcdp_dummy_dot1q_input_trace(u8 *s, va_list *args) {
   return s;
 }
 
-#define foreach_vcdp_dummy_dot1q_input_next                                    \
-  _(LOOKUP_IP4, "vcdp-lookup-ip4")                                             \
+#define foreach_vcdp_dummy_dot1q_input_next                                                                            \
+  _(LOOKUP_IP4, "vcdp-lookup-ip4")                                                                                     \
   _(LOOKUP_IP6, "vcdp-lookup-ip6")
 #define foreach_vcdp_dummy_dot1q_input_error _(NOERROR, "No error")
 
@@ -56,11 +56,11 @@ typedef struct {
 } vcdp_dummy_dot1q_output_trace_t;
 
 static u8 *
-format_vcdp_dummy_dot1q_output_trace(u8 *s, va_list *args) {
+format_vcdp_dummy_dot1q_output_trace(u8 *s, va_list *args)
+{
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
-  CLIB_UNUSED(vcdp_dummy_dot1q_output_trace_t * t) =
-    va_arg(*args, vcdp_dummy_dot1q_output_trace_t *);
+  CLIB_UNUSED(vcdp_dummy_dot1q_output_trace_t * t) = va_arg(*args, vcdp_dummy_dot1q_output_trace_t *);
 
   /*s = format (s, "snort-enq: sw_if_index %d, next index %d\n",
      t->sw_if_index, t->next_index);*/
@@ -68,8 +68,8 @@ format_vcdp_dummy_dot1q_output_trace(u8 *s, va_list *args) {
   return s;
 }
 
-#define foreach_vcdp_dummy_dot1q_output_next                                   \
-  _(LOOKUP_IP4, "vcdp-lookup-ip4")                                             \
+#define foreach_vcdp_dummy_dot1q_output_next                                                                           \
+  _(LOOKUP_IP4, "vcdp-lookup-ip4")                                                                                     \
   _(LOOKUP_IP6, "vcdp-lookup-ip6")
 #define foreach_vcdp_dummy_dot1q_output_error _(NOERROR, "No error")
 
@@ -94,9 +94,9 @@ typedef enum {
 } vcdp_dummy_dot1q_output_next_t;
 
 static_always_inline void
-process_one_pkt(vlib_main_t *vm, vcdp_main_t *vcdp,
-                vlib_combined_counter_main_t *cm, u32 thread_index,
-                vlib_buffer_t **b, u16 *current_next) {
+process_one_pkt(vlib_main_t *vm, vcdp_main_t *vcdp, vlib_combined_counter_main_t *cm, u32 thread_index,
+                vlib_buffer_t **b, u16 *current_next)
+{
   vcdp_tenant_t *tenant;
   clib_bihash_kv_8_8_t kv = {0};
   u8 *data = vlib_buffer_get_current(b[0]);
@@ -129,19 +129,16 @@ process_one_pkt(vlib_main_t *vm, vcdp_main_t *vcdp,
   vcdp_buffer(b[0])->tenant_index = tenant_idx;
   vnet_buffer(b[0])->l2_hdr_offset = b[0]->current_data;
   vnet_buffer(b[0])->l3_hdr_offset = b[0]->current_data + off;
-  b[0]->flags |=
-    VNET_BUFFER_F_L2_HDR_OFFSET_VALID | VNET_BUFFER_F_L3_HDR_OFFSET_VALID;
-  current_next[0] = type == ETHERNET_TYPE_IP4 ?
-                      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4 :
-                      VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6;
-  vlib_increment_combined_counter(cm, thread_index, tenant_idx, 1,
-                                  orig_len - off);
+  b[0]->flags |= VNET_BUFFER_F_L2_HDR_OFFSET_VALID | VNET_BUFFER_F_L3_HDR_OFFSET_VALID;
+  current_next[0] =
+    type == ETHERNET_TYPE_IP4 ? VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP4 : VCDP_DUMMY_DOT1Q_INPUT_NEXT_LOOKUP_IP6;
+  vlib_increment_combined_counter(cm, thread_index, tenant_idx, 1, orig_len - off);
   vlib_buffer_advance(b[0], off);
 }
 
 static_always_inline uword
-vcdp_dummy_dot1q_input_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
-                              vlib_frame_t *frame) {
+vcdp_dummy_dot1q_input_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   /*
    * use VNI as tenant ID
    * tenant_id -> tenant index
@@ -155,8 +152,7 @@ vcdp_dummy_dot1q_input_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
   u32 thread_index = vlib_get_thread_index();
-  vlib_combined_counter_main_t *cm =
-    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_INCOMING];
+  vlib_combined_counter_main_t *cm = &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_INCOMING];
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
   current_next = next_indices;
@@ -172,7 +168,8 @@ vcdp_dummy_dot1q_input_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
 }
 
 VLIB_NODE_FN(vcdp_dummy_dot1q_input_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_dummy_dot1q_input_inline(vm, node, frame);
 }
 
@@ -199,10 +196,10 @@ VNET_FEATURE_INIT(vcdp_dummy_dot1q_input_feat, static) = {
 
 #define VCDP_PREFETCH_SIZE 8
 VLIB_NODE_FN(vcdp_dummy_dot1q_output_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vcdp_main_t *vcdp = &vcdp_main;
-  vlib_combined_counter_main_t *cm =
-    &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_OUTGOING];
+  vlib_combined_counter_main_t *cm = &vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_OUTGOING];
   u32 thread_index = vlib_get_thread_index();
   u16 tenant_idx[VCDP_PREFETCH_SIZE];
   u32 orig_len[VCDP_PREFETCH_SIZE];
@@ -223,8 +220,7 @@ VLIB_NODE_FN(vcdp_dummy_dot1q_output_node)
     for (int i = 0; i < VCDP_PREFETCH_SIZE; i++) {
       orig_len[i] = vlib_buffer_length_in_chain(vm, b[i]);
       tenant_idx[i] = vcdp_buffer(b[i])->tenant_index;
-      vlib_increment_combined_counter(cm, thread_index, tenant_idx[i], 1,
-                                      orig_len[i]);
+      vlib_increment_combined_counter(cm, thread_index, tenant_idx[i], 1, orig_len[i]);
       l2_len[i] = vnet_buffer(b[i])->l3_hdr_offset;
       l2_len[i] -= vnet_buffer(b[i])->l2_hdr_offset;
       vlib_buffer_advance(b[i], -l2_len[i]);
@@ -254,22 +250,20 @@ VLIB_NODE_FN(vcdp_dummy_dot1q_output_node)
 }
 #undef VCDP_PREFETCH_SIZE
 
-VLIB_REGISTER_NODE(vcdp_dummy_dot1q_output_node) = {
-  .name = "vcdp-dummy-dot1q-output",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_dummy_dot1q_output_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_dummy_dot1q_output_node) = {.name = "vcdp-dummy-dot1q-output",
+                                                    .vector_size = sizeof(u32),
+                                                    .format_trace = format_vcdp_dummy_dot1q_output_trace,
+                                                    .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_dummy_dot1q_output_error_strings),
-  .error_strings = vcdp_dummy_dot1q_output_error_strings,
+                                                    .n_errors = ARRAY_LEN(vcdp_dummy_dot1q_output_error_strings),
+                                                    .error_strings = vcdp_dummy_dot1q_output_error_strings,
 
-  .sibling_of = "vcdp-dummy-dot1q-input"
+                                                    .sibling_of = "vcdp-dummy-dot1q-input"
 
 };
 
 VCDP_SERVICE_DEFINE(dummy_dot1q_output) = {
   .node_name = "vcdp-dummy-dot1q-output",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle",
-                              "vcdp-tcp-check"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 1};

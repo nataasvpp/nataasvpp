@@ -23,10 +23,10 @@ typedef struct {
   u32 handle;
 } vcdp_session_timer_t;
 
-#define foreach_vcdp_timeout                                                   \
-  _(EMBRYONIC, 5, "embryonic")                                                 \
-  _(ESTABLISHED, 120, "established")                                           \
-  _(TCP_ESTABLISHED, 3600, "tcp-established")                                  \
+#define foreach_vcdp_timeout                                                                                           \
+  _(EMBRYONIC, 5, "embryonic")                                                                                         \
+  _(ESTABLISHED, 120, "established")                                                                                   \
+  _(TCP_ESTABLISHED, 3600, "tcp-established")                                                                          \
   _(SECURITY, 30, "security")
 
 typedef enum {
@@ -44,49 +44,48 @@ typedef enum {
 #define VCDP_TIMER_INTERVAL        ((f64) 1.0) /*in seconds*/
 
 static_always_inline void
-vcdp_tw_init(vcdp_tw_t *tw, void *expired_timer_callback, f64 timer_interval,
-             u32 max_expirations) {
-  tw_timer_wheel_init_2t_1w_2048sl(tw, expired_timer_callback, timer_interval,
-                                   max_expirations);
+vcdp_tw_init(vcdp_tw_t *tw, void *expired_timer_callback, f64 timer_interval, u32 max_expirations)
+{
+  tw_timer_wheel_init_2t_1w_2048sl(tw, expired_timer_callback, timer_interval, max_expirations);
 }
 
 static_always_inline void
-vcdp_session_timer_start(vcdp_tw_t *tw, vcdp_session_timer_t *timer,
-                         u32 session_index, f64 now, u32 ticks) {
+vcdp_session_timer_start(vcdp_tw_t *tw, vcdp_session_timer_t *timer, u32 session_index, f64 now, u32 ticks)
+{
   timer->handle = vcdp_timer_start_internal(tw, session_index, 0, ticks);
   timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
 }
 
 static_always_inline void
-vcdp_session_timer_stop(vcdp_tw_t *tw, vcdp_session_timer_t *timer) {
+vcdp_session_timer_stop(vcdp_tw_t *tw, vcdp_session_timer_t *timer)
+{
   vcdp_timer_stop_internal(tw, timer->handle);
 }
 
 static_always_inline void
-vcdp_session_timer_update(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now,
-                          u32 ticks) {
+vcdp_session_timer_update(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now, u32 ticks)
+{
   timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
 }
 
 static_always_inline void
-vcdp_session_timer_update_maybe_past(vcdp_tw_t *tw, vcdp_session_timer_t *timer,
-                                     f64 now, u32 ticks) {
+vcdp_session_timer_update_maybe_past(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now, u32 ticks)
+{
   if (timer->next_expiration > now + (ticks * VCDP_TIMER_INTERVAL))
     vcdp_timer_update_internal(tw, timer->handle, ticks);
   timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
 }
 
 static_always_inline uword
-vec_reset_len_return(u32 *v) {
+vec_reset_len_return(u32 *v)
+{
   vec_reset_length(v);
   return 0;
 }
 
-#define vcdp_session_index_iterate_expired(ptd, s)                             \
-  for (u32 *s_ptr = (ptd)->expired_sessions;                                   \
-       ((s_ptr < vec_end(ptd->expired_sessions)) &&                            \
-        (((s) = s_ptr[0]) || 1)) ||                                            \
-       vec_reset_len_return((ptd)->expired_sessions);                          \
+#define vcdp_session_index_iterate_expired(ptd, s)                                                                     \
+  for (u32 *s_ptr = (ptd)->expired_sessions; ((s_ptr < vec_end(ptd->expired_sessions)) && (((s) = s_ptr[0]) || 1)) ||  \
+                                             vec_reset_len_return((ptd)->expired_sessions);                            \
        s_ptr++)
 
 #endif /* __included_vcdp_timer_h__ */

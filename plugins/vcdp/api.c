@@ -14,11 +14,11 @@
 #include <vlibapi/api_helper_macros.h>
 
 static void
-vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp) {
+vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
-  u32 context_id =
-    mp->context_id == ~0 ? tenant_id : clib_net_to_host_u32(mp->context_id);
+  u32 context_id = mp->context_id == ~0 ? tenant_id : clib_net_to_host_u32(mp->context_id);
   u8 is_del = mp->is_del;
   clib_error_t *err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, is_del);
   vl_api_vcdp_tenant_add_del_reply_t *rmp;
@@ -27,7 +27,8 @@ vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp) {
 }
 
 static void
-vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp) {
+vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u32 bitmap = 0;
@@ -37,8 +38,7 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp) {
   for (uword i = 0; i < mp->n_services; i++) {
     char *cstring = (char *) mp->services[i].data;
     unformat_input_t tmp;
-    unformat_init_string(&tmp, cstring,
-                         strnlen(cstring, sizeof(mp->services[0].data)));
+    unformat_init_string(&tmp, cstring, strnlen(cstring, sizeof(mp->services[0].data)));
     rv = unformat_user(&tmp, unformat_vcdp_service, &idx);
     unformat_free(&tmp);
     if (!rv) {
@@ -55,20 +55,21 @@ fail:
 }
 
 static void
-vl_api_vcdp_set_timeout_t_handler(vl_api_vcdp_set_timeout_t *mp) {
+vl_api_vcdp_set_timeout_t_handler(vl_api_vcdp_set_timeout_t *mp)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u32 timeout_id = clib_net_to_host_u32(mp->timeout_id);
   u32 timeout_value = clib_net_to_host_u32(mp->timeout_value);
-  clib_error_t *err =
-    vcdp_set_timeout(vcdp, tenant_id, timeout_id, timeout_value);
+  clib_error_t *err = vcdp_set_timeout(vcdp, tenant_id, timeout_id, timeout_value);
   vl_api_vcdp_set_timeout_reply_t *rmp;
   int rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_SET_TIMEOUT_REPLY);
 }
 
 static void
-vl_api_vcdp_set_sp_node_t_handler(vl_api_vcdp_set_sp_node_t *mp) {
+vl_api_vcdp_set_sp_node_t_handler(vl_api_vcdp_set_sp_node_t *mp)
+{
   vl_api_vcdp_set_sp_node_reply_t *rmp;
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
@@ -81,22 +82,22 @@ vl_api_vcdp_set_sp_node_t_handler(vl_api_vcdp_set_sp_node_t *mp) {
 }
 
 static void
-vl_api_vcdp_set_icmp_error_node_t_handler(
-  vl_api_vcdp_set_icmp_error_node_t *mp) {
+vl_api_vcdp_set_icmp_error_node_t_handler(vl_api_vcdp_set_icmp_error_node_t *mp)
+{
   vl_api_vcdp_set_icmp_error_node_reply_t *rmp;
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u8 is_ip6 = mp->is_ip6;
   u32 node_index = clib_net_to_host_u32(mp->node_index);
 
-  clib_error_t *err =
-    vcdp_set_icmp_error_node(vcdp, tenant_id, is_ip6, node_index);
+  clib_error_t *err = vcdp_set_icmp_error_node(vcdp, tenant_id, is_ip6, node_index);
   int rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_SET_ICMP_ERROR_NODE_REPLY);
 }
 
 static vl_api_vcdp_session_state_t
-vcdp_session_state_encode(vcdp_session_state_t x) {
+vcdp_session_state_encode(vcdp_session_state_t x)
+{
   switch (x) {
   case VCDP_SESSION_STATE_FSOL:
     return VCDP_API_SESSION_STATE_FSOL;
@@ -110,9 +111,9 @@ vcdp_session_state_encode(vcdp_session_state_t x) {
 };
 
 static void
-vcdp_send_session_details(vl_api_registration_t *rp, u32 context,
-                          u32 session_index, u32 thread_index,
-                          vcdp_session_t *session) {
+vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_index, u32 thread_index,
+                          vcdp_session_t *session)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vlib_main_t *vm = vlib_get_main();
   vl_api_vcdp_session_details_t *mp;
@@ -140,23 +141,17 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context,
   mp->protocol = ip_proto_encode(session->proto);
   mp->state = vcdp_session_state_encode(session->state);
   mp->remaining_time = clib_host_to_net_f64(remaining_time);
-  mp->forward_bitmap =
-    clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_FORWARD]);
-  mp->reverse_bitmap =
-    clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_REVERSE]);
+  mp->forward_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_FORWARD]);
+  mp->reverse_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_REVERSE]);
   mp->n_keys = n_keys;
   for (int i = 0; i < n_keys; i++) {
-    if ((i == 0 &&
-         session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
-        (i == 1 &&
-         session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
+    if ((i == 0 && session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
+        (i == 1 && session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
       vcdp_normalise_ip4_key(session, &skey.key4, i);
       vcdp_session_ip46_key_encode(&skey, IP46_TYPE_IP4, &mp->keys[i]);
     }
-    if ((i == 0 &&
-         session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6) ||
-        (i == 1 &&
-         session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)) {
+    if ((i == 0 && session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6) ||
+        (i == 1 && session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)) {
       vcdp_normalise_ip6_key(session, &skey.key6, i);
       vcdp_session_ip46_key_encode(&skey, IP46_TYPE_IP6, &mp->keys[i]);
     }
@@ -165,7 +160,8 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context,
 }
 
 static void
-vl_api_vcdp_session_dump_t_handler(vl_api_vcdp_session_dump_t *mp) {
+vl_api_vcdp_session_dump_t_handler(vl_api_vcdp_session_dump_t *mp)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
@@ -180,15 +176,14 @@ vl_api_vcdp_session_dump_t_handler(vl_api_vcdp_session_dump_t *mp) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     pool_foreach_index (session_index, ptd->sessions) {
       session = vcdp_session_at_index(ptd, session_index);
-      vcdp_send_session_details(rp, mp->context, session_index, thread_index,
-                                session);
+      vcdp_send_session_details(rp, mp->context, session_index, thread_index, session);
     }
   }
 }
 
 static void
-vcdp_send_tenant_details(vl_api_registration_t *rp, u32 context,
-                         u16 tenant_index, vcdp_tenant_t *tenant) {
+vcdp_send_tenant_details(vl_api_registration_t *rp, u32 context, u16 tenant_index, vcdp_tenant_t *tenant)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vl_api_vcdp_tenant_details_t *mp;
 
@@ -205,16 +200,15 @@ vcdp_send_tenant_details(vl_api_registration_t *rp, u32 context,
   mp->forward_bitmap = clib_host_to_net_u32(tenant->bitmaps[VCDP_FLOW_FORWARD]);
   mp->reverse_bitmap = clib_host_to_net_u32(tenant->bitmaps[VCDP_FLOW_REVERSE]);
   mp->n_timeout = clib_host_to_net_u32(VCDP_N_TIMEOUT);
-#define _(name, y, z)                                                          \
-  mp->timeout[VCDP_TIMEOUT_##name] =                                           \
-    clib_host_to_net_u32(tenant->timeouts[VCDP_TIMEOUT_##name]);
+#define _(name, y, z) mp->timeout[VCDP_TIMEOUT_##name] = clib_host_to_net_u32(tenant->timeouts[VCDP_TIMEOUT_##name]);
   foreach_vcdp_timeout
 #undef _
     vl_api_send_msg(rp, (u8 *) mp);
 }
 
 static void
-vl_api_vcdp_tenant_dump_t_handler(vl_api_vcdp_tenant_dump_t *mp) {
+vl_api_vcdp_tenant_dump_t_handler(vl_api_vcdp_tenant_dump_t *mp)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tenant_t *tenant;
   u16 tenant_index;
@@ -231,7 +225,8 @@ vl_api_vcdp_tenant_dump_t_handler(vl_api_vcdp_tenant_dump_t *mp) {
 
 #include <vcdp/vcdp.api.c>
 static clib_error_t *
-vcdp_plugin_api_hookup(vlib_main_t *vm) {
+vcdp_plugin_api_hookup(vlib_main_t *vm)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp->msg_id_base = setup_message_id_table();
   return 0;

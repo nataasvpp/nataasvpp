@@ -5,7 +5,8 @@
 vcdp_tcp_check_main_t vcdp_tcp;
 
 static clib_error_t *
-vcdp_tcp_check_init(vlib_main_t *vm) {
+vcdp_tcp_check_init(vlib_main_t *vm)
+{
   vlib_thread_main_t *tm = vlib_get_thread_main();
   vcdp_tcp_check_main_t *vtcm = &vcdp_tcp;
   vcdp_tcp_check_per_thread_data_t *ptd;

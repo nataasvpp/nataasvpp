@@ -6,7 +6,8 @@
 #include <vcdp/service.h>
 
 static clib_error_t *
-vcdp_service_init(vlib_main_t *vm) {
+vcdp_service_init(vlib_main_t *vm)
+{
   vcdp_service_main_t *sm = &vcdp_service_main;
   vcdp_service_registration_t **services = 0;
   vcdp_service_registration_t *current_reg;
@@ -101,15 +102,15 @@ again:
 }
 
 void
-vcdp_service_next_indices_init(vlib_main_t *vm, uword node_index) {
+vcdp_service_next_indices_init(vlib_main_t *vm, uword node_index)
+{
   vcdp_service_main_t *sm = &vcdp_service_main;
   vcdp_service_registration_t **services = sm->services;
   for (uword i = 0; i < vec_len(services); i++) {
     vcdp_service_registration_t *reg = vec_elt_at_index(services, i)[0];
     vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) reg->node_name);
     if (node)
-      vlib_node_add_next_with_slot(vm, node_index, node->index,
-                                   *reg->index_in_bitmap);
+      vlib_node_add_next_with_slot(vm, node_index, node->index, *reg->index_in_bitmap);
   }
 }
 

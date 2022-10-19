@@ -1,6 +1,7 @@
 // Copyright(c) 2022 Cisco Systems, Inc.
 
-// Get packets from the IP unicast input feature arc set tenant and pass them to VCDP.
+// Get packets from the IP unicast input feature arc set tenant and pass them to
+// VCDP.
 
 #include <vlib/vlib.h>
 #include <vnet/fib/fib_table.h>
@@ -9,14 +10,13 @@
 #include <vcdp/common.h>
 #include "gateway.h"
 
-enum vcdp_input_next_e {
-    VCDP_INPUT_NEXT_LOOKUP,
-    VCDP_INPUT_N_NEXT
-};
+enum vcdp_input_next_e { VCDP_INPUT_NEXT_LOOKUP, VCDP_INPUT_N_NEXT };
 
-// This node assumes that the tenant has been configured for the given FIB table before being enabled.
+// This node assumes that the tenant has been configured for the given FIB table
+// before being enabled.
 VLIB_NODE_FN(vcdp_input_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
 
   // use VRF ID as tenant ID
   vcdp_main_t *vcdp = &vcdp_main;

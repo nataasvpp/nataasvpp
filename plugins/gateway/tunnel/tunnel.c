@@ -15,8 +15,7 @@ uword *uuid_hash;
 // Unidirectional session. Only accepting flows in forward direction>!>!>!>
 // Adds session state to all threads.
 void
-make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst,
-                   u8 proto, u16 sport, u16 dport,
+make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport,
                    vcdp_tunnel_key_t *k)
 {
   k->context_id = context_id;
@@ -30,8 +29,8 @@ make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst,
 // Create a new session.
 // The fields must be in big-endian.
 int
-vcdp_tunnel_add(u32 context_id, ip4_address_t src, ip4_address_t dst,
-                        u8 proto, u16 sport, u16 dport, u32 value) {
+vcdp_tunnel_add(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u32 value)
+{
   vcdp_tunnel_key_t key = {0};
   clib_bihash_kv_16_8_t kv = {};
 
@@ -51,15 +50,15 @@ vcdp_tunnel_add(u32 context_id, ip4_address_t src, ip4_address_t dst,
 
 // returns 0 on success (found), < 0 on error (not found)
 int
-vcdp_tunnel_lookup(u32 context_id, ip4_address_t src, ip4_address_t dst,
-                           u8 proto, u16 sport, u16 dport, u64 *value) {
+vcdp_tunnel_lookup(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u64 *value)
+{
   vcdp_tunnel_key_t key = {0};
   clib_bihash_kv_16_8_t kv, v;
   make_static_key_v4(context_id, src, dst, proto, sport, dport, &key);
 
   clib_memcpy(&kv.key, &key, sizeof(kv.key));
 
-  if (!clib_bihash_search_16_8 (&vcdp_tunnel_main.tunnels_hash, &kv, &v)) {
+  if (!clib_bihash_search_16_8(&vcdp_tunnel_main.tunnels_hash, &kv, &v)) {
     *value = v.value;
     return 0;
   }
@@ -74,7 +73,7 @@ vcdp_session_static_delete()
 }
 
 vcdp_tunnel_t *
-vcdp_tunnel_lookup_by_uuid (char *uuid)
+vcdp_tunnel_lookup_by_uuid(char *uuid)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
 
@@ -86,12 +85,13 @@ vcdp_tunnel_lookup_by_uuid (char *uuid)
 }
 
 vcdp_tunnel_t *
-vcdp_tunnel_get(u32 index) {
+vcdp_tunnel_get(u32 index)
+{
   return pool_elt_at_index(vcdp_tunnel_main.tunnels, index);
 }
 
 static u8 *
-vcdp_tunnel_vxlan_dummy_l2_build_rewrite (vcdp_tunnel_t *t, u16 *encap_len)
+vcdp_tunnel_vxlan_dummy_l2_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
 {
   ip4_header_t *ip;
   udp_header_t *udp;
@@ -127,16 +127,16 @@ vcdp_tunnel_vxlan_dummy_l2_build_rewrite (vcdp_tunnel_t *t, u16 *encap_len)
 }
 
 static u8 *
-vcdp_tunnel_geneve_l3_build_rewrite (vcdp_tunnel_t *t, u16 *encap_len)
+vcdp_tunnel_geneve_l3_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
 {
   ASSERT(0); // Not implemented yet.
   return 0;
 }
 
 int
-vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
-                   ip_address_t *src, ip_address_t *dst, u16 sport, u16 dport,
-                   u16 mtu) {
+vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
+                   u16 sport, u16 dport, u16 mtu)
+{
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
 
@@ -185,14 +185,14 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method,
   }
 
   switch (method) {
-    case VCDP_TUNNEL_VXLAN_DUMMY_L2:
-     t->rewrite = vcdp_tunnel_vxlan_dummy_l2_build_rewrite(t, &t->encap_size);
-      break;
-    case VCDP_TUNNEL_GENEVE_L3:
-      t->rewrite = vcdp_tunnel_geneve_l3_build_rewrite(t, &t->encap_size);
-      break;
-    default:
-      ASSERT(0);
+  case VCDP_TUNNEL_VXLAN_DUMMY_L2:
+    t->rewrite = vcdp_tunnel_vxlan_dummy_l2_build_rewrite(t, &t->encap_size);
+    break;
+  case VCDP_TUNNEL_GENEVE_L3:
+    t->rewrite = vcdp_tunnel_geneve_l3_build_rewrite(t, &t->encap_size);
+    break;
+  default:
+    ASSERT(0);
   }
 
   // Add tenant if needed
@@ -224,20 +224,19 @@ vcdp_tunnel_delete(char *tunnel_id)
 
 // enable on interface
 int
-vcdp_tunnel_enable_disable_input(u32 sw_if_index, bool is_enable) {
-  return vnet_feature_enable_disable("ip4-unicast", "vcdp-tunnel-input",
-                                     sw_if_index, is_enable, 0, 0);
+vcdp_tunnel_enable_disable_input(u32 sw_if_index, bool is_enable)
+{
+  return vnet_feature_enable_disable("ip4-unicast", "vcdp-tunnel-input", sw_if_index, is_enable, 0, 0);
 }
 
 clib_error_t *
 vcdp_tunnel_init(vlib_main_t *vm)
 {
-  vcdp_tunnel_main.log_default = vlib_log_register_class ("vcdp", 0);
-  uuid_hash = hash_create_string (0, sizeof (uword));
-  clib_bihash_init_16_8(&vcdp_tunnel_main.tunnels_hash, "vcdp ipv4 static session table",
-                        VCDP_TUNNELS_NUM_BUCKETS, 0);
+  vcdp_tunnel_main.log_default = vlib_log_register_class("vcdp", 0);
+  uuid_hash = hash_create_string(0, sizeof(uword));
+  clib_bihash_init_16_8(&vcdp_tunnel_main.tunnels_hash, "vcdp ipv4 static session table", VCDP_TUNNELS_NUM_BUCKETS, 0);
 
   return 0;
 }
 
-VLIB_INIT_FUNCTION (vcdp_tunnel_init);
+VLIB_INIT_FUNCTION(vcdp_tunnel_init);

@@ -26,12 +26,12 @@ typedef struct {
   uword fib_index;
 } nat_tenant_t;
 
-#define foreach_nat_rewrite_op                                                 \
-  _(SADDR, 0x1, "src-addr")                                                    \
-  _(SPORT, 0x2, "src-port")                                                    \
-  _(DADDR, 0x4, "dst-addr")                                                    \
-  _(DPORT, 0x8, "dst-port")                                                    \
-  _(ICMP_ID, 0x10, "icmp-id")                                                  \
+#define foreach_nat_rewrite_op                                                                                         \
+  _(SADDR, 0x1, "src-addr")                                                                                            \
+  _(SPORT, 0x2, "src-port")                                                                                            \
+  _(DADDR, 0x4, "dst-addr")                                                                                            \
+  _(DPORT, 0x8, "dst-port")                                                                                            \
+  _(ICMP_ID, 0x10, "icmp-id")                                                                                          \
   _(TXFIB, 0x20, "tx-fib")
 
 typedef enum {
@@ -81,16 +81,13 @@ typedef struct {
 extern nat_main_t nat_main;
 
 clib_error_t *
-nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index,
-                                  u32 tenant_id, u8 unset);
+nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index, u32 tenant_id, u8 unset);
 
 clib_error_t *
-nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del,
-                       ip4_address_t *addr);
+nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del, ip4_address_t *addr);
 
 clib_error_t *
-nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id,
-                    u32 table_id, u32 alloc_pool_id, u8 unset);
+nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id, u32 table_id, u32 alloc_pool_id, u8 unset);
 format_function_t format_vcdp_nat_rewrite;
 
 #endif

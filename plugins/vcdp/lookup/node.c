@@ -24,11 +24,11 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
-#define foreach_vcdp_lookup_error                                              \
-  _(MISS, "flow miss")                                                         \
-  _(LOCAL, "local flow")                                                       \
-  _(REMOTE, "remote flow")                                                     \
-  _(COLLISION, "hash add collision")                                           \
+#define foreach_vcdp_lookup_error                                                                                      \
+  _(MISS, "flow miss")                                                                                                 \
+  _(LOCAL, "local flow")                                                                                               \
+  _(REMOTE, "remote flow")                                                                                             \
+  _(COLLISION, "hash add collision")                                                                                   \
   _(CON_DROP, "handoff drop")
 
 typedef enum {
@@ -86,25 +86,24 @@ typedef struct {
 } vcdp_handoff_trace_t;
 
 static_always_inline int
-vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-                       vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
-                       f64 time_now, void *k, u64 *h, u64 *lookup_val, u32 rx_id) {
-  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                    time_now, k, h, lookup_val, 0, rx_id);
+vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
+                       u32 thread_index, f64 time_now, void *k, u64 *h, u64 *lookup_val, u32 rx_id)
+{
+  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k, h, lookup_val, 0, rx_id);
 }
 
 static_always_inline int
-vcdp_create_session_v6(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-                       vcdp_tenant_t *tenant, u16 tenant_idx, u32 thread_index,
-                       f64 time_now, void *k, u64 *h, u64 *lookup_val) {
-  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                    time_now, k, h, lookup_val, 1, 0 /* NO v6 */);
+vcdp_create_session_v6(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
+                       u32 thread_index, f64 time_now, void *k, u64 *h, u64 *lookup_val)
+{
+  return vcdp_create_session_inline(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k, h, lookup_val, 1,
+                                    0 /* NO v6 */);
 }
 
 static_always_inline u8
-vcdp_lookup_four_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
-                    u64 *lookup_val, u64 *h, i16 *l4_hdr_offset,
-                    int prefetch_buffer_stride, u8 slowpath) {
+vcdp_lookup_four_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lookup_val, u64 *h, i16 *l4_hdr_offset,
+                    int prefetch_buffer_stride, u8 slowpath)
+{
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
   u8 slowpath_needed = 0;
   if (prefetch_buffer_stride) {
@@ -112,43 +111,35 @@ vcdp_lookup_four_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
     clib_prefetch_load(pb[0]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0,
-                     l4_hdr_offset + 0, slowpath);
+  slowpath_needed |= vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0, l4_hdr_offset + 0, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[1]);
     clib_prefetch_load(pb[1]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v4(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1,
-                     l4_hdr_offset + 1, slowpath);
+  slowpath_needed |= vcdp_calc_key_v4(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1, l4_hdr_offset + 1, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[2]);
     clib_prefetch_load(pb[2]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v4(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2,
-                     l4_hdr_offset + 2, slowpath);
+  slowpath_needed |= vcdp_calc_key_v4(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2, l4_hdr_offset + 2, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[3]);
     clib_prefetch_load(pb[3]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v4(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3,
-                     l4_hdr_offset + 3, slowpath);
+  slowpath_needed |= vcdp_calc_key_v4(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3, l4_hdr_offset + 3, slowpath);
   return slowpath_needed;
 }
 
 static_always_inline u8
-vcdp_lookup_four_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
-                    u64 *lookup_val, u64 *h, i16 *l4_hdr_offset,
-                    int prefetch_buffer_stride, u8 slowpath) {
+vcdp_lookup_four_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lookup_val, u64 *h, i16 *l4_hdr_offset,
+                    int prefetch_buffer_stride, u8 slowpath)
+{
   vlib_buffer_t **pb = b + prefetch_buffer_stride;
   u8 slowpath_needed = 0;
   if (prefetch_buffer_stride) {
@@ -156,55 +147,47 @@ vcdp_lookup_four_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
     clib_prefetch_load(pb[0]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0,
-                     l4_hdr_offset + 0, slowpath);
+  slowpath_needed |= vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lookup_val + 0, h + 0, l4_hdr_offset + 0, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[1]);
     clib_prefetch_load(pb[1]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v6(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1,
-                     l4_hdr_offset + 1, slowpath);
+  slowpath_needed |= vcdp_calc_key_v6(b[1], b[1]->flow_id, k + 1, lookup_val + 1, h + 1, l4_hdr_offset + 1, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[2]);
     clib_prefetch_load(pb[2]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v6(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2,
-                     l4_hdr_offset + 2, slowpath);
+  slowpath_needed |= vcdp_calc_key_v6(b[2], b[2]->flow_id, k + 2, lookup_val + 2, h + 2, l4_hdr_offset + 2, slowpath);
 
   if (prefetch_buffer_stride) {
     clib_prefetch_load(pb[3]);
     clib_prefetch_load(pb[3]->data);
   }
 
-  slowpath_needed |=
-    vcdp_calc_key_v6(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3,
-                     l4_hdr_offset + 3, slowpath);
+  slowpath_needed |= vcdp_calc_key_v6(b[3], b[3]->flow_id, k + 3, lookup_val + 3, h + 3, l4_hdr_offset + 3, slowpath);
   return slowpath_needed;
 }
 
 static_always_inline void
-vcdp_prepare_all_keys_v4_slow(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left);
+vcdp_prepare_all_keys_v4_slow(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left);
 
 static_always_inline void
-vcdp_prepare_all_keys_v6_slow(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left);
+vcdp_prepare_all_keys_v6_slow(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left);
 
 static_always_inline uword
-vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv,
-                         u64 *h, i16 *l4_hdr_offset, u32 n_left, u8 slowpath) {
+vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left,
+                         u8 slowpath)
+{
   /* main loop - prefetch next 4 buffers,
    * prefetch previous 4 buckets */
   while (n_left >= 8) {
-    if (vcdp_lookup_four_v4(b, k, lv, h, l4_hdr_offset, 4, slowpath) &&
-        !slowpath)
+    if (vcdp_lookup_four_v4(b, k, lv, h, l4_hdr_offset, 4, slowpath) && !slowpath)
       return n_left;
 
     b += 4;
@@ -218,8 +201,7 @@ vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv,
   /* last 4 packets - dont prefetch next 4 buffers,
    * prefetch previous 4 buckets */
   if (n_left >= 4) {
-    if (vcdp_lookup_four_v4(b, k, lv, h, l4_hdr_offset, 0, slowpath) &&
-        !slowpath)
+    if (vcdp_lookup_four_v4(b, k, lv, h, l4_hdr_offset, 0, slowpath) && !slowpath)
       return n_left;
 
     b += 4;
@@ -231,9 +213,7 @@ vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv,
   }
 
   while (n_left > 0) {
-    if (vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0,
-                         l4_hdr_offset + 0, slowpath) &&
-        !slowpath)
+    if (vcdp_calc_key_v4(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0, l4_hdr_offset + 0, slowpath) && !slowpath)
       return n_left;
 
     b += 1;
@@ -247,13 +227,13 @@ vcdp_prepare_all_keys_v4(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv,
 }
 
 static_always_inline uword
-vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv,
-                         u64 *h, i16 *l4_hdr_offset, u32 n_left, u8 slowpath) {
+vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left,
+                         u8 slowpath)
+{
   /* main loop - prefetch next 4 buffers,
    * prefetch previous 4 buckets */
   while (n_left >= 8) {
-    if (vcdp_lookup_four_v6(b, k, lv, h, l4_hdr_offset, 4, slowpath) &&
-        !slowpath)
+    if (vcdp_lookup_four_v6(b, k, lv, h, l4_hdr_offset, 4, slowpath) && !slowpath)
       return n_left;
 
     b += 4;
@@ -267,8 +247,7 @@ vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv,
   /* last 4 packets - dont prefetch next 4 buffers,
    * prefetch previous 4 buckets */
   if (n_left >= 4) {
-    if (vcdp_lookup_four_v6(b, k, lv, h, l4_hdr_offset, 0, slowpath) &&
-        !slowpath)
+    if (vcdp_lookup_four_v6(b, k, lv, h, l4_hdr_offset, 0, slowpath) && !slowpath)
       return n_left;
 
     b += 4;
@@ -280,9 +259,7 @@ vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv,
   }
 
   while (n_left > 0) {
-    if (vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0,
-                         l4_hdr_offset, slowpath) &&
-        !slowpath)
+    if (vcdp_calc_key_v6(b[0], b[0]->flow_id, k + 0, lv + 0, h + 0, l4_hdr_offset, slowpath) && !slowpath)
       return n_left;
 
     b += 1;
@@ -296,35 +273,38 @@ vcdp_prepare_all_keys_v6(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv,
 }
 
 static_always_inline void
-vcdp_prepare_all_keys_v4_slow(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left) {
+vcdp_prepare_all_keys_v4_slow(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left)
+{
   vcdp_prepare_all_keys_v4(b, k, lv, h, l4_hdr_offset, n_left, 1);
 }
 static_always_inline uword
-vcdp_prepare_all_keys_v4_fast(vlib_buffer_t **b, vcdp_session_ip4_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left) {
+vcdp_prepare_all_keys_v4_fast(vlib_buffer_t **b, vcdp_session_ip4_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left)
+{
   return vcdp_prepare_all_keys_v4(b, k, lv, h, l4_hdr_offset, n_left, 0);
 }
 
 static_always_inline void
-vcdp_prepare_all_keys_v6_slow(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left) {
+vcdp_prepare_all_keys_v6_slow(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left)
+{
   vcdp_prepare_all_keys_v6(b, k, lv, h, l4_hdr_offset, n_left, 1);
 }
 
 static_always_inline uword
-vcdp_prepare_all_keys_v6_fast(vlib_buffer_t **b, vcdp_session_ip6_key_t *k,
-                              u64 *lv, u64 *h, i16 *l4_hdr_offset, u32 n_left) {
+vcdp_prepare_all_keys_v6_fast(vlib_buffer_t **b, vcdp_session_ip6_key_t *k, u64 *lv, u64 *h, i16 *l4_hdr_offset,
+                              u32 n_left)
+{
   return vcdp_prepare_all_keys_v6(b, k, lv, h, l4_hdr_offset, n_left, 0);
 }
 
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
-                   vlib_frame_t *frame, u8 is_ipv6) {
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, u8 is_ipv6)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   vcdp_bihash_kv46_t kv = {};
   vcdp_tenant_t *tenant;
@@ -361,8 +341,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
    * - (Phase 2) thread_index (32bits)||| flow_index (32bits)
       OR same as Phase 1 if slow path
       ASSUMPTION: thread index < 2^31 */
-  u64 __attribute__((aligned(32))) lookup_vals[VLIB_FRAME_SIZE],
-    *lv = lookup_vals;
+  u64 __attribute__((aligned(32))) lookup_vals[VLIB_FRAME_SIZE], *lv = lookup_vals;
   u16 hit_count = 0;
   uword n_left_slow_keys;
 
@@ -374,18 +353,14 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
 
   if (is_ipv6) {
-    if (PREDICT_FALSE((n_left_slow_keys = vcdp_prepare_all_keys_v6_fast(
-                         b, k6, lv, h, l4o, n_left)))) {
+    if (PREDICT_FALSE((n_left_slow_keys = vcdp_prepare_all_keys_v6_fast(b, k6, lv, h, l4o, n_left)))) {
       uword n_done = n_left - n_left_slow_keys;
-      vcdp_prepare_all_keys_v6_slow(b + n_done, k6 + n_done, lv + n_done,
-                                    h + n_done, l4o + n_done, n_left_slow_keys);
+      vcdp_prepare_all_keys_v6_slow(b + n_done, k6 + n_done, lv + n_done, h + n_done, l4o + n_done, n_left_slow_keys);
     }
   } else {
-    if (PREDICT_FALSE((n_left_slow_keys = vcdp_prepare_all_keys_v4_fast(
-                         b, k4, lv, h, l4o, n_left)))) {
+    if (PREDICT_FALSE((n_left_slow_keys = vcdp_prepare_all_keys_v4_fast(b, k4, lv, h, l4o, n_left)))) {
       uword n_done = n_left - n_left_slow_keys;
-      vcdp_prepare_all_keys_v4_slow(b + n_done, k4 + n_done, lv + n_done,
-                                    h + n_done, l4o + n_done, n_left_slow_keys);
+      vcdp_prepare_all_keys_v4_slow(b + n_done, k4 + n_done, lv + n_done, h + n_done, l4o + n_done, n_left_slow_keys);
     }
   }
 
@@ -401,15 +376,12 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
         goto next_pkt6;
 
       clib_memcpy_fast(&kv.kv6.key, k6, 48);
-      if (clib_bihash_search_inline_with_hash_48_8(&vcdp->table6, h[0],
-                                                   &kv.kv6)) {
+      if (clib_bihash_search_inline_with_hash_48_8(&vcdp->table6, h[0], &kv.kv6)) {
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
         /* if there is colision, we just reiterate */
-        if (vcdp_create_session_v6(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                   time_now, k6, h, lv)) {
-          vlib_node_increment_counter(vm, node->node_index,
-                                      VCDP_LOOKUP_ERROR_COLLISION, 1);
+        if (vcdp_create_session_v6(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k6, h, lv)) {
+          vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
           continue;
         }
       } else {
@@ -443,15 +415,13 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
         goto next_pkt4;
 
       clib_memcpy_fast(&kv.kv4.key, k4, 24);
-      if (clib_bihash_search_inline_with_hash_24_8(&vcdp->table4, h[0],
-                                                   &kv.kv4)) {
+      if (clib_bihash_search_inline_with_hash_24_8(&vcdp->table4, h[0], &kv.kv4)) {
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
         /* if there is colision, we just reiterate */
-        if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index,
-                                   time_now, k4, h, lv, vcdp_buffer(b[0])->rx_id)) {
-          vlib_node_increment_counter(vm, node->node_index,
-                                      VCDP_LOOKUP_ERROR_COLLISION, 1);
+        if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv,
+                                   vcdp_buffer(b[0])->rx_id)) {
+          vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
           continue;
         }
       } else {
@@ -495,8 +465,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
 
     flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
     flow_index = lv[0] & (~(u32) 0);
-    vcm = &vcdp->per_thread_data[flow_thread_index]
-             .per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP];
+    vcm = &vcdp->per_thread_data[flow_thread_index].per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP];
     vlib_increment_combined_counter(vcm, thread_index, flow_index, 1, len[0]);
     if (flow_thread_index == thread_index) {
       /* known flow which belongs to this thread */
@@ -522,13 +491,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
   if (n_remote) {
     u32 n_remote_enq;
     n_remote_enq =
-      vlib_buffer_enqueue_to_thread(vm, node, vcdp->frame_queue_index,
-                                    to_remote, thread_indices, n_remote, 1);
-    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_REMOTE,
-                                n_remote_enq);
-    vlib_node_increment_counter(vm, node->node_index,
-                                VCDP_LOOKUP_ERROR_CON_DROP,
-                                n_remote - n_remote_enq);
+      vlib_buffer_enqueue_to_thread(vm, node, vcdp->frame_queue_index, to_remote, thread_indices, n_remote, 1);
+    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_REMOTE, n_remote_enq);
+    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_CON_DROP, n_remote - n_remote_enq);
   }
 
   /* enqueue local */
@@ -542,8 +507,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
     while (n_left) {
       session_index = local_flow_index[0] >> 1;
       session = vcdp_session_at_index(ptd, session_index);
-      u32 pbmp =
-        session->bitmaps[vcdp_direction_from_flow_index(local_flow_index[0])];
+      u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(local_flow_index[0])];
       vcdp_buffer(b[0])->service_bitmap = pbmp;
 
       /* The tenant of the buffer is the tenant of the session */
@@ -556,10 +520,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       b += 1;
       n_left -= 1;
     }
-    vlib_buffer_enqueue_to_next(vm, node, to_local, local_next_indices,
-                                n_local);
-    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_LOCAL,
-                                n_local);
+    vlib_buffer_enqueue_to_next(vm, node, to_local, local_next_indices, n_local);
+    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_LOCAL, n_local);
   }
 
   if (n_to_sp) {
@@ -584,8 +546,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
       node_index = tenant->sp_node_indices[sp_index[0]];
       sp_node_index[0] = node_index;
 
-      if (PREDICT_FALSE(node_index != last_node_index) ||
-          current_left_to_next == 0) {
+      if (PREDICT_FALSE(node_index != last_node_index) || current_left_to_next == 0) {
         if (f != NULL)
           vlib_put_frame_to_node(vm, last_node_index, f);
         f = vlib_get_frame_to_node(vm, node_index);
@@ -653,21 +614,17 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
-  return vcdp_lookup_inline(vm, node, frame, 0);
-}
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) { return vcdp_lookup_inline(vm, node, frame, 0); }
 
 VLIB_NODE_FN(vcdp_lookup_ip6_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
-  return vcdp_lookup_inline(vm, node, frame, 1);
-}
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) { return vcdp_lookup_inline(vm, node, frame, 1); }
 
 VLIB_NODE_FN(vcdp_handoff_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
@@ -713,7 +670,8 @@ VLIB_NODE_FN(vcdp_handoff_node)
 }
 
 static u8 *
-format_vcdp_lookup_trace(u8 *s, va_list *args) {
+format_vcdp_lookup_trace(u8 *s, va_list *args)
+{
   vlib_main_t *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_lookup_trace_t *t = va_arg(*args, vcdp_lookup_trace_t *);
@@ -722,25 +680,22 @@ format_vcdp_lookup_trace(u8 *s, va_list *args) {
     s = format(s,
                "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
                "flow-id %u (session %u, %s) key 0x%U",
-               t->sw_if_index, t->next_index, t->hash, t->flow_id,
-               t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
-               format_hex_bytes_no_wrap,
-               t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
-               t->is_ip6 ? sizeof(t->k6) : sizeof(t->k4));
+               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
+               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap,
+               t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4, t->is_ip6 ? sizeof(t->k6) : sizeof(t->k4));
   else
     s = format(s,
                "vcdp-lookup: sw_if_index %d, slow-path (%U) "
                "slow-path node index %d key 0x%U",
-               t->sw_if_index, format_vcdp_sp_node, t->sp_index,
-               format_vlib_node_name, vm, t->sp_node_index,
-               format_hex_bytes_no_wrap,
-               t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
+               t->sw_if_index, format_vcdp_sp_node, t->sp_index, format_vlib_node_name, vm, t->sp_node_index,
+               format_hex_bytes_no_wrap, t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
                t->is_ip6 ? sizeof(t->k6) : sizeof(t->k4));
   return s;
 }
 
 static u8 *
-format_vcdp_handoff_trace(u8 *s, va_list *args) {
+format_vcdp_handoff_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_handoff_trace_t *t = va_arg(*args, vcdp_handoff_trace_t *);
@@ -748,8 +703,7 @@ format_vcdp_handoff_trace(u8 *s, va_list *args) {
   s = format(s,
              "vcdp-handoff: next index %d "
              "flow-id %u (session %u, %s)",
-             t->next_index, t->flow_id, t->flow_id >> 1,
-             t->flow_id & 0x1 ? "reverse" : "forward");
+             t->next_index, t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 

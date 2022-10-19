@@ -18,8 +18,8 @@
 
 #include <vcdp/vcdp.h>
 
-#define foreach_gw_tenant_flag                                                 \
-  _(OUTPUT_DATA_SET, "output-data-set", 0)                                     \
+#define foreach_gw_tenant_flag                                                                                         \
+  _(OUTPUT_DATA_SET, "output-data-set", 0)                                                                             \
   _(STATIC_MAC, "static-mac", 1)
 
 typedef enum {
@@ -44,11 +44,13 @@ typedef struct {
 extern gw_main_t gateway_main;
 
 static_always_inline gw_tenant_t *
-gw_tenant_at_index(gw_main_t *gm, u32 idx) {
+gw_tenant_at_index(gw_main_t *gm, u32 idx)
+{
   return vec_elt_at_index(gm->tenants, idx);
 }
 
-int gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
+int
+gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
 
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 

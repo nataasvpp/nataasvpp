@@ -3,9 +3,8 @@
 #include <vcdp_services/nat/nat.h>
 
 static clib_error_t *
-vcdp_nat_external_interface_set_unset_fn(vlib_main_t *vm,
-                                         unformat_input_t *input,
-                                         vlib_cli_command_t *cmd) {
+vcdp_nat_external_interface_set_unset_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
 
   clib_error_t *err = 0;
@@ -21,16 +20,14 @@ vcdp_nat_external_interface_set_unset_fn(vlib_main_t *vm,
       ;
     else if (unformat(line_input, "disable"))
       unset = 1;
-    else if (unformat(line_input, "%U", unformat_vnet_sw_interface,
-                      vnet_get_main(), &sw_if_index))
+    else if (unformat(line_input, "%U", unformat_vnet_sw_interface, vnet_get_main(), &sw_if_index))
       ;
     else {
       err = unformat_parse_error(line_input);
       goto done;
     }
   }
-  err =
-    nat_external_interface_set_tenant(&nat_main, sw_if_index, tenant_id, unset);
+  err = nat_external_interface_set_tenant(&nat_main, sw_if_index, tenant_id, unset);
 done:
   unformat_free(line_input);
   return err;
@@ -38,14 +35,13 @@ done:
 
 VLIB_CLI_COMMAND(vcdp_nat_external_interface_set_unset, static) = {
   .path = "set vcdp nat external-interface",
-  .short_help =
-    "set vcdp nat external-interface <interface> tenant <tenant-id> [disable]",
+  .short_help = "set vcdp nat external-interface <interface> tenant <tenant-id> [disable]",
   .function = vcdp_nat_external_interface_set_unset_fn,
 };
 
 static clib_error_t *
-vcdp_nat_alloc_pool_add_del_fn(vlib_main_t *vm, unformat_input_t *input,
-                               vlib_cli_command_t *cmd) {
+vcdp_nat_alloc_pool_add_del_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
 
   clib_error_t *err = 0;
@@ -83,8 +79,8 @@ VLIB_CLI_COMMAND(vcdp_nat_alloc_pool_add_del, static) = {
 };
 
 static clib_error_t *
-vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input,
-                           vlib_cli_command_t *cmd) {
+vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
 
   clib_error_t *err = 0;
@@ -113,8 +109,7 @@ vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input,
       goto done;
     }
   }
-  err = nat_tenant_set_snat(&nat_main, tenant_id, outside_tenant_id, table_id,
-                            alloc_pool_id, unset);
+  err = nat_tenant_set_snat(&nat_main, tenant_id, outside_tenant_id, table_id, alloc_pool_id, unset);
 done:
   unformat_free(line_input);
   return err;
@@ -122,8 +117,7 @@ done:
 
 VLIB_CLI_COMMAND(vcdp_nat_snat_set_unset, static) = {
   .path = "set vcdp nat snat",
-  .short_help =
-    "set vcdp nat snat tenant <tenant-id> outside-tenant <tenant-id> table "
-    "<table-id> alloc-pool <alloc-pool-id> [disable]",
+  .short_help = "set vcdp nat snat tenant <tenant-id> outside-tenant <tenant-id> table "
+                "<table-id> alloc-pool <alloc-pool-id> [disable]",
   .function = vcdp_nat_snat_set_unset_fn,
 };

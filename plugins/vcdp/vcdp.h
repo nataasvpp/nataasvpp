@@ -56,9 +56,9 @@ typedef enum {
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
 
-#define foreach_vcdp_session_state                                             \
-  _(FSOL, "embryonic")                                                         \
-  _(ESTABLISHED, "established")                                                \
+#define foreach_vcdp_session_state                                                                                     \
+  _(FSOL, "embryonic")                                                                                                 \
+  _(ESTABLISHED, "established")                                                                                        \
   _(TIME_WAIT, "time-wait")
 
 typedef enum {
@@ -77,12 +77,12 @@ typedef enum {
     VCDP_FLOW_N_COUNTER
 } vcdp_flow_counter_index_t;
 
-#define foreach_vcdp_tenant_session_counter                                    \
-  _(CREATED, "created", "created sessions")                                    \
+#define foreach_vcdp_tenant_session_counter                                                                            \
+  _(CREATED, "created", "created sessions")                                                                            \
   _(REMOVED, "removed", "removed sessions")
 
-#define foreach_vcdp_tenant_data_counter                                       \
-  _(INCOMING, "incoming", "incoming data into tenant")                         \
+#define foreach_vcdp_tenant_data_counter                                                                               \
+  _(INCOMING, "incoming", "incoming data into tenant")                                                                 \
   _(OUTGOING, "outgoing", "outgoing data out of tenant")
 
 typedef enum {
@@ -103,16 +103,12 @@ typedef u16 session_version_t;
 
 enum { VCDP_FLOW_FORWARD = 0, VCDP_FLOW_REVERSE = 1, VCDP_FLOW_F_B_N = 2 };
 
-enum {
-  VCDP_SESSION_KEY_PRIMARY,
-  VCDP_SESSION_KEY_SECONDARY,
-  VCDP_SESSION_N_KEY
-};
+enum { VCDP_SESSION_KEY_PRIMARY, VCDP_SESSION_KEY_SECONDARY, VCDP_SESSION_N_KEY };
 /* Flags to determine key validity in the session */
-#define foreach_vcdp_session_key_flag                                          \
-  _(PRIMARY_VALID_IP4, 0x1, "primary-valid-ip4")                               \
-  _(PRIMARY_VALID_IP6, 0x2, "primary-valid-ip6")                               \
-  _(SECONDARY_VALID_IP4, 0x4, "secondary-valid-ip4")                           \
+#define foreach_vcdp_session_key_flag                                                                                  \
+  _(PRIMARY_VALID_IP4, 0x1, "primary-valid-ip4")                                                                       \
+  _(PRIMARY_VALID_IP6, 0x2, "primary-valid-ip6")                                                                       \
+  _(SECONDARY_VALID_IP4, 0x4, "secondary-valid-ip4")                                                                   \
   _(SECONDARY_VALID_IP6, 0x8, "secondary-valid-ip6")
 
 enum {
@@ -121,12 +117,12 @@ enum {
 #undef _
 };
 
-#define foreach_vcdp_sp_node                                                   \
-  _(IP4_REASS, "error-drop", "sp-ip4-reassembly")                              \
-  _(IP6_REASS, "error-drop", "sp-ip6-reassembly")                              \
-  _(IP4_UNKNOWN_PROTO, "error-drop", "sp-ip4-unknown-proto")                   \
-  _(IP6_UNKNOWN_PROTO, "error-drop", "sp-ip6-unknown-proto")                   \
-  _(IP4_ICMP4_ERROR, "error-drop", "sp-ip4-icmp4-error")                       \
+#define foreach_vcdp_sp_node                                                                                           \
+  _(IP4_REASS, "error-drop", "sp-ip4-reassembly")                                                                      \
+  _(IP6_REASS, "error-drop", "sp-ip6-reassembly")                                                                      \
+  _(IP4_UNKNOWN_PROTO, "error-drop", "sp-ip4-unknown-proto")                                                           \
+  _(IP6_UNKNOWN_PROTO, "error-drop", "sp-ip6-unknown-proto")                                                           \
+  _(IP4_ICMP4_ERROR, "error-drop", "sp-ip4-icmp4-error")                                                               \
   _(IP6_ICMP6_ERROR, "error-drop", "sp-ip4-icmp6-error")
 
 enum {
@@ -232,10 +228,10 @@ typedef union {
   clib_bihash_kv_48_8_t kv6;
 } vcdp_bihash_kv46_t;
 
-#define VCDP_SESSION_IP46_KEYS_TYPE(n)                                         \
-  union {                                                                      \
-    vcdp_session_ip4_key_t keys4[(n)];                                         \
-    vcdp_session_ip6_key_t keys6[(n)];                                         \
+#define VCDP_SESSION_IP46_KEYS_TYPE(n)                                                                                 \
+  union {                                                                                                              \
+    vcdp_session_ip4_key_t keys4[(n)];                                                                                 \
+    vcdp_session_ip6_key_t keys6[(n)];                                                                                 \
   }
 
 typedef struct {
@@ -327,71 +323,81 @@ unformat_function_t unformat_vcdp_service_bitmap;
 unformat_function_t unformat_vcdp_sp_node;
 
 static_always_inline u32
-vcdp_session_index_from_lookup(u64 val) {
+vcdp_session_index_from_lookup(u64 val)
+{
   return (val & (~(u32) 0)) >> 1;
 }
 
 static_always_inline u32
-vcdp_thread_index_from_lookup(u64 val) {
+vcdp_thread_index_from_lookup(u64 val)
+{
   return val >> 32;
 }
 
 static_always_inline u32
-vcdp_packet_dir_from_lookup(u64 val) {
+vcdp_packet_dir_from_lookup(u64 val)
+{
   return val & 0x1;
 }
 
 static_always_inline u32
-vcdp_pseudo_flow_index_from_lookup(u64 val) {
+vcdp_pseudo_flow_index_from_lookup(u64 val)
+{
   return val & (~(u32) 0);
 }
 
 static_always_inline u64
-vcdp_session_mk_table_value(u32 thread_index, u32 pseudo_flow_index) {
+vcdp_session_mk_table_value(u32 thread_index, u32 pseudo_flow_index)
+{
   return ((u64) thread_index << 32) | pseudo_flow_index;
 }
 
 static_always_inline vcdp_session_t *
-vcdp_session_at_index(vcdp_per_thread_data_t *ptd, u32 idx) {
+vcdp_session_at_index(vcdp_per_thread_data_t *ptd, u32 idx)
+{
   return pool_elt_at_index(ptd->sessions, idx);
 }
 
 static_always_inline u32
-vcdp_mk_flow_index(u32 session_index, u8 dir) {
+vcdp_mk_flow_index(u32 session_index, u8 dir)
+{
   return (session_index << 1) | !(dir == VCDP_FLOW_FORWARD);
 }
 
 static_always_inline u32
-vcdp_session_from_flow_index(u32 flow_index) {
+vcdp_session_from_flow_index(u32 flow_index)
+{
   return flow_index >> 1;
 }
 
 static_always_inline u32
-vcdp_direction_from_flow_index(u32 flow_index) {
+vcdp_direction_from_flow_index(u32 flow_index)
+{
   return (flow_index & 0x1);
 }
 
 static_always_inline vcdp_tenant_t *
-vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx) {
+vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
+{
   return pool_elt_at_index(vcdpm->tenants, idx);
 }
 
-vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
+vcdp_tenant_t *
+vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 static_always_inline u8
-vcdp_session_n_keys(vcdp_session_t *session) {
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 |
-                            VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
+vcdp_session_n_keys(vcdp_session_t *session)
+{
+  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
     return 2;
   else
     return 1;
 }
 
 static_always_inline int
-vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
-                           vcdp_tenant_t *tenant, u16 tenant_idx,
-                           u32 thread_index, f64 time_now, void *k, u64 *h,
-                           u64 *lookup_val, int is_ipv6, u32 rx_id) {
+vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
+                           u32 thread_index, f64 time_now, void *k, u64 *h, u64 *lookup_val, int is_ipv6, u32 rx_id)
+{
   vcdp_bihash_kv46_t kv = {};
   clib_bihash_kv_8_8_t kv2;
   u64 value;
@@ -429,10 +435,8 @@ vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
   }
   session->session_version += 1;
-  session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) |
-               ptd->session_id_template;
-  ptd->session_id_ctr +=
-    2; /* two at a time, because last bit is reserved for direction */
+  session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
+  ptd->session_id_ctr += 2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
   session->rx_id = rx_id;
@@ -443,11 +447,9 @@ vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
   clib_memcpy_fast(session->bitmaps, tenant->bitmaps, sizeof(session->bitmaps));
   if (is_ipv6)
-    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key6, k,
-                     sizeof(session->keys[0].key6));
+    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key6, k, sizeof(session->keys[0].key6));
   else
-    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key4, k,
-                     sizeof(session->keys[0].key4));
+    clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY].key4, k, sizeof(session->keys[0].key4));
   session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
   session->proto = proto;
 
@@ -456,57 +458,41 @@ vcdp_create_session_inline(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 
   lookup_val[0] ^= value;
   /* Bidirectional counter zeroing */
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
-                             lookup_val[0]);
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP],
-                             lookup_val[0] | 0x1);
-  vlib_increment_simple_counter(
-    &vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED],
-    thread_index, tenant_idx, 1);
+  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], lookup_val[0]);
+  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], lookup_val[0] | 0x1);
+  vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED], thread_index,
+                                tenant_idx, 1);
   return 0;
 }
 
 int
-vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id,
-                    u32 thread_index, u32 tenant_index, u32 *session_index,
-                    int is_ipv6);
+vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id, u32 thread_index, u32 tenant_index,
+                    u32 *session_index, int is_ipv6);
 
 clib_error_t *
-vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id,
-                    u8 is_del);
+vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u8 is_del);
 clib_error_t *
 vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
 clib_error_t *
-vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx,
-                 u32 timeout_val);
+vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 
 clib_error_t *
-vcdp_set_sp_node(vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index,
-                 u32 node_index);
+vcdp_set_sp_node(vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index, u32 node_index);
 clib_error_t *
-vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6,
-                         u32 node_index);
+vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6, u32 node_index);
 void
-vcdp_normalise_ip4_key(vcdp_session_t *session, vcdp_session_ip4_key_t *result,
-                       u8 key_idx);
+vcdp_normalise_ip4_key(vcdp_session_t *session, vcdp_session_ip4_key_t *result, u8 key_idx);
 
 void
-vcdp_normalise_ip6_key(vcdp_session_t *session, vcdp_session_ip6_key_t *result,
-                       u8 key_idx);
+vcdp_normalise_ip6_key(vcdp_session_t *session, vcdp_session_ip6_key_t *result, u8 key_idx);
 
 u32
-vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index,
-                                 vcdp_session_t *session, u32 tenant_id,
-                                 f64 now);
+vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
 int
-vcdp_bihash_add_del_inline_with_hash_24_8(clib_bihash_24_8_t *h,
-                                          clib_bihash_kv_24_8_t *kv, u64 hash,
-                                          u8 is_add);
+vcdp_bihash_add_del_inline_with_hash_24_8(clib_bihash_24_8_t *h, clib_bihash_kv_24_8_t *kv, u64 hash, u8 is_add);
 
 int
-vcdp_bihash_add_del_inline_with_hash_48_8(clib_bihash_48_8_t *h,
-                                          clib_bihash_kv_48_8_t *kv, u64 hash,
-                                          u8 is_add);
+vcdp_bihash_add_del_inline_with_hash_48_8(clib_bihash_48_8_t *h, clib_bihash_kv_48_8_t *kv, u64 hash, u8 is_add);
 
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 

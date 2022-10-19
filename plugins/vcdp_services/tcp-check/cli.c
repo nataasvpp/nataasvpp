@@ -5,9 +5,8 @@
 #include <vcdp_services/tcp-check/tcp_check.h>
 
 static clib_error_t *
-vcdp_tcp_check_show_sessions_command_fn(vlib_main_t *vm,
-                                        unformat_input_t *input,
-                                        vlib_cli_command_t *cmd) {
+vcdp_tcp_check_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
@@ -40,8 +39,7 @@ vcdp_tcp_check_show_sessions_command_fn(vlib_main_t *vm,
       first = 1;
       table_t session_table_ = {}, *session_table = &session_table_;
       u32 n = 0;
-      table_add_header_col(session_table, 8, "id", "tenant", "index", "type",
-                           "context", "ingress", "egress", "flags");
+      table_add_header_col(session_table, 8, "id", "tenant", "index", "type", "context", "ingress", "egress", "flags");
       pool_foreach_index (session_index, ptd->sessions) {
         session = vcdp_session_at_index(ptd, session_index);
         tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
@@ -54,8 +52,7 @@ vcdp_tcp_check_show_sessions_command_fn(vlib_main_t *vm,
           table_format_title(session_table, "Thread #%d:", thread_index);
         }
         tcp_session = vec_elt_at_index(vptd->state, session_index);
-        n = vcdp_table_format_insert_tcp_check_session(
-          session_table, n, vcdp, session_index, session, tcp_session);
+        n = vcdp_table_format_insert_tcp_check_session(session_table, n, vcdp, session_index, session, tcp_session);
       }
       if (!first)
         vlib_cli_output(vm, "%U", format_table, session_table);

@@ -9,6 +9,8 @@ BreakBeforeTernaryOperators: false
 BreakBeforeBinaryOperators: None
 ContinuationIndentWidth: 2
 AlwaysBreakAfterReturnType: All
+BreakBeforeBraces: Linux
+ColumnLimit: 120
 
 ForEachMacros:
   - 'clib_bitmap_foreach'

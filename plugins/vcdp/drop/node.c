@@ -44,26 +44,26 @@ typedef struct {
 } vcdp_drop_trace_t;
 
 static u8 *
-format_vcdp_drop_trace(u8 *s, va_list *args) {
+format_vcdp_drop_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_drop_trace_t *t = va_arg(*args, vcdp_drop_trace_t *);
 
-  s = format(s, "vcdp-drop: flow-id %u (session %u, %s)", t->flow_id,
-             t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format(s, "vcdp-drop: flow-id %u (session %u, %s)", t->flow_id, t->flow_id >> 1,
+             t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
 
 VLIB_NODE_FN(vcdp_drop_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
 
-  vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_DROP_NEXT_DROP,
-                                     n_left);
-  vlib_node_increment_counter(vm, node->node_index, VCDP_DROP_ERROR_DROP,
-                              n_left);
+  vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_DROP_NEXT_DROP, n_left);
+  vlib_node_increment_counter(vm, node->node_index, VCDP_DROP_ERROR_DROP, n_left);
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
     vlib_get_buffers(vm, from, bufs, n_left);
@@ -80,26 +80,23 @@ VLIB_NODE_FN(vcdp_drop_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_drop_node) = {
-  .name = "vcdp-drop",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_drop_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_drop_node) = {.name = "vcdp-drop",
+                                      .vector_size = sizeof(u32),
+                                      .format_trace = format_vcdp_drop_trace,
+                                      .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_drop_error_strings),
-  .error_strings = vcdp_drop_error_strings,
+                                      .n_errors = ARRAY_LEN(vcdp_drop_error_strings),
+                                      .error_strings = vcdp_drop_error_strings,
 
-  .n_next_nodes = VCDP_DROP_N_NEXT,
-  .next_nodes =
-    {
+                                      .n_next_nodes = VCDP_DROP_N_NEXT,
+                                      .next_nodes =
+                                        {
 #define _(n, x) [VCDP_DROP_NEXT_##n] = x,
-      foreach_vcdp_drop_next
+                                          foreach_vcdp_drop_next
 #undef _
-    }
+                                        }
 
 };
 
-VCDP_SERVICE_DEFINE(drop) = {.node_name = "vcdp-drop",
-                             .runs_before = VCDP_SERVICES(0),
-                             .runs_after = VCDP_SERVICES(0),
-                             .is_terminal = 1};
+VCDP_SERVICE_DEFINE(drop) = {
+  .node_name = "vcdp-drop", .runs_before = VCDP_SERVICES(0), .runs_after = VCDP_SERVICES(0), .is_terminal = 1};

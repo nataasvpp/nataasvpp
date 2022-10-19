@@ -22,18 +22,18 @@ typedef struct {
 } vcdp_lookup_sp_sv_reass_trace_t;
 
 static u8 *
-format_vcdp_lookup_sp_sv_reass_trace(u8 *s, va_list *args) {
+format_vcdp_lookup_sp_sv_reass_trace(u8 *s, va_list *args)
+{
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   vlib_node_t *node = va_arg(*args, vlib_node_t *);
-  CLIB_UNUSED(vcdp_lookup_sp_sv_reass_trace_t * t) =
-    va_arg(*args, vcdp_lookup_sp_sv_reass_trace_t *);
+  CLIB_UNUSED(vcdp_lookup_sp_sv_reass_trace_t * t) = va_arg(*args, vcdp_lookup_sp_sv_reass_trace_t *);
 
   s = format(s, "%v: sent to svr node", node->name);
   return s;
 }
 
-#define foreach_vcdp_lookup_sp_sv_reass_next                                   \
-  _(IP4_SVR, "ip4-sv-reassembly-custom-context")                               \
+#define foreach_vcdp_lookup_sp_sv_reass_next                                                                           \
+  _(IP4_SVR, "ip4-sv-reassembly-custom-context")                                                                       \
   _(IP6_SVR, "ip6-sv-reassembly-custom-context")
 
 enum {
@@ -58,8 +58,8 @@ static char *vcdp_lookup_sp_sv_reass_error_strings[] = {
 };
 
 static_always_inline u32
-vcdp_lookup_sp_sv_reass_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
-                               vlib_frame_t *frame, bool is_ip6) {
+vcdp_lookup_sp_sv_reass_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
+{
   vcdp_main_t *vcdp = &vcdp_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 aux_data[VLIB_FRAME_SIZE], *a;
@@ -73,30 +73,27 @@ vcdp_lookup_sp_sv_reass_inline(vlib_main_t *vm, vlib_node_runtime_t *node,
   while (n_left) {
     a[0] = b[0]->flow_id;
     if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-      vcdp_lookup_sp_sv_reass_trace_t *t =
-        vlib_add_trace(vm, node, b[0], sizeof(*t));
+      vcdp_lookup_sp_sv_reass_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
     }
 
     /* Save the tenant index */
     vcdp_buffer2(b[0])->tenant_index = vcdp_buffer(b[0])->tenant_index;
     vcdp_buffer2(b[0])->flags = VCDP_BUFFER_FLAG_REASSEMBLED;
 
-    vnet_buffer(b[0])->ip.reass.next_index =
-      is_ip6 ? vcdp->ip6_sv_reass_next_index : vcdp->ip4_sv_reass_next_index;
+    vnet_buffer(b[0])->ip.reass.next_index = is_ip6 ? vcdp->ip6_sv_reass_next_index : vcdp->ip4_sv_reass_next_index;
     b += 1;
     a += 1;
     n_left -= 1;
   }
   vlib_buffer_enqueue_to_single_next_with_aux(
-    vm, node, from, aux_data,
-    is_ip6 ? VCDP_LOOKUP_SP_SV_REASS_NEXT_IP6_SVR :
-             VCDP_LOOKUP_SP_SV_REASS_NEXT_IP4_SVR,
+    vm, node, from, aux_data, is_ip6 ? VCDP_LOOKUP_SP_SV_REASS_NEXT_IP6_SVR : VCDP_LOOKUP_SP_SV_REASS_NEXT_IP4_SVR,
     frame->n_vectors);
   return frame->n_vectors;
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_sp_sv_reass)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_lookup_sp_sv_reass_inline(vm, node, frame, 0);
 }
 
@@ -118,7 +115,8 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_sp_sv_reass) = {
 };
 
 VLIB_NODE_FN(vcdp_lookup_ip6_sp_sv_reass)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_lookup_sp_sv_reass_inline(vm, node, frame, 1);
 }
 

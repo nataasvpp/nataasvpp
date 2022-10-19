@@ -9,9 +9,8 @@
  *  set vcdp interface <interface> tenant <tenant-id>
  */
 static clib_error_t *
-gateway_interface_input_enable_command_fn(vlib_main_t *vm,
-                                          unformat_input_t *input,
-                                          vlib_cli_command_t *cmd) {
+gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   u32 sw_if_index = ~0, tenant_id = ~0;
@@ -19,8 +18,7 @@ gateway_interface_input_enable_command_fn(vlib_main_t *vm,
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "%U", unformat_vnet_sw_interface, vnet_get_main(),
-                 &sw_if_index))
+    if (unformat(line_input, "%U", unformat_vnet_sw_interface, vnet_get_main(), &sw_if_index))
       ;
     else if (unformat(line_input, "tenant %d", &tenant_id))
       ;
@@ -53,8 +51,8 @@ VLIB_CLI_COMMAND(gateway_interface_input_enable_command, static) = {
  *  set vcdp gateway tunnel <ifname>
  */
 static clib_error_t *
-vcdp_tunnel_enable_command_fn(vlib_main_t *vm, unformat_input_t *input,
-                              vlib_cli_command_t *cmd) {
+vcdp_tunnel_enable_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   u32 sw_if_index;
@@ -63,8 +61,7 @@ vcdp_tunnel_enable_command_fn(vlib_main_t *vm, unformat_input_t *input,
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "%U", unformat_vnet_sw_interface,
-                 vnet_get_main(), &sw_if_index))
+    if (unformat(line_input, "%U", unformat_vnet_sw_interface, vnet_get_main(), &sw_if_index))
       ;
     else {
       err = unformat_parse_error(line_input);
@@ -93,7 +90,8 @@ VLIB_CLI_COMMAND(vcdp_tunnel_enable_command, static) = {
 };
 
 static uword
-unformat_vcdp_tunnel_method(unformat_input_t *input, va_list *args) {
+unformat_vcdp_tunnel_method(unformat_input_t *input, va_list *args)
+{
   vcdp_tunnel_method_t *m = va_arg(*args, vcdp_tunnel_method_t *);
   if (unformat(input, "vxlan-dummy-l2"))
     *m = VCDP_TUNNEL_VXLAN_DUMMY_L2;
@@ -105,8 +103,8 @@ unformat_vcdp_tunnel_method(unformat_input_t *input, va_list *args) {
 }
 
 static clib_error_t *
-vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input,
-                       vlib_cli_command_t *cmd) {
+vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   u32 dport = ~0, sport = 0, mtu = 0;
@@ -140,8 +138,7 @@ vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input,
       goto done;
     }
   }
-  int rv =
-    vcdp_tunnel_create(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu);
+  int rv = vcdp_tunnel_create(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu);
   if (rv) {
     err = clib_error_return(0, "missing tunnel parameters");
   }
@@ -156,7 +153,8 @@ done:
  */
 VLIB_CLI_COMMAND(vcdp_tunnel_command, static) = {
   .path = "set vcdp tunnel",
-  .short_help = "set vcdp tunnel id <id> tenant <tenant-id> method <geneve-l3|vxlan-dummy-l2> src "
+  .short_help = "set vcdp tunnel id <id> tenant <tenant-id> method "
+                "<geneve-l3|vxlan-dummy-l2> src "
                 "<src> dst <dst> [sport <sport>] dport <dport> [mtu <mtu>]",
   .function = vcdp_tunnel_command_fn,
 };

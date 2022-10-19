@@ -27,8 +27,7 @@ typedef struct {
   u32 rx_id;
 } vcdp_buffer_opaque_t;
 
-STATIC_ASSERT(sizeof(vcdp_buffer_opaque_t) <=
-                sizeof(vnet_buffer((vlib_buffer_t *) 0)->unused),
+STATIC_ASSERT(sizeof(vcdp_buffer_opaque_t) <= sizeof(vnet_buffer((vlib_buffer_t *) 0)->unused),
               "size of vcdp_buffer_opaque_t must be <= size of "
               "vnet_buffer_opaque_t->unused");
 

@@ -14,7 +14,8 @@
 gw_main_t gateway_main;
 
 __clib_unused static void
-gateway_init_main_if_needed(gw_main_t *gm) {
+gateway_init_main_if_needed(gw_main_t *gm)
+{
   static u32 done = 0;
   // vlib_thread_main_t *tm = vlib_get_thread_main();
   if (done)
@@ -32,19 +33,22 @@ gateway_init_main_if_needed(gw_main_t *gm) {
 }
 
 static clib_error_t *
-gateway_init(vlib_main_t *vm) {
+gateway_init(vlib_main_t *vm)
+{
   return 0;
 }
 
 int
-gw_interface_input_enable(u32 sw_if_index, u32 tenant_id) {
+gw_interface_input_enable(u32 sw_if_index, u32 tenant_id)
+{
   gw_main_t *gm = &gateway_main;
   gateway_init_main_if_needed(gm);
   u16 *config;
   u16 tenant_idx;
 
   vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
-  if (!tenant) return -1;
+  if (!tenant)
+    return -1;
 
   vec_validate(gm->tenants, tenant_idx);
   vec_validate(gm->tenant_idx_by_sw_if_idx, sw_if_index);

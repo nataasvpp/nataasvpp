@@ -7,7 +7,8 @@
 
 // Graph node for VXLAN and Geneve tunnel decap
 VLIB_NODE_FN(vcdp_tunnel_input_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_tunnel_input_node_inline(vm, node, frame);
 }
 
@@ -40,9 +41,9 @@ VNET_FEATURE_INIT(vcdp_tunnel_input, static) = {
   .runs_after = VNET_FEATURES("ip4-sv-reassembly-feature"), // TODO: Needed?
 };
 
-
 VLIB_NODE_FN(vcdp_tunnel_output_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
   return vcdp_tunnel_output_node_inline(vm, node, frame);
 }
 
@@ -52,26 +53,24 @@ vlib_error_desc_t vcdp_tunnel_output_error_counters[] = {
 #undef _
 };
 
-VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {
-  .name = "vcdp-tunnel-output",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tunnel_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {.name = "vcdp-tunnel-output",
+                                               .vector_size = sizeof(u32),
+                                               .format_trace = format_vcdp_tunnel_trace,
+                                               .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
-  .error_counters = vcdp_tunnel_output_error_counters,
-  .n_next_nodes = VCDP_TUNNEL_OUTPUT_N_NEXT,
-  .next_nodes =
-    {
-      [VCDP_TUNNEL_OUTPUT_NEXT_DROP] = "error-drop",
-      [VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
-    }
+                                               .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
+                                               .error_counters = vcdp_tunnel_output_error_counters,
+                                               .n_next_nodes = VCDP_TUNNEL_OUTPUT_N_NEXT,
+                                               .next_nodes =
+                                                 {
+                                                   [VCDP_TUNNEL_OUTPUT_NEXT_DROP] = "error-drop",
+                                                   [VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
+                                                 }
 
 };
 
 VCDP_SERVICE_DEFINE(vcdp_tunnel_output) = {
   .node_name = "vcdp-tunnel-output",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle",
-                              "vcdp-tcp-check"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 1};

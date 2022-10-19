@@ -25,51 +25,47 @@ typedef struct {
 } vcdp_tcp_check_trace_t;
 
 static u8 *
-format_vcdp_tcp_check_trace(u8 *s, va_list *args) {
+format_vcdp_tcp_check_trace(u8 *s, va_list *args)
+{
   vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_tcp_check_trace_t *t = va_arg(*args, vcdp_tcp_check_trace_t *);
   u32 indent = format_get_indent(s);
   indent += 2;
-  s = format(s, "vcdp-tcp-check: flow-id %u (session %u, %s)\n", t->flow_id,
-             t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
-  s = format(s, "%Uold session flags: %U\n", format_white_space, indent,
-             format_vcdp_tcp_check_session_flags, t->old_state_flags);
-  s = format(s, "%Unew session flags: %U\n", format_white_space, indent,
-             format_vcdp_tcp_check_session_flags, t->new_state_flags);
+  s = format(s, "vcdp-tcp-check: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
+             t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format(s, "%Uold session flags: %U\n", format_white_space, indent, format_vcdp_tcp_check_session_flags,
+             t->old_state_flags);
+  s = format(s, "%Unew session flags: %U\n", format_white_space, indent, format_vcdp_tcp_check_session_flags,
+             t->new_state_flags);
   return s;
 }
 
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
-update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant,
-                     vcdp_tcp_check_session_state_t *tcp_session,
-                     vcdp_session_t *session, f64 current_time, u8 dir,
-                     u16 *to_next, vlib_buffer_t **b, u32 *sf, u32 *nsf) {
+update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_session_state_t *tcp_session,
+                     vcdp_session_t *session, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
+                     u32 *nsf)
+{
   /* Parse the packet */
   /* TODO: !!! Broken with IP options !!! */
   u8 *data = vlib_buffer_get_current(b[0]);
   tcp_header_t *tcph =
-    (void *) (data + (session->type == VCDP_SESSION_TYPE_IP4 ?
-                        sizeof(ip4_header_t) :
-                        sizeof(ip6_header_t)));
+    (void *) (data + (session->type == VCDP_SESSION_TYPE_IP4 ? sizeof(ip4_header_t) : sizeof(ip6_header_t)));
   ip4_header_t *ip4 = (void *) data;
   ip6_header_t *ip6 = (void *) data;
   /* Ignore non first fragments */
   if (session->type == VCDP_SESSION_TYPE_IP4 &&
-      ip4->flags_and_fragment_offset &
-        clib_host_to_net_u16(IP4_HEADER_FLAG_MORE_FRAGMENTS - 1)) {
+      ip4->flags_and_fragment_offset & clib_host_to_net_u16(IP4_HEADER_FLAG_MORE_FRAGMENTS - 1)) {
     vcdp_next(b[0], to_next);
     return;
   }
 
   if (session->type == VCDP_SESSION_TYPE_IP6 && ip6_ext_hdr(ip6->protocol)) {
     ip6_ext_hdr_chain_t chain;
-    int res =
-      ip6_ext_header_walk(b[0], ip6, IP_PROTOCOL_IPV6_FRAGMENTATION, &chain);
+    int res = ip6_ext_header_walk(b[0], ip6, IP_PROTOCOL_IPV6_FRAGMENTATION, &chain);
     if (res >= 0 && chain.eh[res].protocol == IP_PROTOCOL_IPV6_FRAGMENTATION) {
-      ip6_frag_hdr_t *frag =
-        ip6_ext_next_header_offset(ip6, chain.eh[res].offset);
+      ip6_frag_hdr_t *frag = ip6_ext_next_header_offset(ip6, chain.eh[res].offset);
       if (ip6_frag_hdr_offset(frag)) {
         vcdp_next(b[0], to_next);
         return;
@@ -102,8 +98,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant,
     if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN) {
       /* New session, must be a SYN otherwise bad */
       if (sf[0] == 0)
-        nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
-                 VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
+        nsf[0] = VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN | VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
       else {
         remove_session = 1;
         goto out;
@@ -114,8 +109,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant,
       if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN)
         nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
       /* Or ACK to FIN */
-      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP &&
-          acknum == tcp_session->fin_num[VCDP_FLOW_REVERSE])
+      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_RESP && acknum == tcp_session->fin_num[VCDP_FLOW_REVERSE])
         nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_INIT;
       /* Or regular ACK */
     }
@@ -137,16 +131,14 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant,
       goto out;
     if (flags & VCDP_TCP_CHECK_TCP_FLAGS_SYN) {
       if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN)
-        nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN |
-                  VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
+        nsf[0] ^= VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_SYN | VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_INIT_ACK_TO_SYN;
     }
     if (flags & VCDP_TCP_CHECK_TCP_FLAGS_ACK) {
       /* Either ACK to SYN */
       if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN)
         nsf[0] &= ~VCDP_TCP_CHECK_SESSION_FLAG_WAIT_FOR_RESP_ACK_TO_SYN;
       /* Or ACK to FIN */
-      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT &&
-          acknum == tcp_session->fin_num[VCDP_FLOW_FORWARD])
+      if (sf[0] & VCDP_TCP_CHECK_SESSION_FLAG_SEEN_FIN_INIT && acknum == tcp_session->fin_num[VCDP_FLOW_FORWARD])
         nsf[0] |= VCDP_TCP_CHECK_SESSION_FLAG_SEEN_ACK_TO_FIN_RESP;
       /* Or regular ACK */
     }
@@ -187,23 +179,21 @@ out:
   else
     next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];
 
-  vcdp_session_timer_update_maybe_past(tw, &session->timer, current_time,
-                                       next_timeout);
+  vcdp_session_timer_update_maybe_past(tw, &session->timer, current_time, next_timeout);
   vcdp_next(b[0], to_next);
   return;
 }
 
 VLIB_NODE_FN(vcdp_tcp_check_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) {
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_check_main_t *vtcm = &vcdp_tcp;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd =
-    vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  vcdp_tcp_check_per_thread_data_t *tptd =
-    vec_elt_at_index(vtcm->ptd, thread_index);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  vcdp_tcp_check_per_thread_data_t *tptd = vec_elt_at_index(vtcm->ptd, thread_index);
   vcdp_session_t *session;
   vcdp_tenant_t *tenant;
   u32 session_idx;
@@ -223,11 +213,9 @@ VLIB_NODE_FN(vcdp_tcp_check_node)
     tcp_session = vec_elt_at_index(tptd->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
     if (vcdp_direction_from_flow_index(b[0]->flow_id) == VCDP_FLOW_FORWARD)
-      update_state_one_pkt(tw, tenant, tcp_session, session, current_time,
-                           VCDP_FLOW_FORWARD, to_next, b, sf, nsf);
+      update_state_one_pkt(tw, tenant, tcp_session, session, current_time, VCDP_FLOW_FORWARD, to_next, b, sf, nsf);
     else
-      update_state_one_pkt(tw, tenant, tcp_session, session, current_time,
-                           VCDP_FLOW_REVERSE, to_next, b, sf, nsf);
+      update_state_one_pkt(tw, tenant, tcp_session, session, current_time, VCDP_FLOW_REVERSE, to_next, b, sf, nsf);
     n_left -= 1;
     b += 1;
     to_next += 1;
@@ -257,20 +245,18 @@ VLIB_NODE_FN(vcdp_tcp_check_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_tcp_check_node) = {
-  .name = "vcdp-tcp-check",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tcp_check_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
+VLIB_REGISTER_NODE(vcdp_tcp_check_node) = {.name = "vcdp-tcp-check",
+                                           .vector_size = sizeof(u32),
+                                           .format_trace = format_vcdp_tcp_check_trace,
+                                           .type = VLIB_NODE_TYPE_INTERNAL,
 
-  .n_errors = ARRAY_LEN(vcdp_tcp_check_error_strings),
-  .error_strings = vcdp_tcp_check_error_strings,
-  .sibling_of = "vcdp-lookup-ip4"
+                                           .n_errors = ARRAY_LEN(vcdp_tcp_check_error_strings),
+                                           .error_strings = vcdp_tcp_check_error_strings,
+                                           .sibling_of = "vcdp-lookup-ip4"
 
 };
 
-VCDP_SERVICE_DEFINE(tcp_check) = {
-  .node_name = "vcdp-tcp-check",
-  .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
-  .is_terminal = 0};
+VCDP_SERVICE_DEFINE(tcp_check) = {.node_name = "vcdp-tcp-check",
+                                  .runs_before = VCDP_SERVICES(0),
+                                  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
+                                  .is_terminal = 0};
