@@ -39,12 +39,12 @@ install-release: $(release_build_dir)
 run run-release debug debug-release:
 	@make -C $(VPP_DIR) STARTUP_DIR=$(PWD) $@
 
-test-debug: $(debug_build_dir)
+test-debug: build
 	@make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins TEST=nataas $@
-test: $(release_build_dir)
+test: build-release
 	@make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(release_build_dir)/lib/vpp_plugins TEST=nataas $@
 
-check: $(debug_build_dir)
+check: build
 	@ctest --test-dir $(debug_build_dir)
 
 clean:
