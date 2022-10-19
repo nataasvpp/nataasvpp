@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+#
+# Copyright (c) 2022 Cisco and/or its affiliates.
+
 """NATaaS tests"""
 
 import unittest

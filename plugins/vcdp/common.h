@@ -1,5 +1,7 @@
-#ifndef __included_vcdp_common_h__
-#define __included_vcdp_common_h__
+// Copyright(c) 2022 Cisco Systems, Inc.
+
+#ifndef included_vcdp_common_h
+#define included_vcdp_common_h
 
 #include <vnet/vnet.h>
 

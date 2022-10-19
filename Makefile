@@ -1,3 +1,5 @@
+# Copyright (c) 2022 Cisco and/or its affiliates.
+
 VPP_DIR?=$(PWD)/../vpp
 
 build_dir = $(PWD)/_build
