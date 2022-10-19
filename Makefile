@@ -44,6 +44,9 @@ test-debug: $(debug_build_dir)
 test: $(release_build_dir)
 	@make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(release_build_dir)/lib/vpp_plugins TEST=nataas $@
 
+check: $(debug_build_dir)
+	@ctest --test-dir $(debug_build_dir)
+
 clean:
 	@rm -rf $(build_dir)
 

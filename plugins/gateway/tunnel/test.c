@@ -147,7 +147,7 @@ main(int argc, char **argv)
   printf("Found a tunnel: %s\n", t->tunnel_id);
 
   u64 value;
-  rv = vcdp_tunnel_lookup(0, src.ip.ip4, dst.ip.ip4, 17, htons(4278), 0, &value);
+  rv = vcdp_tunnel_lookup(0, src.ip.ip4, dst.ip.ip4, 17, 0, htons(4278), &value);
 
   assert(rv == 0 && "Lookup by session parameters");
 
