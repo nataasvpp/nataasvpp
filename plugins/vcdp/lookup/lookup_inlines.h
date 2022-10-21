@@ -187,6 +187,45 @@ static const u32x8 key_ip6_shuff_no_norm_B = {KEY_IP6_SHUFF_NO_NORM_B};
 static const u32x8 key_ip6_shuff_norm_B = {KEY_IP6_SHUFF_NORM_B};
 static const u8x8 key_ip6_swap_icmp = {KEY_IP6_SWAP_ICMP};
 
+#include <vnet/udp/udp_packet.h>
+static_always_inline u8
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h,
+                 i16 *l4_hdr_offset, u8 slow_path)
+{
+  ip4_header_t *ip = vlib_buffer_get_current(b);
+  udp_header_t *udp = (udp_header_t *) (ip+1);
+
+  u16 sport = udp->src_port;
+  u16 dport = udp->dst_port;
+  u32 src = ntohl(ip->src_address.as_u32);
+  u32 dst = ntohl(ip->dst_address.as_u32);
+  u32 ip_addr_lo = src < dst ? src : dst;
+  u32 ip_addr_hi = src > dst ? src : dst;
+  u16 port_lo = sport < dport ? sport : dport;
+  u16 port_hi = sport > dport ? sport : dport;
+
+  skey->ip4_key = (vcdp_ip4_key_t){0};
+  skey->context_id = context_id;
+  skey->ip4_key.ip_addr_lo = htonl(ip_addr_lo);
+  skey->ip4_key.port_lo = port_lo;
+  skey->ip4_key.port_hi = port_hi;
+  skey->ip4_key.ip_addr_hi = htonl(ip_addr_hi);
+  skey->ip4_key.proto = ip->protocol;
+
+  // did we normalise?
+  if (src > dst) {
+    lookup_val[0] |= 0x1;
+  }
+  // figure out who uses this:
+  void *next_header = ip4_next_header(ip);
+  l4_hdr_offset[0] = (u8 *) next_header - b->data;
+
+  /* calculate hash */
+  h[0] = clib_bihash_hash_24_8((clib_bihash_kv_24_8_t *) (skey));
+  return 0;
+}
+
+#if 0
 static_always_inline u8
 vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h,
                  i16 *l4_hdr_offset, u8 slow_path)
@@ -317,168 +356,8 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
    be overwritten, but we avoid too much branching in fastpath */
   return slowpath_needed;
 }
-
-#if 0
-static_always_inline u8
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
-                 u64 *lookup_val, u64 *h, i16 *l4_hdr_offset, u8 slow_path) {
-  u8 pr;
-  // i64x2 norm, zero = {};
-  // u8x16 k, swap;
-  // u32 l4_hdr;
-  void *next_header;
-  ip4_header_t *ip = vlib_buffer_get_current(b);
-  u8 slowpath_needed;
-  u8 reass_needed;
-  u8 l4_from_reass = 0;
-  u8 tcp_or_udp;
-  u8 unknown_protocol;
-
-  pr = ip->protocol;
-  next_header = ip4_next_header(ip);
-  l4_hdr_offset[0] = (u8 *) next_header - b->data;
-
-  reass_needed = !!(ip->flags_and_fragment_offset &
-                    clib_host_to_net_u16(IP4_REASS_NEEDED_FLAGS));
-  tcp_or_udp = pr == IP_PROTOCOL_TCP || pr == IP_PROTOCOL_UDP;
-  unknown_protocol = !tcp_or_udp && pr != IP_PROTOCOL_ICMP;
-  slowpath_needed = !tcp_or_udp || reass_needed;
-  clib_warning("CALC KEY PACKET: %U", format_ip4_header, ip);
-  u16 sport = 0, dport = 0;
-  if (tcp_or_udp) {
-    udp_header_t *udp = (udp_header_t *)ip + 1;
-    sport = ntohs(udp->src_port);
-    dport = ntohs(udp->dst_port);
-    clib_warning("PACKET WITH PORTS %d %d", sport, dport);
-  }
-  u32 src, dst;
-  src = ntohl(ip->src_address.as_u32);
-  dst = ntohl(ip->dst_address.as_u32);
-  u32 ip_addr_lo = src < dst ? src : dst;
-  u32 ip_addr_hi = src > dst ? src : dst;
-  u16 port_lo = sport < dport ? sport : dport;
-  u16 port_hi = sport > dport ? sport : dport;
-
-  skey->ip4_key =  (vcdp_ip4_key_t) {0};
-  skey->context_id = context_id;
-  skey->ip4_key.ip_addr_lo = ip_addr_lo;
-  skey->ip4_key.port_lo = port_lo;
-  skey->ip4_key.port_hi = port_hi;
-  skey->ip4_key.ip_addr_hi = ip_addr_hi;
-  clib_memset(skey->zeros, 0, sizeof(skey->zeros));
-
-
-  if (slow_path && reass_needed &&
-      vcdp_buffer2(b)->flags & VCDP_BUFFER_FLAG_REASSEMBLED) {
-    /* This packet comes back from shallow virtual reassembly */
-    l4_from_reass = 1;
-  } else if (slow_path && reass_needed) {
-    /* Reassembly is needed and has not been done yet */
-    lookup_val[0] = (u64) VCDP_SP_NODE_IP4_REASS << 32 | VCDP_LV_TO_SP;
-    return slowpath_needed;
-  }
-
-  /* non TCP, UDP or ICMP packets are going to slowpath */
-  if (slow_path && unknown_protocol) {
-    lookup_val[0] = (u64) VCDP_SP_NODE_IP4_UNKNOWN_PROTO << 32 | VCDP_LV_TO_SP;
-    return slowpath_needed;
-  }
-
-  /* byteswap src and dst ip and splat into all 4 elts of u32x4, then
-   * compare so result will hold all ones if we need to swap src and dst
-   * signed vector type is used as */
-  // norm = (((i64x2) u8x16_shuffle2(k, zero, SRC_IP4_BYTESWAP_X2)) >
-  //         ((i64x2) u8x16_shuffle2(k, zero, DST_IP4_BYTESWAP_X2)));
-
-  if (slow_path && pr == IP_PROTOCOL_ICMP) {
-    u8 type;
-    i64 x, y;
-    if (l4_from_reass)
-      type = vnet_buffer(b)->ip.reass.icmp_type_or_tcp_flags;
-    else {
-      icmp46_header_t *icmp = next_header;
-      type = icmp->type;
-    }
-    x = (1ULL << type) & icmp4_type_ping_bitmask;
-    y = (1ULL << type) & icmp4_type_errors_bitmask;
-    if (x == 0) {
-      /* If it's an known ICMP error, treat in the specific slowpath (with
-         a lookup on inner packet), otherwise, it's an unknown protocol */
-      lookup_val[0] =
-        y ? (u64) VCDP_SP_NODE_IP4_ICMP4_ERROR << 32 | VCDP_LV_TO_SP :
-            (u64) VCDP_SP_NODE_IP4_UNKNOWN_PROTO << 32 | VCDP_LV_TO_SP;
-      return slowpath_needed;
-    }
-    // norm &= i64x2_splat(x) != zero;
-  } else {
-    // norm &= i64x2_splat((1ULL << pr) & tcp_udp_bitmask) != zero;
-  ;
-  }
-  // swap = key_ip4_shuff_no_norm;
-  /* if norm is zero, we don't need to normalize so nothing happens here */
-  // swap += (key_ip4_shuff_norm - key_ip4_shuff_no_norm) & (u8x16) norm;
-
-  /* overwrite first 4 bytes with first 0 - 4 bytes of l4 header */
-#if 0
-  if (slow_path && l4_from_reass) {
-    u16 src_port, dst_port;
-    src_port = vnet_buffer(b)->ip.reass.l4_src_port;
-    dst_port = vnet_buffer(b)->ip.reass.l4_dst_port;
-    // l4_hdr = dst_port << 16 | src_port;
-    /* Mask seqnum field out for ICMP */
-    if (pr == IP_PROTOCOL_ICMP)
-      l4_hdr &= 0xff;
-  } else if (slow_path)
-    l4_hdr = ((u32 *) next_header + l4_offset_32w[pr])[0] &
-             pow2_mask(l4_mask_bits[pr]);
-  else
-    l4_hdr = *(u32 *) next_header & pow2_mask(l4_mask_bits[pr]);
-  // k = (u8x16) u32x4_insert((u32x4) k, l4_hdr, 0);
 #endif
-  // k = u8x16_shuffle_dynamic(k, swap);
 
-  /* Reshuffle for ICMP
-     TODO: merge with fast path? */
-  // if (slow_path && pr == IP_PROTOCOL_ICMP)
-  //   k += u8x16_shuffle2(k, zero, KEY_IP4_SWAP_ICMP);
-  // lookup_val[0] = ((u32x4) norm)[0] & 0x1;
-
-  /* extract tcp flags */
-  if (slow_path && l4_from_reass && pr == IP_PROTOCOL_TCP)
-    vcdp_buffer2(b)->tcp_flags =
-      vnet_buffer(b)->ip.reass.icmp_type_or_tcp_flags;
-  else if (pr == IP_PROTOCOL_TCP)
-    vcdp_buffer(b)->tcp_flags = *(u8 *) next_header + 13;
-  else
-    vcdp_buffer(b)->tcp_flags = 0;
-
-  /* store key */
-  // skey->ip4_key.as_u8x16 = k;
-  // skey->context_id = context_id;
-  // clib_memset(skey->zeros, 0, sizeof(skey->zeros));
-  /* calculate hash */
-  h[0] = clib_bihash_hash_24_8((clib_bihash_kv_24_8_t *) (skey));
-
-  if (slow_path && l4_from_reass) {
-    /* Restore vcdp_buffer */
-    /* TODO: optimise save/restore ? */
-    vcdp_buffer(b)->flags = vcdp_buffer2(b)->flags;
-    vcdp_buffer(b)->service_bitmap = vcdp_buffer2(b)->service_bitmap;
-    vcdp_buffer(b)->tcp_flags = vcdp_buffer2(b)->tcp_flags;
-    vcdp_buffer(b)->tenant_index = vcdp_buffer2(b)->tenant_index;
-
-    /*Clear*/
-    vcdp_buffer2(b)->flags = 0;
-    vcdp_buffer2(b)->service_bitmap = 0;
-    vcdp_buffer2(b)->tcp_flags = 0;
-    vcdp_buffer2(b)->tenant_index = 0;
-  }
-
-  /* If slowpath needed == 1, we may have done a lot of useless work that will
-   be overwritten, but we avoid too much branching in fastpath */
-  return slowpath_needed;
-}
-#endif
 static_always_inline u32x2
 u32x2_insert(u32x2 x, u32 y, uword idx)
 {

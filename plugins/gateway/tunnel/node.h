@@ -182,7 +182,6 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
         break;
     }
   }
-
   return frame->n_vectors;
 }
 
@@ -295,7 +294,6 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
         break;
     }
   }
-
   return frame->n_vectors;
 }
 

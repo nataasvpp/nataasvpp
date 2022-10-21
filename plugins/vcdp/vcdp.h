@@ -263,8 +263,12 @@ typedef struct {
   u64 session_id_ctr;
   u64 session_id_template;
   u32 *expired_sessions;
-  vlib_combined_counter_main_t per_session_ctr[VCDP_FLOW_N_COUNTER];
+  vlib_combined_counter_main_t per_session_ctr[VCDP_FLOW_N_COUNTER]; // TODO: Shouldn't be here
 } vcdp_per_thread_data_t;
+
+typedef enum {
+  VCDP_TENANT_FLAG_NO_CREATE = 1 << 1,
+} vcdp_tenant_flags_t;
 
 typedef struct {
   u32 tenant_id;
@@ -274,6 +278,7 @@ typedef struct {
   u32 sp_node_indices[VCDP_N_SP_NODES];
   uword icmp4_lookup_next; // TODO: Remove?
   uword icmp6_lookup_next; // TODO: Remove?
+  vcdp_tenant_flags_t flags;
 
 } vcdp_tenant_t;
 
@@ -287,8 +292,8 @@ typedef struct {
   clib_bihash_48_8_t table6;
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
-  u32 icmp4_error_frame_queue_index;
-  u32 icmp6_error_frame_queue_index;
+  u32 icmp4_error_frame_queue_index; // TODO: Remove
+  u32 icmp6_error_frame_queue_index; // TODO: Remove
   u64 session_id_ctr_mask;
   vlib_simple_counter_main_t tenant_session_ctr[VCDP_TENANT_SESSION_N_COUNTER];
   vlib_combined_counter_main_t tenant_data_ctr[VCDP_TENANT_DATA_N_COUNTER];
@@ -307,8 +312,8 @@ typedef struct {
 
 extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
-extern vlib_node_registration_t vcdp_lookup_ip4_icmp_node;
-extern vlib_node_registration_t vcdp_lookup_ip6_icmp_node;
+extern vlib_node_registration_t vcdp_lookup_ip4_icmp_node; // TODO: Remove
+extern vlib_node_registration_t vcdp_lookup_ip6_icmp_node; // TODO: Remove
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
 extern vlib_node_registration_t vcdp_lookup_ip6_node;
 format_function_t format_vcdp_session;
@@ -470,7 +475,7 @@ vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id, u32 threa
                     u32 *session_index, int is_ipv6);
 
 clib_error_t *
-vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u8 is_del);
+vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del);
 clib_error_t *
 vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
 clib_error_t *

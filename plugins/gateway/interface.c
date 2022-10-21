@@ -8,9 +8,26 @@
 #include <vnet/feature/feature.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/common.h>
+#include <vnet/ip/reass/ip4_sv_reass.h>
 #include "gateway.h"
 
 enum vcdp_input_next_e { VCDP_INPUT_NEXT_LOOKUP, VCDP_INPUT_N_NEXT };
+
+typedef struct {
+  u16 tenant_index;
+} vcdp_input_trace_t;
+
+static inline u8 *
+format_vcdp_input_trace(u8 *s, va_list *args)
+{
+  CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
+  CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
+  vcdp_input_trace_t *t = va_arg(*args, vcdp_input_trace_t *);
+
+  s = format(s, "vcdp-input: tenant idx %d", t->tenant_index);
+  return s;
+}
+
 
 // This node assumes that the tenant has been configured for the given FIB table
 // before being enabled.
@@ -23,6 +40,9 @@ VLIB_NODE_FN(vcdp_input_node)
   gw_main_t *gw = &gateway_main;
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
+  u16 tenant_indicies[VLIB_FRAME_SIZE] = {0},
+    *tenant_idx = tenant_indicies; // Used only for tracing
+
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
@@ -33,28 +53,45 @@ VLIB_NODE_FN(vcdp_input_node)
   while (n_left) {
 
     u32 rx_sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
-    u32 tenant_idx = gw->tenant_idx_by_sw_if_idx[rx_sw_if_index];
-    if (tenant_idx == ~0) {
+    tenant_idx[0] = gw->tenant_idx_by_sw_if_idx[rx_sw_if_index];
+    if ((u32)tenant_idx[0] == ~0) {
       vnet_feature_next_u16(current_next, b[0]);
       goto next;
     }
-    vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+    vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx[0]);
     b[0]->flow_id = tenant->context_id;
-    vcdp_buffer(b[0])->tenant_index = tenant_idx;
+    vcdp_buffer(b[0])->tenant_index = tenant_idx[0];
     current_next[0] = VCDP_INPUT_NEXT_LOOKUP;
 
   next:
     b += 1;
     current_next += 1;
     n_left -= 1;
+    tenant_idx += 1;
   }
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
+
+  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
+    int i;
+    b = bufs;
+    tenant_idx = tenant_indicies;
+    for (i = 0; i < frame->n_vectors; i++) {
+      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
+        vcdp_input_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        t->tenant_index = tenant_idx[0];
+        b++;
+        tenant_idx++;
+      } else
+        break;
+    }
+  }
   return frame->n_vectors;
 }
 
 VLIB_REGISTER_NODE(vcdp_input_node) = {
   .name = "vcdp-input",
   .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_input_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_next_nodes = VCDP_INPUT_N_NEXT,
   .next_nodes =

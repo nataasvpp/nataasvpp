@@ -1,17 +1,4 @@
-/*
- * Copyright (c) 2015 Cisco and/or its affiliates.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright(c) 2022 Cisco Systems, Inc.
 
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
@@ -24,6 +11,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
+
 #define foreach_vcdp_lookup_error                                                                                      \
   _(MISS, "flow miss")                                                                                                 \
   _(LOCAL, "local flow")                                                                                               \
@@ -379,7 +367,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       if (clib_bihash_search_inline_with_hash_48_8(&vcdp->table6, h[0], &kv.kv6)) {
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-        /* if there is colision, we just reiterate */
+        /* if there is collision, we just reiterate */
         if (vcdp_create_session_v6(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k6, h, lv)) {
           vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
           continue;
@@ -418,7 +406,11 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       if (clib_bihash_search_inline_with_hash_24_8(&vcdp->table4, h[0], &kv.kv4)) {
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-        /* if there is colision, we just reiterate */
+        /* if there is collision, we just reiterate */
+        if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
+          clib_warning("OLE: Trying to create session from outside");
+          goto next_pkt4;
+        }
         if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv,
                                    vcdp_buffer(b[0])->rx_id)) {
           vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);

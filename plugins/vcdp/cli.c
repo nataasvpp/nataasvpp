@@ -30,6 +30,8 @@ vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   u8 is_del = 0;
   u32 tenant_id = ~0;
   u32 context_id = ~0;
+  vcdp_tenant_flags_t flags = 0;
+
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
@@ -39,6 +41,8 @@ vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
       is_del = 1;
     else if (unformat(line_input, "context %d", &context_id))
       ;
+    else if (unformat(line_input, "no-create"))
+      flags |= VCDP_TENANT_FLAG_NO_CREATE;
     else {
       err = unformat_parse_error(line_input);
       goto done;
@@ -50,7 +54,7 @@ vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   }
   if (context_id == ~0)
     context_id = tenant_id;
-  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, is_del);
+  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, flags, is_del);
 done:
   unformat_free(line_input);
   return err;
@@ -353,7 +357,7 @@ vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vli
 
 VLIB_CLI_COMMAND(vcdp_tenant_add_del_command, static) = {
   .path = "vcdp tenant",
-  .short_help = "vcdp tenant <add|del> <tenant-id> context <context-id>",
+  .short_help = "vcdp tenant <add|del> <tenant-id> context <context-id> [<flags>]",
   .function = vcdp_tenant_add_del_command_fn,
 };
 

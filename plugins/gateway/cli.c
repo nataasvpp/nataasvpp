@@ -6,7 +6,7 @@
 #include "tunnel/tunnel.h"
 
 /*
- *  set vcdp interface <interface> tenant <tenant-id>
+ *  set vcdp gateway interface <interface> tenant <tenant-id>
  */
 static clib_error_t *
 gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)

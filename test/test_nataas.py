@@ -71,12 +71,14 @@ class TestNATaaS(VppTestCase):
         """VXLAN gateway through NAT"""
         # Create tunnel
         tenant=0
+        outside_tenant=1000
         dport=4789
         dport2=4790
         vrf=0
 
         self.vapi.cli(f'vcdp tenant add {tenant} context 0')
-        self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {tenant}")
+        self.vapi.cli(f'vcdp tenant add {outside_tenant} context 0 no-create')
+        self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {outside_tenant}")
 
         self.vapi.cli(f"set vcdp gateway tunnel {self.pg0.name}")
         self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
@@ -84,8 +86,7 @@ class TestNATaaS(VppTestCase):
         self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
         self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
         self.vapi.cli("vcdp nat alloc-pool add 4242 1.1.1.1")
-        self.vapi.cli(f"set vcdp nat snat tenant {tenant} outside-tenant {tenant} table {vrf} alloc-pool 4242")
-        print(self.vapi.cli("show interface features pg0"))
+        self.vapi.cli(f"set vcdp nat snat tenant {tenant} outside-tenant {outside_tenant} table {vrf} alloc-pool 4242")
 
         # Send a VXLAN packet and validate that is passes through the service chain and is natively forwarded
         pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP()
@@ -120,6 +121,14 @@ class TestNATaaS(VppTestCase):
         rx[0].show2()
         print(self.vapi.cli("show vcdp session-table"))
 
+        # # verify that packet from outside does not create session (default drop for tenant 1000)
+        # no_session_pkt = pkt_to_send
+        # no_session_pkt[TCP].dport = 666
+        # print('SENDING PACKET FROM OUTSIDE')
+        # self.send_and_assert_no_replies(self.pg1, no_session_pkt)
+        # print(self.vapi.cli("show vcdp session-table"))
+
+        print(self.vapi.cli('show vcdp tenant'))
 
 if __name__ == "__main__":
     unittest.main(testRunner=VppTestRunner)

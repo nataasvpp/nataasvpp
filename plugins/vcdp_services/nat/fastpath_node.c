@@ -233,6 +233,6 @@ VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
-  .runs_before = VCDP_SERVICES("vcdp-geneve-output"),
+  .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0};

@@ -24,6 +24,7 @@ $(debug_build_dir):
 $(release_build_dir):
 	$(call configure,release,vpp)
 
+.PHONY: build
 build: $(debug_build_dir)
 	@cmake --build $<
 
