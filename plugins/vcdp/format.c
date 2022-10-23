@@ -194,18 +194,6 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
     return s;
 }
 
-u8 *
-format_vcdp_sp_node(u8 *s, va_list *args)
-{
-  u32 sp_index = va_arg(*args, u32);
-#define _(sym, default, name)                                                                                          \
-  if (sp_index == VCDP_SP_NODE_##sym)                                                                                  \
-    s = format(s, name);
-  foreach_vcdp_sp_node
-#undef _
-    return s;
-}
-
 uword
 unformat_vcdp_service(unformat_input_t *input, va_list *args)
 {

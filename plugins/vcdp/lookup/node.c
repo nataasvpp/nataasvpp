@@ -47,25 +47,18 @@ static char *vcdp_handoff_error_strings[] = {
 #undef _
 };
 
-typedef struct {
+typedef struct
+{
+  u32 next_index;
   u32 sw_if_index;
-  union {
+  u64 hash;
+  u32 flow_id;
+  union
+  {
     vcdp_session_ip4_key_t k4;
     vcdp_session_ip6_key_t k6;
   };
   u8 is_ip6;
-  u8 is_sp;
-  union {
-    struct {
-      u32 next_index;
-      u64 hash;
-      u32 flow_id;
-    };
-    struct {
-      u32 sp_index;
-      u32 sp_node_index;
-    };
-  };
 } vcdp_lookup_trace_t;
 
 typedef struct {
@@ -305,7 +298,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   u32 to_sp[VLIB_FRAME_SIZE], n_to_sp = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
   u16 local_next_indices[VLIB_FRAME_SIZE];
-  u32 sp_indices[VLIB_FRAME_SIZE];
   u32 sp_node_indices[VLIB_FRAME_SIZE];
   vlib_buffer_t *local_bufs[VLIB_FRAME_SIZE];
   vlib_buffer_t *to_sp_bufs[VLIB_FRAME_SIZE];
@@ -447,13 +439,14 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     u32 flow_index;
     vlib_combined_counter_main_t *vcm;
 
-    if (lv[0] & VCDP_LV_TO_SP) {
-      to_sp[n_to_sp] = bi[0];
-      sp_indices[n_to_sp] = (lv[0] & ~(VCDP_LV_TO_SP)) >> 32;
-      to_sp_bufs[n_to_sp] = b[0];
-      n_to_sp++;
-      goto next_packet2;
-    }
+      if (lv[0] & VCDP_LV_TO_SP)
+	{
+	  to_sp[n_to_sp] = bi[0];
+	  sp_node_indices[n_to_sp] = (lv[0] & ~(VCDP_LV_TO_SP)) >> 32;
+	  to_sp_bufs[n_to_sp] = b[0];
+	  n_to_sp++;
+	  goto next_packet2;
+	}
 
     flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
     flow_index = lv[0] & (~(u32) 0);
@@ -516,14 +509,14 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_LOCAL, n_local);
   }
 
-  if (n_to_sp) {
-    vlib_frame_t *f = NULL;
-    u32 *current_next_slot = NULL;
-    u32 current_left_to_next = 0;
-    u32 *current_to_sp = to_sp;
-    u32 *sp_index = sp_indices;
-    u32 *sp_node_index = sp_node_indices;
-    u32 last_node_index = VLIB_INVALID_NODE_INDEX;
+  if (n_to_sp)
+    {
+      vlib_frame_t *f = NULL;
+      u32 *current_next_slot = NULL;
+      u32 current_left_to_next = 0;
+      u32 *current_to_sp = to_sp;
+      u32 *sp_node_index = sp_node_indices;
+      u32 last_node_index = VLIB_INVALID_NODE_INDEX;
 
     b = to_sp_bufs;
     n_left = n_to_sp;
@@ -533,10 +526,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u16 tenant_idx;
       vcdp_tenant_t *tenant;
 
-      tenant_idx = vcdp_buffer(b[0])->tenant_index;
-      tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-      node_index = tenant->sp_node_indices[sp_index[0]];
-      sp_node_index[0] = node_index;
+	  tenant_idx = vcdp_buffer (b[0])->tenant_index;
+	  tenant = vcdp_tenant_at_index (vcdp, tenant_idx);
+	  node_index = tenant->sp_node_indices[sp_node_index[0]];
 
       if (PREDICT_FALSE(node_index != last_node_index) || current_left_to_next == 0) {
         if (f != NULL)
@@ -550,12 +542,11 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       current_next_slot[0] = current_to_sp[0];
 
-      f->n_vectors += 1;
-      current_to_sp += 1;
-      b += 1;
-      sp_index += 1;
-      sp_node_index += 1;
-      current_next_slot += 1;
+	  f->n_vectors += 1;
+	  current_to_sp += 1;
+	  b += 1;
+	  sp_node_index += 1;
+	  current_next_slot += 1;
 
       current_left_to_next -= 1;
       n_left -= 1;
@@ -563,45 +554,45 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     vlib_put_frame_to_node(vm, last_node_index, f);
   }
 
-  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
-    int i;
-    b = bufs;
-    bi = from;
-    h = hashes;
-    u32 *in_local = to_local;
-    u32 *in_remote = to_remote;
-    u32 *in_sp = to_sp;
-    for (i = 0; i < frame->n_vectors; i++) {
-      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_lookup_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
-        t->sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
-        t->flow_id = b[0]->flow_id;
-        t->hash = h[0];
-        t->is_sp = 0;
-        if (bi[0] == in_local[0]) {
-          t->next_index = local_next_indices[(in_local++) - to_local];
-        } else if (bi[0] == in_remote[0]) {
-          t->next_index = ~0;
-          in_remote++;
-        } else {
-          t->is_sp = 1;
-          t->sp_index = sp_indices[in_sp - to_sp];
-          t->sp_node_index = sp_node_indices[in_sp - to_sp];
-          in_sp++;
-        }
+  if (PREDICT_FALSE ((node->flags & VLIB_NODE_FLAG_TRACE)))
+    {
+      int i;
+      b = bufs;
+      bi = from;
+      h = hashes;
+      u32 *in_local = to_local;
+      u32 *in_remote = to_remote;
 
-        if ((t->is_ip6 = is_ipv6))
-          clib_memcpy(&t->k6, &keys.keys6[i], sizeof(t->k6));
-        else
-          clib_memcpy(&t->k4, &keys.keys4[i], sizeof(t->k4));
-
-        bi++;
-        b++;
-        h++;
-      } else
-        break;
+      for (i = 0; i < frame->n_vectors; i++)
+	{
+	  if (b[0]->flags & VLIB_BUFFER_IS_TRACED)
+	    {
+	      vcdp_lookup_trace_t *t =
+		vlib_add_trace (vm, node, b[0], sizeof (*t));
+	      t->sw_if_index = vnet_buffer (b[0])->sw_if_index[VLIB_RX];
+	      t->flow_id = b[0]->flow_id;
+	      t->hash = h[0];
+	      if (bi[0] == in_local[0])
+		{
+		  t->next_index = local_next_indices[(in_local++) - to_local];
+		}
+	      else
+		{
+		  t->next_index = ~0;
+		  in_remote++;
+		}
+	      if ((t->is_ip6 = is_ipv6))
+		clib_memcpy (&t->k6, &keys.keys6[i], sizeof (t->k6));
+	      else
+		clib_memcpy (&t->k4, &keys.keys4[i], sizeof (t->k4));
+	      bi++;
+	      b++;
+	      h++;
+	    }
+	  else
+	    break;
+	}
     }
-  }
   return frame->n_vectors;
 }
 
@@ -664,24 +655,18 @@ VLIB_NODE_FN(vcdp_handoff_node)
 static u8 *
 format_vcdp_lookup_trace(u8 *s, va_list *args)
 {
-  vlib_main_t *vm = va_arg(*args, vlib_main_t *);
-  vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
-  vcdp_lookup_trace_t *t = va_arg(*args, vcdp_lookup_trace_t *);
+  vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
+  vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
+  vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
 
-  if (!t->is_sp)
-    s = format(s,
-               "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
-               "flow-id %u (session %u, %s) key 0x%U",
-               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
-               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap,
-               t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4, t->is_ip6 ? sizeof(t->k6) : sizeof(t->k4));
-  else
-    s = format(s,
-               "vcdp-lookup: sw_if_index %d, slow-path (%U) "
-               "slow-path node index %d key 0x%U",
-               t->sw_if_index, format_vcdp_sp_node, t->sp_index, format_vlib_node_name, vm, t->sp_node_index,
-               format_hex_bytes_no_wrap, t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
-               t->is_ip6 ? sizeof(t->k6) : sizeof(t->k4));
+  s = format (s,
+	      "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
+	      "flow-id %u (session %u, %s) key 0x%U",
+	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
+	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
+	      format_hex_bytes_no_wrap,
+	      t->is_ip6 ? (u8 *) &t->k6 : (u8 *) &t->k4,
+	      t->is_ip6 ? sizeof (t->k6) : sizeof (t->k4));
   return s;
 }
 

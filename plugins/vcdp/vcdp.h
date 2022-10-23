@@ -322,7 +322,6 @@ format_function_t format_vcdp_session_state;
 format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
-format_function_t format_vcdp_sp_node;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
 unformat_function_t unformat_vcdp_sp_node;
