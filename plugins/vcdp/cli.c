@@ -183,52 +183,6 @@ done:
 }
 
 static clib_error_t *
-vcdp_set_icmp_error_node_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
-{
-  unformat_input_t line_input_, *line_input = &line_input_;
-  clib_error_t *err = 0;
-  vcdp_main_t *vcdp = &vcdp_main;
-  u32 tenant_id = ~0;
-  u32 node_index = ~0;
-  u8 ip46 = 0;
-
-  if (!unformat_user(input, unformat_line_input, line_input))
-    return 0;
-  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d", &tenant_id))
-      ;
-    else if (unformat(line_input, "node %U", unformat_vlib_node, vm, &node_index))
-      ;
-    else if (unformat(line_input, "ip4"))
-      ip46 = 1;
-    else if (unformat(line_input, "ip6"))
-      ip46 = 2;
-    else {
-      err = unformat_parse_error(line_input);
-      goto done;
-    }
-  }
-  if (tenant_id == ~0) {
-    err = clib_error_return(0, "missing tenant id");
-    goto done;
-  }
-  if (node_index == ~0) {
-    err = clib_error_return(0, "missing node");
-    goto done;
-  }
-  if (ip46 == 0) {
-    err = clib_error_return(0, "missing adress family");
-    goto done;
-  }
-
-  err = vcdp_set_icmp_error_node(vcdp, tenant_id, ip46 - 1, node_index);
-
-done:
-  unformat_free(line_input);
-  return err;
-}
-
-static clib_error_t *
 vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   unformat_input_t line_input_, *line_input = &line_input_;
@@ -395,9 +349,3 @@ VLIB_CLI_COMMAND(vcdp_set_sp_node_command, static) = {.path = "set vcdp sp-node"
                                                       .short_help = "set vcdp sp-node tenant <tenant-id>"
                                                                     " <sp-name> node <node-name>",
                                                       .function = vcdp_set_sp_node_command_fn};
-
-VLIB_CLI_COMMAND(vcdp_set_icmp_error_node_command,
-                 static) = {.path = "set vcdp icmp-error-node",
-                            .short_help = "set vcdp icmp-error-node tenant <tenant-id>"
-                                          " <ip4|ip6> node <node-name>",
-                            .function = vcdp_set_icmp_error_node_command_fn};

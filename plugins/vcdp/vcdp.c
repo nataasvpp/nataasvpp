@@ -264,6 +264,7 @@ vcdp_set_sp_node(vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index, u32 node_index)
   return 0;
 }
 
+<<<<<<< HEAD
 clib_error_t *
 vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6, u32 node_index)
 {
@@ -306,6 +307,8 @@ vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id, u32 threa
   return err;
 }
 
+=======
+>>>>>>> parent of f4248db (CLI/API for ICMP errors and sp node setting)
 void
 vcdp_normalise_ip4_key(vcdp_session_t *session, vcdp_session_ip4_key_t *result, u8 key_idx)
 {
