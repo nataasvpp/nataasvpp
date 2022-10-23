@@ -8,7 +8,6 @@ add_vpp_library(vcdp
   SOURCES
   vcdp/lookup/node.c
   vcdp/lookup/sv_reass_node.c
-  vcdp/lookup/icmp_error_node.c
   vcdp/drop/node.c
   vcdp/format.c
   vcdp/vcdp.c
@@ -20,7 +19,6 @@ add_vpp_library(vcdp
   MULTIARCH_SOURCES
   vcdp/lookup/node.c
   vcdp/lookup/sv_reass_node.c
-  vcdp/lookup/icmp_error_node.c
   vcdp/drop/node.c
 
   API_FILES
