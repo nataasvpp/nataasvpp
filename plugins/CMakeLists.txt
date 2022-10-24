@@ -7,7 +7,6 @@ include_directories(${CMAKE_BINARY_DIR})
 add_vpp_library(vcdp
   SOURCES
   vcdp/lookup/node.c
-  vcdp/lookup/sv_reass_node.c
   vcdp/drop/node.c
   vcdp/format.c
   vcdp/vcdp.c
@@ -15,11 +14,6 @@ add_vpp_library(vcdp
   vcdp/cli.c
   vcdp/api.c
   vcdp/timer/node.c
-
-  MULTIARCH_SOURCES
-  vcdp/lookup/node.c
-  vcdp/lookup/sv_reass_node.c
-  vcdp/drop/node.c
 
   API_FILES
   vcdp/vcdp_types.api
@@ -64,8 +58,6 @@ add_vpp_plugin(vcdp_gateway
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
 
-  dummy/dot1q.c
-
   gateway/gateway.c
   gateway/cli.c
   gateway/api.c
@@ -76,7 +68,6 @@ add_vpp_plugin(vcdp_gateway
   MULTIARCH_SOURCES
   vcdp_services/tcp-check/node.c
   vcdp_services/l4-lifecycle/node.c
-  dummy/dot1q.c
 
   API_FILES
   vcdp_services/nat/nat.api

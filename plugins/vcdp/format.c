@@ -24,8 +24,6 @@ format_vcdp_session_type(u8 *s, va_list *args)
   u32 session_type = va_arg(*args, u32);
   if (session_type == VCDP_SESSION_TYPE_IP4)
     s = format(s, "ipv4");
-  else if (session_type == VCDP_SESSION_TYPE_IP6)
-    s = format(s, "ipv6");
   return s;
 }
 
@@ -34,9 +32,8 @@ vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_sess
 {
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
-  vcdp_session_ip46_key_t skey;
-  vcdp_ip4_key_t *key4 = &skey.key4.ip4_key;
-  vcdp_ip6_key_t *key6 = &skey.key6.ip6_key;
+  vcdp_session_ip4_key_t skey;
+
   /* Session id */
   table_format_cell(t, n, 0, "0x%U", format_hex_bytes, &session_net, sizeof(session_net));
   /* Tenant id */
@@ -53,28 +50,17 @@ vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_sess
   table_format_cell(t, n, 9, "%f", remaining_time);
 
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey.key4, VCDP_SESSION_KEY_PRIMARY);
-    table_format_cell(t, n, 5, "%d", skey.key4.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &key4->ip_addr_lo, key4->port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &key4->ip_addr_hi, key4->port_hi);
-  } else if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6) {
-    vcdp_normalise_ip6_key(session, &skey.key6, VCDP_SESSION_KEY_PRIMARY);
-    table_format_cell(t, n, 5, "%d", skey.key6.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip6_address, &key6->ip6_addr_lo, key6->port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip6_address, &key6->ip6_addr_hi, key6->port_hi);
+    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
+    table_format_cell(t, n, 5, "%d", skey.context_id);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
   }
   n += 1;
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey.key4, VCDP_SESSION_KEY_SECONDARY);
-    table_format_cell(t, n, 5, "%d", skey.key4.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &key4->ip_addr_lo, key4->port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &key4->ip_addr_hi, key4->port_hi);
-    n += 1;
-  } else if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6) {
-    vcdp_normalise_ip6_key(session, &skey.key6, VCDP_SESSION_KEY_SECONDARY);
-    table_format_cell(t, n, 5, "%d", skey.key6.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip6_address, &key6->ip6_addr_lo, key6->port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip6_address, &key6->ip6_addr_hi, key6->port_hi);
+    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_SECONDARY);
+    table_format_cell(t, n, 5, "%d", skey.context_id);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
     n += 1;
   }
   return n;
@@ -104,26 +90,20 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   u64 session_net = clib_host_to_net_u64(session->session_id);
   vlib_counter_t fctr, bctr;
   uword thread_index = ptd - vcdp_main.per_thread_data;
-  vcdp_session_ip46_key_t skey;
-  vcdp_ip4_key_t *key4 = &skey.key4.ip4_key;
-  vcdp_ip6_key_t *key6 = &skey.key6.ip6_key;
+  vcdp_session_ip4_key_t skey;
+
   vlib_get_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], session_index << 1, &fctr);
   vlib_get_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], (session_index << 1) | 0x1, &bctr);
   /* TODO: deal with secondary keys */
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
-    vcdp_normalise_ip4_key(session, &skey.key4, VCDP_SESSION_KEY_PRIMARY);
-  else
-    vcdp_normalise_ip6_key(session, &skey.key6, VCDP_SESSION_KEY_PRIMARY);
+    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
 
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
   s = format(s, "  thread index: %d\n", thread_index);
   s = format(s, "  session index: %d\n", session_index);
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
-    s = format(s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, key4->proto, format_ip4_address,
-               &key4->ip_addr_lo, key4->port_lo, format_ip4_address, &key4->ip_addr_hi, key4->port_hi);
-  else
-    s = format(s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, key6->proto, format_ip6_address,
-               &key6->ip6_addr_lo, key6->port_lo, format_ip6_address, &key6->ip6_addr_hi, key6->port_hi);
+    s = format(s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey.proto, format_ip4_address,
+               &skey.ip_addr_lo, skey.port_lo, format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format(s, "  expires after: %fs\n", remaining_time);
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
@@ -160,7 +140,6 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
 {
   u32 indent = format_get_indent(s);
   vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
-  vlib_main_t *vm = vlib_get_main();
   u32 tenant_idx = va_arg(*args, u32);
   __clib_unused vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
   counter_t ctr;
@@ -185,12 +164,6 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
   foreach_vcdp_timeout
 #undef _
 
-    s = format(s, "%U%s\n", format_white_space, indent, "Configured Slowpath nodes:");
-#define _(sym, default, name)                                                                                          \
-  s = format(s, "%U%s: %U\n", format_white_space, indent + 2, name, format_vlib_node_name, vm,                         \
-             tenant->sp_node_indices[VCDP_SP_NODE_##sym]);
-  foreach_vcdp_sp_node
-#undef _
     return s;
 }
 
@@ -223,18 +196,4 @@ unformat_vcdp_service_bitmap(unformat_input_t *input, va_list *args)
     return 1;
   }
   return 0;
-}
-
-uword
-unformat_vcdp_sp_node(unformat_input_t *input, va_list *args)
-{
-  u32 *result = va_arg(*args, u32 *);
-#define _(sym, default, str)                                                                                           \
-  if (unformat(input, str)) {                                                                                          \
-    *result = VCDP_SP_NODE_##sym;                                                                                      \
-    return 1;                                                                                                          \
-  }
-  foreach_vcdp_sp_node
-#undef _
-    return 0;
 }

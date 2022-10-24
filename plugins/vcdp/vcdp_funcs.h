@@ -9,23 +9,15 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
                     u32 session_index)
 {
   clib_bihash_kv_8_8_t kv2 = {0};
-  vcdp_bihash_kv46_t kv = {0};
+  clib_bihash_kv_16_8_t kv = {0};
   kv2.key = session->session_id;
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
-    clib_memcpy_fast(&kv.kv4.key, &session->keys[VCDP_SESSION_KEY_PRIMARY].key4, sizeof(kv.kv4.key));
-    clib_bihash_add_del_24_8(&vcdp->table4, &kv.kv4, 0);
+    clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_PRIMARY], sizeof(kv.key));
+    clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
   }
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
-    clib_memcpy_fast(&kv.kv4.key, &session->keys[VCDP_SESSION_KEY_SECONDARY].key4, sizeof(kv.kv4.key));
-    clib_bihash_add_del_24_8(&vcdp->table4, &kv.kv4, 0);
-  }
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6) {
-    clib_memcpy_fast(&kv.kv6.key, &session->keys[VCDP_SESSION_KEY_PRIMARY].key6, sizeof(kv.kv6.key));
-    clib_bihash_add_del_48_8(&vcdp->table6, &kv.kv6, 0);
-  }
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6) {
-    clib_memcpy_fast(&kv.kv6.key, &session->keys[VCDP_SESSION_KEY_SECONDARY].key6, sizeof(kv.kv6.key));
-    clib_bihash_add_del_48_8(&vcdp->table6, &kv.kv6, 0);
+    clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_SECONDARY], sizeof(kv.key));
+    clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
   }
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0);
   vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED], thread_index,
@@ -47,44 +39,25 @@ vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32
 
 static_always_inline int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_ip46_key_t *key, ip46_type_t type, u64 *h)
+                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
 {
   int rv;
-  vcdp_bihash_kv46_t kv;
+  clib_bihash_kv_16_8_t kv;
   u64 value;
   vcdp_session_t *session;
   u32 session_index;
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
 
-  if (type == IP46_TYPE_IP4) {
-    kv.kv4.key[0] = key->key4.ip4_key.as_u64x2[0];
-    kv.kv4.key[1] = key->key4.ip4_key.as_u64x2[1];
-    kv.kv4.key[2] = key->key4.as_u64;
-    kv.kv4.value = value;
-    *h = clib_bihash_hash_24_8(&kv.kv4);
-    if ((rv = vcdp_bihash_add_del_inline_with_hash_24_8(&vcdp->table4, &kv.kv4, *h, 2)) == 0) {
-      session_index = vcdp_session_from_flow_index(pseudo_flow_index);
-      session = vcdp_session_at_index(ptd, session_index);
-      session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
-      session->pseudo_dir[VCDP_SESSION_KEY_SECONDARY] = pseudo_flow_index & 0x1;
-      session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
-    }
-  } else {
-    kv.kv6.key[0] = key->key6.ip6_key.as_u64;
-    kv.kv6.key[1] = key->key6.ip6_key.as_u64x4[0];
-    kv.kv6.key[2] = key->key6.ip6_key.as_u64x4[1];
-    kv.kv6.key[3] = key->key6.ip6_key.as_u64x4[2];
-    kv.kv6.key[4] = key->key6.ip6_key.as_u64x4[3];
-    kv.kv6.key[5] = key->key6.as_u64;
-    kv.kv6.value = value;
-    *h = clib_bihash_hash_48_8(&kv.kv6);
-    if ((rv = vcdp_bihash_add_del_inline_with_hash_48_8(&vcdp->table6, &kv.kv6, *h, 2)) == 0) {
-      session_index = vcdp_session_from_flow_index(pseudo_flow_index);
-      session = vcdp_session_at_index(ptd, session_index);
-      session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
-      session->pseudo_dir[VCDP_SESSION_KEY_SECONDARY] = pseudo_flow_index & 0x1;
-      session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6;
-    }
+  kv.key[0] = key->as_u64[0];
+  kv.key[1] = key->as_u64[1];
+  kv.value = value;
+  *h = clib_bihash_hash_16_8(&kv);
+  if ((rv = vcdp_bihash_add_del_inline_with_hash_16_8(&vcdp->table4, &kv, *h, 2)) == 0) {
+    session_index = vcdp_session_from_flow_index(pseudo_flow_index);
+    session = vcdp_session_at_index(ptd, session_index);
+    session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
+    session->pseudo_dir[VCDP_SESSION_KEY_SECONDARY] = pseudo_flow_index & 0x1;
+    session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
   }
 
   return rv;
@@ -93,15 +66,15 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
 static_always_inline u8
 vcdp_renormalise_ip4_key(vcdp_session_ip4_key_t *key, u32 old_pseudo)
 {
-  if (clib_net_to_host_u32(key->ip4_key.ip_addr_hi) < clib_net_to_host_u32(key->ip4_key.ip_addr_lo)) {
+  if (clib_net_to_host_u32(key->ip_addr_hi) < clib_net_to_host_u32(key->ip_addr_lo)) {
     u32 tmp_ip4;
     u16 tmp_port;
-    tmp_ip4 = key->ip4_key.ip_addr_hi;
-    tmp_port = key->ip4_key.port_hi;
-    key->ip4_key.ip_addr_hi = key->ip4_key.ip_addr_lo;
-    key->ip4_key.port_hi = key->ip4_key.port_lo;
-    key->ip4_key.ip_addr_lo = tmp_ip4;
-    key->ip4_key.port_lo = tmp_port;
+    tmp_ip4 = key->ip_addr_hi;
+    tmp_port = key->port_hi;
+    key->ip_addr_hi = key->ip_addr_lo;
+    key->port_hi = key->port_lo;
+    key->ip_addr_lo = tmp_ip4;
+    key->port_lo = tmp_port;
     old_pseudo ^= 0x1;
   }
   return old_pseudo;

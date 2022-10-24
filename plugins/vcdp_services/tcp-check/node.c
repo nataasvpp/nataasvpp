@@ -53,25 +53,12 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_sessio
   tcp_header_t *tcph =
     (void *) (data + (session->type == VCDP_SESSION_TYPE_IP4 ? sizeof(ip4_header_t) : sizeof(ip6_header_t)));
   ip4_header_t *ip4 = (void *) data;
-  ip6_header_t *ip6 = (void *) data;
+
   /* Ignore non first fragments */
   if (session->type == VCDP_SESSION_TYPE_IP4 &&
       ip4->flags_and_fragment_offset & clib_host_to_net_u16(IP4_HEADER_FLAG_MORE_FRAGMENTS - 1)) {
     vcdp_next(b[0], to_next);
     return;
-  }
-
-  if (session->type == VCDP_SESSION_TYPE_IP6 && ip6_ext_hdr(ip6->protocol)) {
-    ip6_ext_hdr_chain_t chain;
-    int res = ip6_ext_header_walk(b[0], ip6, IP_PROTOCOL_IPV6_FRAGMENTATION, &chain);
-    if (res >= 0 && chain.eh[res].protocol == IP_PROTOCOL_IPV6_FRAGMENTATION) {
-      ip6_frag_hdr_t *frag = ip6_ext_next_header_offset(ip6, chain.eh[res].offset);
-      if (ip6_frag_hdr_offset(frag)) {
-        vcdp_next(b[0], to_next);
-        return;
-      }
-    }
-    tcph = ip6_ext_next_header_offset(ip6, chain.eh[chain.length - 1].offset);
   }
 
   u8 flags = tcph->flags & VCDP_TCP_CHECK_TCP_FLAGS_MASK;

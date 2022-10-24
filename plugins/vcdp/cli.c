@@ -140,49 +140,6 @@ done:
 }
 
 static clib_error_t *
-vcdp_set_sp_node_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
-{
-  unformat_input_t line_input_, *line_input = &line_input_;
-  clib_error_t *err = 0;
-  vcdp_main_t *vcdp = &vcdp_main;
-  u32 tenant_id = ~0;
-  u32 sp_idx = ~0;
-  u32 node_index = ~0;
-
-  if (!unformat_user(input, unformat_line_input, line_input))
-    return 0;
-  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d", &tenant_id))
-      ;
-    else if (unformat(line_input, "node %U", unformat_vlib_node, vm, &node_index))
-      ;
-    else if (unformat(line_input, "%U", unformat_vcdp_sp_node, &sp_idx))
-      ;
-    else {
-      err = unformat_parse_error(line_input);
-      goto done;
-    }
-  }
-  if (tenant_id == ~0) {
-    err = clib_error_return(0, "missing tenant id");
-    goto done;
-  }
-  if (node_index == ~0) {
-    err = clib_error_return(0, "missing node");
-    goto done;
-  }
-  if (sp_idx == ~0) {
-    err = clib_error_return(0, "missing slow-path");
-    goto done;
-  }
-
-  err = vcdp_set_sp_node(vcdp, tenant_id, sp_idx, node_index);
-done:
-  unformat_free(line_input);
-  return err;
-}
-
-static clib_error_t *
 vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   unformat_input_t line_input_, *line_input = &line_input_;
@@ -344,8 +301,3 @@ VLIB_CLI_COMMAND(vcdp_set_timeout_command, static) = {.path = "set vcdp timeout"
                                                       .short_help = "set vcdp timeout tenant <tenant-id>"
                                                                     " <timeout-name> <timeout-value>",
                                                       .function = vcdp_set_timeout_command_fn};
-
-VLIB_CLI_COMMAND(vcdp_set_sp_node_command, static) = {.path = "set vcdp sp-node",
-                                                      .short_help = "set vcdp sp-node tenant <tenant-id>"
-                                                                    " <sp-name> node <node-name>",
-                                                      .function = vcdp_set_sp_node_command_fn};

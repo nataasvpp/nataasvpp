@@ -3,10 +3,7 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
 
-#include <vppinfra/bihash_24_8.h>
-#include <vppinfra/bihash_template.c>
-
-#include <vppinfra/bihash_48_8.h>
+#include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_template.c>
 
 #include <vcdp/vcdp.h>
@@ -14,8 +11,6 @@
 #include <vcdp/service.h>
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
-#include <vnet/ip/reass/ip4_sv_reass.h>
-#include <vnet/ip/reass/ip6_sv_reass.h>
 
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
@@ -97,8 +92,7 @@ vcdp_init_main_if_needed(vcdp_main_t *vcdp)
   }
   pool_init_fixed(vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
   vcdp_init_tenant_counters(vcdp);
-  clib_bihash_init_24_8(&vcdp->table4, "vcdp ipv4 session table", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
-  clib_bihash_init_48_8(&vcdp->table6, "vcdp ipv6 session table", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
+  clib_bihash_init_16_8(&vcdp->table4, "vcdp ipv4 session table", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
   clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
 
@@ -110,13 +104,9 @@ vcdp_init_main_if_needed(vcdp_main_t *vcdp)
 static clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
-  vcdp_main_t *vcdp = &vcdp_main;
   vlib_call_init_function(vm, vcdp_service_init);
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
-  vcdp_service_next_indices_init(vm, vcdp_lookup_ip6_node.index);
   vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
-  vcdp->ip4_sv_reass_next_index = ip4_sv_reass_custom_context_register_next_node(vcdp_lookup_ip4_node.index);
-  vcdp->ip6_sv_reass_next_index = ip6_sv_reass_custom_context_register_next_node(vcdp_lookup_ip6_node.index);
   return 0;
 }
 
@@ -160,20 +150,6 @@ vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
 #undef _
 }
 
-static void
-vcdp_tenant_init_sp_nodes(vcdp_tenant_t *tenant)
-{
-  vlib_main_t *vm = vlib_get_main();
-  vlib_node_t *node;
-
-#define _(sym, default, str)                                                                                           \
-  node = vlib_get_node_by_name(vm, (u8 *) (default));                                                                  \
-  tenant->sp_node_indices[VCDP_SP_NODE_##sym] = node->index;
-
-  foreach_vcdp_sp_node
-#undef _
-}
-
 clib_error_t *
 vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del)
 {
@@ -193,7 +169,6 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
       tenant->context_id = context_id;
       tenant->flags = flags;
       vcdp_tenant_init_timeouts(tenant);
-      vcdp_tenant_init_sp_nodes(tenant);
       kv.key = tenant_id;
       kv.value = tenant_idx;
       clib_bihash_add_del_8_8(&vcdp->tenant_idx_by_id, &kv, 1);
@@ -250,122 +225,33 @@ vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_
   return 0;
 }
 
-clib_error_t *
-vcdp_set_sp_node(vcdp_main_t *vcdp, u32 tenant_id, u32 sp_index, u32 node_index)
-{
-  vcdp_init_main_if_needed(vcdp);
-  clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
-  vcdp_tenant_t *tenant;
-  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
-    return clib_error_return(0, "Can't configure slow path node: tenant id %d not found", tenant_id);
-  tenant = vcdp_tenant_at_index(vcdp, kv.value);
-  tenant->sp_node_indices[sp_index] = node_index;
-  return 0;
-}
-
-<<<<<<< HEAD
-clib_error_t *
-vcdp_set_icmp_error_node(vcdp_main_t *vcdp, u32 tenant_id, u8 is_ip6, u32 node_index)
-{
-  vcdp_init_main_if_needed(vcdp);
-  vlib_main_t *vm = vlib_get_main();
-  clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
-  vcdp_tenant_t *tenant;
-  uword next_index;
-  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
-    return clib_error_return(0, "Can't configure icmp error node: tenant id %d not found", tenant_id);
-  tenant = vcdp_tenant_at_index(vcdp, kv.value);
-  if (is_ip6) {
-    next_index = vlib_node_add_next(vm, vcdp_lookup_ip6_icmp_node.index, node_index);
-    tenant->icmp6_lookup_next = next_index;
-  } else {
-    next_index = vlib_node_add_next(vm, vcdp_lookup_ip4_icmp_node.index, node_index);
-    tenant->icmp4_lookup_next = next_index;
-  }
-  return 0;
-}
-
-// TODO: Is this used?
-int
-vcdp_create_session(vlib_main_t *vm, vlib_buffer_t *b, u32 context_id, u32 thread_index, u32 tenant_index,
-                    u32 *session_index, int is_ipv6)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_session_ip4_key_t k4 = {};
-  u64 lookup_val = 0, h = 0;
-  i16 l4_hdr_offset = 0;
-  u8 slow_path = 0;
-  vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_index);
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  f64 time_now = vlib_time_now(vm);
-
-  vcdp_calc_key_v4(b, context_id, &k4, &lookup_val, &h, &l4_hdr_offset, slow_path);
-  int err = vcdp_create_session_inline(vcdp, ptd, tenant, tenant_index, thread_index, time_now, &k4, &h, &lookup_val,
-                                       is_ipv6, vcdp_buffer(b)->rx_id);
-  *session_index = vcdp_session_index_from_lookup(lookup_val);
-  return err;
-}
-
-=======
->>>>>>> parent of f4248db (CLI/API for ICMP errors and sp node setting)
 void
 vcdp_normalise_ip4_key(vcdp_session_t *session, vcdp_session_ip4_key_t *result, u8 key_idx)
 {
-  vcdp_session_ip4_key_t *skey = &session->keys[key_idx].key4;
-  vcdp_ip4_key_t *key = &skey->ip4_key;
+  vcdp_session_ip4_key_t *skey = &session->keys[key_idx];
   u8 pseudo_dir = session->pseudo_dir[key_idx];
   u8 proto = session->proto;
   u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP || proto == IP_PROTOCOL_ICMP;
 
-  result->ip4_key.as_u64x2 = key->as_u64x2;
-  result->as_u64 = skey->as_u64;
+  result->as_u64[0] = skey->as_u64[0];
+  result->as_u64[1] = skey->as_u64[1];
   if (with_port && pseudo_dir) {
-    result->ip4_key.ip_addr_lo = key->ip_addr_hi;
-    result->ip4_key.port_lo = clib_net_to_host_u16(key->port_hi);
-    result->ip4_key.ip_addr_hi = key->ip_addr_lo;
-    result->ip4_key.port_hi = clib_net_to_host_u16(key->port_lo);
+    result->ip_addr_lo = skey->ip_addr_hi;
+    result->port_lo = clib_net_to_host_u16(skey->port_hi);
+    result->ip_addr_hi = skey->ip_addr_lo;
+    result->port_hi = clib_net_to_host_u16(skey->port_lo);
   } else {
-    result->ip4_key.ip_addr_lo = key->ip_addr_lo;
-    result->ip4_key.port_lo = clib_net_to_host_u16(key->port_lo);
-    result->ip4_key.ip_addr_hi = key->ip_addr_hi;
-    result->ip4_key.port_hi = clib_net_to_host_u16(key->port_hi);
-  }
-}
-
-void
-vcdp_normalise_ip6_key(vcdp_session_t *session, vcdp_session_ip6_key_t *result, u8 key_idx)
-{
-  vcdp_session_ip6_key_t *skey = &session->keys[key_idx].key6;
-  vcdp_ip6_key_t *key = &skey->ip6_key;
-  u8 pseudo_dir = session->pseudo_dir[key_idx];
-  u8 proto = session->proto;
-  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP || proto == IP_PROTOCOL_ICMP;
-
-  result->ip6_key.as_u64x4 = key->as_u64x4;
-  result->as_u64 = skey->as_u64;
-  if (with_port && pseudo_dir) {
-    result->ip6_key.ip6_addr_lo = key->ip6_addr_hi;
-    result->ip6_key.port_lo = clib_net_to_host_u16(key->port_hi);
-    result->ip6_key.ip6_addr_hi = key->ip6_addr_lo;
-    result->ip6_key.port_hi = clib_net_to_host_u16(key->port_lo);
-  } else {
-    result->ip6_key.ip6_addr_lo = key->ip6_addr_lo;
-    result->ip6_key.port_lo = clib_net_to_host_u16(key->port_lo);
-    result->ip6_key.ip6_addr_hi = key->ip6_addr_hi;
-    result->ip6_key.port_hi = clib_net_to_host_u16(key->port_hi);
+    result->ip_addr_lo = skey->ip_addr_lo;
+    result->port_lo = clib_net_to_host_u16(skey->port_lo);
+    result->ip_addr_hi = skey->ip_addr_hi;
+    result->port_hi = clib_net_to_host_u16(skey->port_hi);
   }
 }
 
 int
-vcdp_bihash_add_del_inline_with_hash_24_8(clib_bihash_24_8_t *h, clib_bihash_kv_24_8_t *kv, u64 hash, u8 is_add)
+vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add)
 {
-  return clib_bihash_add_del_inline_with_hash_24_8(h, kv, hash, is_add, 0, 0, 0, 0);
-}
-
-int
-vcdp_bihash_add_del_inline_with_hash_48_8(clib_bihash_48_8_t *h, clib_bihash_kv_48_8_t *kv, u64 hash, u8 is_add)
-{
-  return clib_bihash_add_del_inline_with_hash_48_8(h, kv, hash, is_add, 0, 0, 0, 0);
+  return clib_bihash_add_del_inline_with_hash_16_8(h, kv, hash, is_add, 0, 0, 0, 0);
 }
 
 vcdp_tenant_t *
