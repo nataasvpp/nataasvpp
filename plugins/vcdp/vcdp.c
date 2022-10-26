@@ -15,6 +15,7 @@
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
 #include <vcdp/service.h>
+
 #define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK(drop)
 
 VCDP_SERVICE_DECLARE(drop)
@@ -107,6 +108,12 @@ vcdp_init(vlib_main_t *vm)
   vlib_call_init_function(vm, vcdp_service_init);
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
   vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
+
+  u32 node_index = vlib_get_node_by_name (vm, (u8 *) "vcdp-lookup-ip4")->index;
+  vcdp_main.lookup_next_nodes[VCDP_LOOKUP_NEXT_SLOWPATH] = vlib_node_add_next(vm, node_index, vcdp_slowpath_node.index);
+  u32 error_node_index = vlib_get_node_by_name (vm, (u8 *) "error-drop")->index;
+  vcdp_main.lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP] = vlib_node_add_next(vm, node_index, error_node_index);
+
   return 0;
 }
 

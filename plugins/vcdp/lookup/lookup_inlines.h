@@ -12,9 +12,9 @@
 #include <arpa/inet.h>
 #include <vnet/udp/udp_packet.h>
 
-static_always_inline u8
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h,
-                 /*i16 *l4_hdr_offset,*/ u8 slow_path)
+// TODO: Remove lookup_val
+static_always_inline void
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
 {
   ip4_header_t *ip = vlib_buffer_get_current(b);
   udp_header_t *udp = (udp_header_t *) (ip+1);
@@ -36,17 +36,18 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   skey->ip_addr_hi = htonl(ip_addr_hi);
   skey->proto = ip->protocol;
 
+  lookup_val[0] = 0;
   // did we normalise?
   if (src > dst) {
     lookup_val[0] |= 0x1;
   }
+
   // figure out who uses this:
   // void *next_header = ip4_next_header(ip);
   // l4_hdr_offset[0] = (u8 *) next_header - b->data;
 
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
-  return 0;
 }
 
 #endif

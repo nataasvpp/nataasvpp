@@ -6,16 +6,9 @@
 #include <vnet/vnet.h>
 #include <vnet/ip/ip.h>
 #include <vnet/ethernet/ethernet.h>
-
 #include <vppinfra/hash.h>
 #include <vppinfra/error.h>
 #include <vppinfra/elog.h>
-
-#include <vppinfra/bihash_24_8.h>
-#include <vppinfra/bihash_8_8.h>
-
-#include <vppinfra/bihash_template.h>
-
 #include <vcdp/vcdp.h>
 
 #define foreach_gw_tenant_flag                                                                                         \
@@ -49,8 +42,7 @@ gw_tenant_at_index(gw_main_t *gm, u32 idx)
   return vec_elt_at_index(gm->tenants, idx);
 }
 
-int
-gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
+int gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
 
 #define VCDP_GW_PLUGIN_BUILD_VER "1.0"
 

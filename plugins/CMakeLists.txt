@@ -65,10 +65,6 @@ add_vpp_plugin(vcdp_gateway
   gateway/tunnel/tunnel.c
   gateway/tunnel/node.c
 
-  MULTIARCH_SOURCES
-  vcdp_services/tcp-check/node.c
-  vcdp_services/l4-lifecycle/node.c
-
   API_FILES
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api

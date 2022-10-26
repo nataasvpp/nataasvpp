@@ -56,12 +56,12 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   uword l4_sum_delta_forward = 0;
   uword l3_sum_delta_reverse = 0;
   uword l4_sum_delta_reverse = 0;
-  vcdp_session_ip4_key_t *new_key;
-  new_key = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+  vcdp_session_ip4_key_t new_key;
+  new_key = session->keys[VCDP_SESSION_KEY_PRIMARY];
   u8 pseudo_dir = session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY];
   u8 proto = session->proto;
   u8 n_retries = 0;
-  u32 *ip4_key_src_addr = pseudo_dir ? &new_key->ip_addr_hi : &new_key->ip_addr_lo;
+  u32 *ip4_key_src_addr = pseudo_dir ? &new_key.ip_addr_hi : &new_key.ip_addr_lo;
   u32 ip4_old_src_addr;
   u32 ip4_new_src_addr;
   u16 *ip4_key_src_port;
@@ -93,24 +93,24 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   if (PREDICT_FALSE(pool->num > NAT_ALLOC_POOL_ARRAY_SZ))
     ASSERT(0);
 
-  new_key->context_id = tenant->reverse_context;
+  new_key.context_id = tenant->reverse_context;
 
   /* Allocate a new source */
   ip4_old_src_addr = *ip4_key_src_addr;
   src_addr_index = ip4_old_src_addr % pool->num;
   ip4_new_src_addr = pool->addr[src_addr_index].as_u32;
   *ip4_key_src_addr = ip4_new_src_addr;
-  pseudo_dir = vcdp_renormalise_ip4_key(new_key, pseudo_dir);
+  pseudo_dir = vcdp_renormalise_ip4_key(&new_key, pseudo_dir);
   pseudo_flow_index = (session_index << 1) | (pseudo_dir & 0x1);
   /* Allocate a new port */
-  ip4_key_src_port = pseudo_dir ? &new_key->port_hi : &new_key->port_lo;
-  ip4_key_dst_port = pseudo_dir ? &new_key->port_lo : &new_key->port_hi;
+  ip4_key_src_port = pseudo_dir ? &new_key.port_hi : &new_key.port_lo;
+  ip4_key_dst_port = pseudo_dir ? &new_key.port_lo : &new_key.port_hi;
   ip4_old_port = *ip4_key_src_port;
 
   /* First try with original src port */
   ip4_new_port = ip4_old_port;
   while ((++n_retries) < 5 && vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index,
-                                                                 new_key, &h)) {
+                                                                 &new_key, &h)) {
     /* Use h to try a different port */
     u32 h2 = h;
     u64 reduced = h2;

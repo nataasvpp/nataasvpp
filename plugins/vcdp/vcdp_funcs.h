@@ -52,6 +52,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
   kv.key[1] = key->as_u64[1];
   kv.value = value;
   *h = clib_bihash_hash_16_8(&kv);
+
   if ((rv = vcdp_bihash_add_del_inline_with_hash_16_8(&vcdp->table4, &kv, *h, 2)) == 0) {
     session_index = vcdp_session_from_flow_index(pseudo_flow_index);
     session = vcdp_session_at_index(ptd, session_index);
@@ -59,7 +60,6 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
     session->pseudo_dir[VCDP_SESSION_KEY_SECONDARY] = pseudo_flow_index & 0x1;
     session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
   }
-
   return rv;
 }
 

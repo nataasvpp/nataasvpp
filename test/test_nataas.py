@@ -100,8 +100,8 @@ class TestNATaaS(VppTestCase):
         # p4_reply.ttl -= 1
         rx = self.send_and_expect(self.pg0, pkt_to_send, self.pg1)
         rx[0].show2()
-
         print(self.vapi.cli("show vcdp session-table"))
+
 
         reply = rx[0][IP]
         reply.show2()

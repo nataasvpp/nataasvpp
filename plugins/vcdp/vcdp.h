@@ -165,6 +165,9 @@ typedef struct {
   vcdp_tenant_flags_t flags;
 } vcdp_tenant_t;
 
+// VCDP lookup next nodes
+enum { VCDP_LOOKUP_NEXT_SLOWPATH, VCDP_LOOKUP_NEXT_DROP, VCDP_LOOKUP_N_NEXT};
+
 typedef struct {
   /* key = (u64) tenant_id; val= (u64) tenant_idx; */
   clib_bihash_8_8_t tenant_idx_by_id;
@@ -181,6 +184,9 @@ typedef struct {
   /* pool of tenants */
   vcdp_tenant_t *tenants;
 
+  // static lookup node nexts here
+  u32 lookup_next_nodes[VCDP_LOOKUP_N_NEXT];
+
   /* per-thread data */
   vcdp_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
@@ -189,7 +195,8 @@ typedef struct {
 extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
-extern vlib_node_registration_t vcdp_lookup_ip6_node;
+extern vlib_node_registration_t vcdp_slowpath_node;
+
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
 format_function_t format_vcdp_session_state;
