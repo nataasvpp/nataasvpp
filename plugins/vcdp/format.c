@@ -88,12 +88,9 @@ format_vcdp_session_detail(u8 *s, va_list *args)
 
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
-  vlib_counter_t fctr, bctr;
   uword thread_index = ptd - vcdp_main.per_thread_data;
   vcdp_session_ip4_key_t skey;
 
-  vlib_get_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], session_index << 1, &fctr);
-  vlib_get_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], (session_index << 1) | 0x1, &bctr);
   /* TODO: deal with secondary keys */
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
     vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
@@ -110,11 +107,11 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   s = format(s, "  reverse service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_REVERSE]);
   s = format(s, "  counters:\n");
   s = format(s, "    forward flow:\n");
-  s = format(s, "      bytes: %llu\n", fctr.bytes);
-  s = format(s, "      packets: %llu\n", fctr.packets);
+  s = format(s, "      bytes: %llu\n", session->bytes[VCDP_FLOW_FORWARD]);
+  s = format(s, "      packets: %llu\n", session->pkts[VCDP_FLOW_FORWARD]);
   s = format(s, "    reverse flow:\n");
-  s = format(s, "      bytes: %llu\n", bctr.bytes);
-  s = format(s, "      packets: %llu\n", bctr.packets);
+  s = format(s, "      bytes: %llu\n", session->bytes[VCDP_FLOW_REVERSE]);
+  s = format(s, "      packets: %llu\n", session->pkts[VCDP_FLOW_REVERSE]);
   return s;
 }
 

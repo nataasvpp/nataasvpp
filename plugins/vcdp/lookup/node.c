@@ -137,10 +137,6 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
   lookup_val[0] ^= value;
-  /* Bidirectional counter zeroing */
-  // TODO: Why are these in per thread data??
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], lookup_val[0]);
-  vlib_zero_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_LOOKUP], lookup_val[0] | 0x1);
   vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED], thread_index,
                                 tenant_idx, 1);
   return 0;

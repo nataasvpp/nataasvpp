@@ -130,7 +130,9 @@ typedef struct {
   u8 state; /* see vcdp_session_state_t */
   u8 proto;
   u16 tenant_idx;
-  u8 unused0[28];
+  u64 bytes[VCDP_FLOW_F_B_N];
+  u32 pkts[VCDP_FLOW_F_B_N];
+  u8 unused0[4];
   CLIB_CACHE_LINE_ALIGN_MARK(cache1);
 
   vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY];
@@ -150,7 +152,6 @@ typedef struct {
   u64 session_id_ctr;
   u64 session_id_template;
   u32 *expired_sessions;
-  vlib_combined_counter_main_t per_session_ctr[VCDP_FLOW_N_COUNTER]; // TODO: Shouldn't be here
 } vcdp_per_thread_data_t;
 
 typedef enum {

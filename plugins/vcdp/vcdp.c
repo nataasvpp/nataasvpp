@@ -36,21 +36,6 @@ vcdp_timer_expired(u32 *expired)
 }
 
 static void
-vcdp_init_ptd_counters(vcdp_per_thread_data_t *ptd, uword i)
-{
-#define _(x, y)                                                                                                        \
-  u8 *name = format(0, y "_%d", i);                                                                                    \
-  u8 *stat_seg_name = format(0, "/vcdp/per_flow_counters/" y "/%d%c", i, 0);                                           \
-  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].name = (char *) name;                                                    \
-  ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x].stat_segment_name = (char *) stat_seg_name;                              \
-  vlib_validate_combined_counter(&ptd->per_session_ctr[VCDP_FLOW_COUNTER_##x],                                         \
-                                 1ULL << (1 + VCDP_LOG2_SESSIONS_PER_THREAD));
-
-  foreach_vcdp_flow_counter
-#undef _
-}
-
-static void
 vcdp_init_tenant_counters(vcdp_main_t *vcdp)
 {
 #define _(x, y, z)                                                                                                     \
@@ -89,7 +74,6 @@ vcdp_init_main_if_needed(vcdp_main_t *vcdp)
     vcdp_tw_init(&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
     ptd->session_id_template = (u64) epoch << (template_shift + log_n_thread);
     ptd->session_id_template |= (u64) i << template_shift;
-    vcdp_init_ptd_counters(ptd, i);
   }
   pool_init_fixed(vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
   vcdp_init_tenant_counters(vcdp);
