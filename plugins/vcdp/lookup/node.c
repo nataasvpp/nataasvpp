@@ -180,7 +180,6 @@ VLIB_NODE_FN(vcdp_slowpath_node)
     /* if there is collision, we just reiterate */
     if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
       vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
-      clib_warning("COLLISION");
       // TODO: Check logic
       continue;
     }
@@ -190,6 +189,7 @@ VLIB_NODE_FN(vcdp_slowpath_node)
     vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
     u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
     vcdp_buffer(b[0])->service_bitmap = pbmp;
+    session->rx_id = vcdp_buffer(b[0])->rx_id;
     vcdp_next(b[0], current_next);
 done:
     current_next += 1;

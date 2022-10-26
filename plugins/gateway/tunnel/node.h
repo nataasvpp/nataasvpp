@@ -212,7 +212,7 @@ typedef enum {
 } vcdp_tunnel_output_error_t;
 
 static void
-vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b)
+vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b, ip4_header_t *inner_ip)
 {
   ip4_header_t *ip;
   udp_header_t *udp;
@@ -223,7 +223,10 @@ vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b)
   ip->checksum = ip4_header_checksum(ip);
   udp = (udp_header_t *) (ip + 1);
   udp->length = ip->length - sizeof(ip4_header_t);
-  // TODO: udp->src_port = ip4_compute_flow_hash (b);
+  if (udp->src_port == 0) {
+    udp->src_port = inner_ip->src_address.as_u32 ^ inner_ip->dst_address.as_u32;
+    udp->src_port |= clib_host_to_net_u16(0xC000);
+  }
 }
 
 static inline uword
@@ -257,12 +260,13 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     }
     b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID | VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
     vnet_buffer(b[0])->oflags |= VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
+    ip4_header_t *inner_ip = vlib_buffer_get_current(b[0]);
     vlib_buffer_advance(b[0], -t->encap_size);
     ip4_header_t *ip = vlib_buffer_get_current(b[0]);
     vnet_buffer(b[0])->l3_hdr_offset = b[0]->current_data;
     vnet_buffer(b[0])->l4_hdr_offset = b[0]->current_data + sizeof(ip4_header_t);
     clib_memcpy_fast(ip, t->rewrite, t->encap_size);
-    vcdp_vxlan_dummy_l2_fixup(vm, b[0]);
+    vcdp_vxlan_dummy_l2_fixup(vm, b[0], inner_ip);
     to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP;
 
   done:
