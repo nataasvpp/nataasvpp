@@ -121,12 +121,12 @@ class TestNATaaS(VppTestCase):
         rx[0].show2()
         print(self.vapi.cli("show vcdp session-table"))
 
-        # # verify that packet from outside does not create session (default drop for tenant 1000)
-        # no_session_pkt = pkt_to_send
-        # no_session_pkt[TCP].dport = 666
-        # print('SENDING PACKET FROM OUTSIDE')
-        # self.send_and_assert_no_replies(self.pg1, no_session_pkt)
-        # print(self.vapi.cli("show vcdp session-table"))
+        # verify that packet from outside does not create session (default drop for tenant 1000)
+        no_session_pkt = pkt_to_send
+        no_session_pkt[TCP].dport = 666
+        print('SENDING PACKET FROM OUTSIDE')
+        self.send_and_assert_no_replies(self.pg1, no_session_pkt)
+        print(self.vapi.cli("show vcdp session-table"))
 
         print(self.vapi.cli('show vcdp tenant'))
 

@@ -12,10 +12,10 @@
 #include "lookup_inlines.h"
 
 #define foreach_vcdp_lookup_error                                                                                      \
-  _(MISS, miss, ERROR, "flow miss")                                                                                          \
-  _(LOCAL, local, INFO, "local flow")                                                                                         \
-  _(REMOTE, remote, INFO, "remote flow")                                                                                       \
-  _(COLLISION, collision, ERROR, "hash add collision")                                                                            \
+  _(MISS, miss, ERROR, "flow miss")                                                                                    \
+  _(LOCAL, local, INFO, "local flow")                                                                                  \
+  _(REMOTE, remote, INFO, "remote flow")                                                                               \
+  _(COLLISION, collision, ERROR, "hash add collision")                                                                 \
   _(CON_DROP, con_drop, ERROR, "handoff drop")
 
 typedef enum
@@ -47,7 +47,10 @@ static vlib_error_desc_t vcdp_handoff_error_counters[] = {
 #undef _
 };
 
-#define foreach_vcdp_slowpath_error _(NOERROR, noerror, INFO, "no error")
+#define foreach_vcdp_slowpath_error                                                                                    \
+  _(NOERROR, noerror, INFO, "no error")                                                                                \
+  _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")
+
 typedef enum
 {
 #define _(f, n, s, d) VCDP_SLOWPATH_ERROR_##f,
@@ -167,16 +170,17 @@ VLIB_NODE_FN(vcdp_slowpath_node)
   while (n_left) {
     vcdp_calc_key_v4 (b[0], b[0]->flow_id, k4, lv, h);
 
-
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
     if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
+      vlib_node_increment_counter(vm, node->node_index, VCDP_SLOWPATH_ERROR_NO_CREATE_SESSION, 1);
       current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP];
       goto done;
     }
     /* if there is collision, we just reiterate */
     if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
       vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
+      clib_warning("COLLISION");
       // TODO: Check logic
       continue;
     }
