@@ -180,6 +180,7 @@ VLIB_NODE_FN(vcdp_slowpath_node)
       continue;
     }
 
+    b[0]->flow_id = lv[0] & (~(u32) 0);
     u32 flow_index = b[0]->flow_id;
     u32 session_index = flow_index >> 1;
     vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
@@ -201,12 +202,18 @@ done:
     int i;
     b = bufs;
     current_next = next_indices;
+    h = hashes;
+
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_handoff_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        vcdp_lookup_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        t->sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
         t->flow_id = b[0]->flow_id;
+        t->hash = h[0];
         t->next_index = current_next[0];
+        clib_memcpy(&t->k4, &keys[i], sizeof(t->k4));
         b++;
+        h++;
         current_next++;
       } else
         break;

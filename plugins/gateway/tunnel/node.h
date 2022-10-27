@@ -218,11 +218,12 @@ vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b, ip4_header_t *inner
   udp_header_t *udp;
 
   ip = vlib_buffer_get_current(b);
+  u16 len = vlib_buffer_length_in_chain(vm, b);
 
-  ip->length = clib_host_to_net_u16(vlib_buffer_length_in_chain(vm, b));
+  ip->length = clib_host_to_net_u16(len);
   ip->checksum = ip4_header_checksum(ip);
   udp = (udp_header_t *) (ip + 1);
-  udp->length = ip->length - sizeof(ip4_header_t);
+  udp->length = clib_host_to_net_u16(len - sizeof(ip4_header_t));
   if (udp->src_port == 0) {
     udp->src_port = inner_ip->src_address.as_u32 ^ inner_ip->dst_address.as_u32;
     udp->src_port |= clib_host_to_net_u16(0xC000);
