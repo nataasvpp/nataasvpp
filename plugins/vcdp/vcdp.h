@@ -123,27 +123,23 @@ STATIC_ASSERT_SIZEOF(vcdp_session_ip4_key_t, 16);
 
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  u32 bitmaps[VCDP_FLOW_F_B_N];
-  u64 session_id;
-  vcdp_session_timer_t timer;
-  session_version_t session_version;
-  u8 state; /* see vcdp_session_state_t */
-  u8 proto;
-  u16 tenant_idx;
-  u64 bytes[VCDP_FLOW_F_B_N];
-  u32 pkts[VCDP_FLOW_F_B_N];
-  u8 unused0[4];
-  CLIB_CACHE_LINE_ALIGN_MARK(cache1);
+  u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
+  u64 session_id;               // 8
+  vcdp_session_timer_t timer;   // 12
+  u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
+  vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY]; //32
 
-  vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY];
-
-  u8 pseudo_dir[VCDP_SESSION_N_KEY];
-  u8 type; /* see vcdp_session_type_t */
-  u8 key_flags;
-  u8 unused1[24];
-  u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)
+  u64 bytes[VCDP_FLOW_F_B_N];   // 16
+  u32 pkts[VCDP_FLOW_F_B_N];    // 8
+  session_version_t session_version;    // 2
+  u16 tenant_idx;               // 2
+  u8 state; /* see vcdp_session_state_t */ // 1
+  u8 proto;                     // 1
+  u8 pseudo_dir[VCDP_SESSION_N_KEY];    // 2
+  u8 type; /* see vcdp_session_type_t */ // 1
+  u8 key_flags;                         // 1
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
-STATIC_ASSERT_SIZEOF(vcdp_session_t, 256);
+STATIC_ASSERT_SIZEOF(vcdp_session_t, 128);
 
 typedef struct {
   vcdp_session_t *sessions; /* fixed pool */
