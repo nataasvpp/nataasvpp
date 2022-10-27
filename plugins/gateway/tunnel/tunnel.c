@@ -4,7 +4,6 @@
 
 #include <arpa/inet.h>
 #include "tunnel.h"
-#include <vppinfra/bihash_template.c>
 #include <vnet/adj/adj_nbr.h>
 #include <vnet/vxlan/vxlan_packet.h>
 #include <vpp_plugins/geneve/geneve_packet.h>

@@ -44,6 +44,4 @@ gw_tenant_at_index(gw_main_t *gm, u32 idx)
 
 int gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
 
-#define VCDP_GW_PLUGIN_BUILD_VER "1.0"
-
 #endif /* included_gateway_h */

@@ -4,20 +4,30 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
-add_vpp_library(vcdp
+add_vpp_library(vcdpcore
   SOURCES
   vcdp/lookup/node.c
   vcdp/drop/node.c
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/service.c
-  vcdp/cli.c
-  vcdp/api.c
   vcdp/timer/node.c
 
-  API_FILES
-  vcdp/vcdp_types.api
-  vcdp/vcdp.api
+  vcdp_services/tcp-check/node.c
+  vcdp_services/tcp-check/tcp_check.c
+  vcdp_services/tcp-check/format.c
+
+  vcdp_services/l4-lifecycle/node.c
+
+  vcdp_services/nat/nat.c
+  vcdp_services/nat/format.c
+  vcdp_services/nat/fastpath_node.c
+  vcdp_services/nat/slowpath_node.c
+
+  gateway/gateway.c
+  gateway/interface.c
+  gateway/tunnel/tunnel.c
+  gateway/tunnel/node.c
 
   INSTALL_HEADERS
   vcdp/vcdp.h
@@ -26,53 +36,49 @@ add_vpp_library(vcdp
   vcdp/vcdp_types_funcs.h
   vcdp/common.h
   vcdp/timer/timer.h
-
-  ####################
-  # This is a hack   #
-  # remove when VPP  #
-  # fixed            #
-  ####################
-  DEPENDS
-  vcdp_api_headers
 )
 
-add_vpp_test_library(vcdp
-  vcdp/vcdp_types.api
-  vcdp/vcdp.api
-)
-
-add_vpp_plugin(vcdp_gateway
+add_vpp_plugin(vcdp
   SOURCES
-  vcdp_services/tcp-check/node.c
-  vcdp_services/tcp-check/tcp_check.c
-  vcdp_services/tcp-check/format.c
+  vcdp/plugin.c
+  vcdp/cli.c
+  vcdp/api.c
   vcdp_services/tcp-check/cli.c
   vcdp_services/tcp-check/api.c
-
-  vcdp_services/l4-lifecycle/node.c
-
-  vcdp_services/nat/nat.c
   vcdp_services/nat/cli.c
   vcdp_services/nat/api.c
-  vcdp_services/nat/format.c
-  vcdp_services/nat/fastpath_node.c
-  vcdp_services/nat/slowpath_node.c
-
-  gateway/gateway.c
   gateway/cli.c
   gateway/api.c
-  gateway/interface.c
-  gateway/tunnel/tunnel.c
-  gateway/tunnel/node.c
 
   API_FILES
+  vcdp/vcdp_types.api
+  vcdp/vcdp.api
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
 
+  # DEPENDS
+  # vcdp_api_headers
+
   LINK_LIBRARIES
-  vcdp
+  vcdpcore
+
 )
+
+# add_vpp_library(vcdp
+#   SOURCES
+
+#   INSTALL_HEADERS
+
+#   ####################
+#   # This is a hack   #
+#   # remove when VPP  #
+#   # fixed            #
+#   ####################
+#   # DEPENDS
+#   # vcdp_api_headers
+# )
+
 
 find_library(VPPINFRA_LIBRARY vppinfra)
 find_library(VLIB_LIBRARY vlib)
@@ -83,6 +89,6 @@ message(STATUS "foo include dir: ${VPPINFRA_LIBRARY}")
 message(STATUS "foo include dir: ${VLIB_LIBRARY}")
 #set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
 add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/test_stubs.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
-target_link_libraries(test_tunnel ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
+target_link_libraries(test_tunnel vcdpcore ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
 add_test(NAME test_tunnel
          COMMAND test_tunnel)

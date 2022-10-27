@@ -6,6 +6,9 @@
 #include <vcdp/service.h>
 #include <arpa/inet.h>
 
+#include <vppinfra/bihash_16_8.h>
+#include <vppinfra/bihash_template.c>
+
 vnet_feature_main_t feature_main;
 vcdp_service_main_t vcdp_service_main;
 vcdp_main_t vcdp_main;

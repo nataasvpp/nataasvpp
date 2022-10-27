@@ -4,10 +4,7 @@
 #include <sys/mman.h>
 
 #include <gateway/gateway.h>
-
-#include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
-
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
 
@@ -59,7 +56,3 @@ gw_interface_input_enable(u32 sw_if_index, u32 tenant_id)
 }
 
 VLIB_INIT_FUNCTION(gateway_init);
-VLIB_PLUGIN_REGISTER() = {
-  .version = VCDP_GW_PLUGIN_BUILD_VER,
-  .description = "vCDP Gateway Plugin",
-};
