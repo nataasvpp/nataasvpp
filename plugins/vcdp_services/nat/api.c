@@ -40,15 +40,13 @@ vl_api_vcdp_nat_snat_set_unset_t_handler(vl_api_vcdp_nat_snat_set_unset_t *mp)
 {
   nat_main_t *nat = &nat_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
-  u32 outside_tenant_id = clib_net_to_host_u32(mp->outside_tenant_id);
-  u32 table_id = clib_net_to_host_u32(mp->table_id);
   u32 alloc_pool_id = clib_net_to_host_u32(mp->alloc_pool_id);
   u8 unset = mp->is_disable;
   clib_error_t *err;
   int rv;
   vl_api_vcdp_nat_alloc_pool_add_del_reply_t *rmp;
 
-  err = nat_tenant_set_snat(nat, tenant_id, outside_tenant_id, table_id, alloc_pool_id, unset);
+  err = nat_tenant_set_snat(nat, tenant_id, alloc_pool_id, unset);
   rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY);
 }

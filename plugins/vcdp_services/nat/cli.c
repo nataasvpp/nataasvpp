@@ -48,8 +48,6 @@ vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
 
   clib_error_t *err = 0;
   u32 tenant_id = ~0;
-  u32 outside_tenant_id = ~0;
-  u32 table_id = ~0;
   u32 alloc_pool_id = ~0;
   u8 unset = 0;
 
@@ -58,10 +56,6 @@ vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
     if (unformat(line_input, "tenant %d", &tenant_id))
-      ;
-    else if (unformat(line_input, "outside-tenant %d", &outside_tenant_id))
-      ;
-    else if (unformat(line_input, "table %d", &table_id))
       ;
     else if (unformat(line_input, "alloc-pool %d", &alloc_pool_id))
       ;
@@ -72,7 +66,7 @@ vcdp_nat_snat_set_unset_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
       goto done;
     }
   }
-  err = nat_tenant_set_snat(&nat_main, tenant_id, outside_tenant_id, table_id, alloc_pool_id, unset);
+  err = nat_tenant_set_snat(&nat_main, tenant_id, alloc_pool_id, unset);
 done:
   unformat_free(line_input);
   return err;
@@ -80,7 +74,6 @@ done:
 
 VLIB_CLI_COMMAND(vcdp_nat_snat_set_unset, static) = {
   .path = "set vcdp nat snat",
-  .short_help = "set vcdp nat snat tenant <tenant-id> outside-tenant <tenant-id> table "
-                "<table-id> alloc-pool <alloc-pool-id> [disable]",
+  .short_help = "set vcdp nat snat tenant <tenant-id> alloc-pool <alloc-pool-id> [disable]",
   .function = vcdp_nat_snat_set_unset_fn,
 };

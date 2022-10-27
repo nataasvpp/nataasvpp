@@ -18,15 +18,29 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
 {
   ip4_header_t *ip = vlib_buffer_get_current(b);
   udp_header_t *udp = (udp_header_t *) (ip+1);
-
+  u32 ip_addr_lo, ip_addr_hi;
+  u16 port_lo, port_hi;
   u16 sport = udp->src_port;
   u16 dport = udp->dst_port;
   u32 src = ntohl(ip->src_address.as_u32);
   u32 dst = ntohl(ip->dst_address.as_u32);
-  u32 ip_addr_lo = src < dst ? src : dst;
-  u32 ip_addr_hi = src > dst ? src : dst;
-  u16 port_lo = sport < dport ? sport : dport;
-  u16 port_hi = sport > dport ? sport : dport;
+
+  lookup_val[0] = 0;
+
+  if (src < dst) {
+    ip_addr_lo = src;
+    port_lo = sport;
+    ip_addr_hi = dst;
+    port_hi = dport;
+  } else {
+    /* Normalize */
+    ip_addr_lo = dst;
+    port_lo = dport;
+    ip_addr_hi = src;
+    port_hi = sport;
+    lookup_val[0] |= 0x1;
+  }
+
 
   *skey = (vcdp_session_ip4_key_t){0};
   skey->context_id = context_id;
@@ -35,12 +49,6 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   skey->port_hi = port_hi;
   skey->ip_addr_hi = htonl(ip_addr_hi);
   skey->proto = ip->protocol;
-
-  lookup_val[0] = 0;
-  // did we normalise?
-  if (src > dst) {
-    lookup_val[0] |= 0x1;
-  }
 
   // figure out who uses this:
   // void *next_header = ip4_next_header(ip);

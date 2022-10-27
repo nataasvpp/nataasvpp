@@ -48,7 +48,7 @@ VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_output)
 static_always_inline void
-nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *fib_index_by_sw_if_index,
+nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
                           u16 thread_index, nat_main_t *nm, nat_tenant_t *tenant, u32 session_index,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
@@ -73,7 +73,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   u32 src_addr_index;
   u64 h;
   u32 pseudo_flow_index;
-  u32 old_fib_index;
+  // u32 old_fib_index;
 
   if (PREDICT_FALSE(!(tenant->flags & NAT_TENANT_FLAG_SNAT))) {
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
@@ -93,7 +93,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   if (PREDICT_FALSE(pool->num > NAT_ALLOC_POOL_ARRAY_SZ))
     ASSERT(0);
 
-  new_key.context_id = tenant->reverse_context;
+//  new_key.context_id = tenant->reverse_context;
 
   /* Allocate a new source */
   ip4_old_src_addr = *ip4_key_src_addr;
@@ -142,7 +142,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   l4_sum_delta_reverse = ip_csum_add_even(l4_sum_delta_reverse, ip4_old_port);
   l4_sum_delta_reverse = ip_csum_sub_even(l4_sum_delta_reverse, ip4_new_port);
 
-  old_fib_index = vec_elt(fib_index_by_sw_if_index, vnet_buffer(b[0])->sw_if_index[VLIB_RX]);
+  // old_fib_index = vec_elt(fib_index_by_sw_if_index, vnet_buffer(b[0])->sw_if_index[VLIB_RX]);
   nat_session[0].version = session->session_version;
   nat_session[1].version = session->session_version;
 
@@ -159,13 +159,13 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, u32 *
   }
 
   nat_session[0].rewrite.saddr.as_u32 = ip4_new_src_addr;
-  nat_session[0].rewrite.fib_index = tenant->fib_index;
+//  nat_session[0].rewrite.fib_index = tenant->fib_index;
   nat_session[0].rewrite.proto = proto;
   nat_session[0].l3_csum_delta = l3_sum_delta_forward;
   nat_session[0].l4_csum_delta = l4_sum_delta_forward;
 
   nat_session[1].rewrite.daddr.as_u32 = ip4_old_src_addr;
-  nat_session[1].rewrite.fib_index = old_fib_index;
+//  nat_session[1].rewrite.fib_index = old_fib_index;
   nat_session[1].rewrite.proto = proto;
   nat_session[1].l3_csum_delta = l3_sum_delta_reverse;
   nat_session[1].l4_csum_delta = l4_sum_delta_reverse;
@@ -187,7 +187,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_main_t *vcdp = &vcdp_main;
-  ip4_main_t *im = &ip4_main;
+  // ip4_main_t *im = &ip4_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
@@ -211,7 +211,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     ASSERT(tenant != 0 && "Tenant not configured");
 
     // nat_slow_path_process_one (tenant, nat_rewrites, session, to_next, b);
-    nat_slow_path_process_one(vcdp, ptd, im->fib_index_by_sw_if_index, thread_index, nat, tenant, session_idx,
+    nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, tenant, session_idx,
                               nat_rewrites, session, to_next, b);
     n_left -= 1;
     b += 1;

@@ -21,9 +21,7 @@ enum {
 
 typedef struct {
   u16 flags;
-  u32 reverse_context;
   uword out_alloc_pool_idx;
-  uword fib_index;
 } nat_tenant_t;
 
 #define foreach_nat_rewrite_op                                                                                         \
@@ -49,8 +47,8 @@ typedef struct {
     u16 icmp_id;
     u8 proto;
   } rewrite;
-  u32 ops; /* see nat_rewrite_op_t */
-  uword l3_csum_delta;
+  nat_rewrite_op_t ops;
+  uword l3_csum_delta; // TODO: csum_t?
   uword l4_csum_delta;
   session_version_t version;
 } nat_rewrite_data_t;
@@ -83,7 +81,7 @@ clib_error_t *
 nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del, ip4_address_t *addr);
 
 clib_error_t *
-nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 outside_tenant_id, u32 table_id, u32 alloc_pool_id, u8 unset);
+nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 alloc_pool_id, u8 unset);
 format_function_t format_vcdp_nat_rewrite;
 
 #endif
