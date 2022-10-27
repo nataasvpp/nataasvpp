@@ -70,7 +70,6 @@ typedef struct {
 STATIC_ASSERT_SIZEOF(nat_alloc_pool_t, CLIB_CACHE_LINE_BYTES);
 
 typedef struct {
-  u16 *tenant_idx_by_sw_if_idx; /* vec */
   nat_tenant_t *tenants;        /* vec */
   nat_alloc_pool_t *alloc_pool; /* pool of allocation pools */
   nat_per_thread_data_t *ptd;   /* vec */
@@ -79,9 +78,6 @@ typedef struct {
 } nat_main_t;
 
 extern nat_main_t nat_main;
-
-clib_error_t *
-nat_external_interface_set_tenant(nat_main_t *nat, u32 sw_if_index, u32 tenant_id, u8 unset);
 
 clib_error_t *
 nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del, ip4_address_t *addr);

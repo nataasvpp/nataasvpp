@@ -15,19 +15,6 @@
 #include <vlibapi/api_helper_macros.h>
 
 static void
-vl_api_vcdp_nat_set_external_interface_t_handler(vl_api_vcdp_nat_set_external_interface_t *mp)
-{
-  nat_main_t *nat = &nat_main;
-  u32 sw_if_index = clib_net_to_host_u32(mp->sw_if_index);
-  u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
-  u8 unset = mp->is_disable;
-  clib_error_t *err = nat_external_interface_set_tenant(nat, sw_if_index, tenant_id, unset);
-  int rv = err ? -1 : 0;
-  vl_api_vcdp_nat_set_external_interface_reply_t *rmp;
-  REPLY_MACRO(VL_API_VCDP_NAT_SET_EXTERNAL_INTERFACE_REPLY);
-}
-
-static void
 vl_api_vcdp_nat_alloc_pool_add_del_t_handler(vl_api_vcdp_nat_alloc_pool_add_del_t *mp)
 {
   nat_main_t *nat = &nat_main;
