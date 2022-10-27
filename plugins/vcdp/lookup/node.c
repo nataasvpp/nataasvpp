@@ -176,8 +176,6 @@ VLIB_NODE_FN(vcdp_slowpath_node)
     /* if there is collision, we just reiterate */
     if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
       vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
-      // TODO: Check logic
-      continue;
     }
 
     b[0]->flow_id = lv[0] & (~(u32) 0);
@@ -283,6 +281,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_SLOWPATH];
       to_local[n_local] = bi[0];
       n_local++;
+      current_next++;
     } else {
       // Match. Figure out if this is local or remote thread
       lv[0] ^= kv.value;

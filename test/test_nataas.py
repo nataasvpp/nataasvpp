@@ -75,7 +75,9 @@ class TestNATaaS(VppTestCase):
         print("PACKET TO SEND:")
         pkt_to_send.show2()
 
-        rx = self.send_and_expect(self.pg0, pkt_to_send, self.pg1)
+        # Send two packets in two frames to test both slowpath and fastpath
+        rx = self.send_and_expect(self.pg0, pkt_to_send*2, self.pg1)
+        rx = self.send_and_expect(self.pg0, pkt_to_send*2, self.pg1)
         rx[0].show2()
         print(self.vapi.cli("show vcdp session-table"))
 
