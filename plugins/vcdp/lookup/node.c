@@ -192,7 +192,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
       if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
         vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_NO_CREATE_SESSION, 1);
-        current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP];
+        current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP]; // TODO: Replace this with vcdp_drop?
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
