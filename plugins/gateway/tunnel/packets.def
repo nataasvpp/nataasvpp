@@ -1,0 +1,8 @@
+[
+    (
+        "da rewritten",
+        IP(src='1.1.1.1', dst='2.2.2.2')/UDP(sport=80, dport=6871),
+        IP(src='1.1.1.1', dst='1.2.3.4')/UDP(sport=80, dport=6871),
+        4242
+    ),
+]
