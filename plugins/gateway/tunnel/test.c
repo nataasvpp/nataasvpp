@@ -93,6 +93,13 @@ buffer_init(u32 *vector, int count)
   return vector;
 }
 
+/*
+ * Always return the frame of generated packets
+ */
+#define vlib_frame_vector_args test_vlib_frame_vector_args
+void *test_vlib_frame_vector_args(vlib_frame_t *f) { return buffers_vector; }
+
+
 /* Gather output packets */
 #define vlib_buffer_enqueue_to_next test_vlib_buffer_enqueue_to_next
 void
