@@ -21,20 +21,20 @@ find_package(VPP)
 # sanitizers
 ##############################################################################
 
-option(VPP_ENABLE_SANITIZE_ADDR "Enable Address Sanitizer" OFF)
-set(VPP_SANITIZE_ADDR_OPTIONS
+option(VCDP_SANITIZE_ADDR "Enable Address Sanitizer" OFF)
+set(VCDP_SANITIZE_ADDR_OPTIONS
   "unmap_shadow_on_exit=1:disable_coredump=0:abort_on_error=1:detect_leaks=0"
   CACHE
   STRING "Address sanitizer arguments"
 )
 add_compile_options(-Werror -Wall)
 
-if (VPP_ENABLE_SANITIZE_ADDR)
-  add_compile_options(-fsanitize=address)
+if (VCDP_SANITIZE_ADDR)
+  add_compile_options(-fsanitize=address -fsanitize=undefined)
   add_compile_definitions(CLIB_SANITIZE_ADDR)
   set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address ${CMAKE_EXE_LINKER_FLAGS}")
   set(CMAKE_SHARED_LINKER_FLAGS "-fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS}")
-endif (VPP_ENABLE_SANITIZE_ADDR)
+endif (VCDP_SANITIZE_ADDR)
 
 include(CTest)
 

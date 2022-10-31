@@ -16,7 +16,8 @@
   _(LOCAL, local, INFO, "local flow")                                                                                  \
   _(REMOTE, remote, INFO, "remote flow")                                                                               \
   _(COLLISION, collision, ERROR, "hash add collision")                                                                 \
-  _(CON_DROP, con_drop, ERROR, "handoff drop")
+  _(CON_DROP, con_drop, ERROR, "handoff drop")                                                                         \
+  _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")
 
 typedef enum
 {
@@ -44,24 +45,6 @@ typedef enum
 static vlib_error_desc_t vcdp_handoff_error_counters[] = {
 #define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
   foreach_vcdp_handoff_error
-#undef _
-};
-
-#define foreach_vcdp_slowpath_error                                                                                    \
-  _(NOERROR, noerror, INFO, "no error")                                                                                \
-  _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")
-
-typedef enum
-{
-#define _(f, n, s, d) VCDP_SLOWPATH_ERROR_##f,
-  foreach_vcdp_slowpath_error
-#undef _
-    VCDP_SLOWPATH_N_ERROR,
-} vcdp_slowpath_error_t;
-
-static vlib_error_desc_t vcdp_slowpath_error_counters[] = {
-#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
-  foreach_vcdp_slowpath_error
 #undef _
 };
 
@@ -112,7 +95,7 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   proto = k->proto;
 
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
-    /* collision - remote thread created same entry */
+    /* collision - previous packet created same entry */
     pool_put(ptd->sessions, session);
     return 1;
   }
@@ -136,88 +119,10 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
-  lookup_val[0] ^= value;
+  lookup_val[0] |= value;
   vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED], thread_index,
                                 tenant_idx, 1);
   return 0;
-}
-
-VLIB_NODE_FN(vcdp_slowpath_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
-  u32 *from = vlib_frame_vector_args(frame);
-  u32 n_left = frame->n_vectors;
-  u16 next_indices[VLIB_FRAME_SIZE], *current_next;
-  f64 time_now = vlib_time_now(vm);
-  u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
-  vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4= keys;
-  u64 __attribute__((aligned(32))) lookup_vals[VLIB_FRAME_SIZE], *lv = lookup_vals;
-
-  ptd->current_time = time_now;
-
-  vlib_get_buffers(vm, from, bufs, n_left);
-  b = bufs;
-  current_next = next_indices;
-
-  while (n_left) {
-    vcdp_calc_key_v4 (b[0], b[0]->flow_id, k4, lv, h);
-
-    u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
-    vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-    if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
-      vlib_node_increment_counter(vm, node->node_index, VCDP_SLOWPATH_ERROR_NO_CREATE_SESSION, 1);
-      current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP];
-      goto done;
-    }
-    /* if there is collision, we just reiterate */
-    if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
-      vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
-    }
-
-    b[0]->flow_id = lv[0] & (~(u32) 0);
-    u32 flow_index = b[0]->flow_id;
-    u32 session_index = flow_index >> 1;
-    vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
-    u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
-    vcdp_buffer(b[0])->service_bitmap = pbmp;
-    session->rx_id = vcdp_buffer(b[0])->rx_id;
-    vcdp_next(b[0], current_next);
-done:
-    current_next += 1;
-    b += 1;
-    n_left -= 1;
-    h += 1;
-    k4 += 1;
-    lv += 1;
-  }
-  vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
-
-  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
-    int i;
-    b = bufs;
-    current_next = next_indices;
-    h = hashes;
-
-    for (i = 0; i < frame->n_vectors; i++) {
-      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
-        vcdp_lookup_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
-        t->sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
-        t->flow_id = b[0]->flow_id;
-        t->hash = h[0];
-        t->next_index = current_next[0];
-        clib_memcpy(&t->k4, &keys[i], sizeof(t->k4));
-        b++;
-        h++;
-        current_next++;
-      } else
-        break;
-    }
-  }
-  return frame->n_vectors;
 }
 
 static_always_inline uword
@@ -278,38 +183,59 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     kv.key[1] = k4->as_u64[1];
 
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
-      current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_SLOWPATH];
-      to_local[n_local] = bi[0];
-      n_local++;
-      current_next++;
+      // Miss
+
+
+      // current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_SLOWPATH];
+
+      u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
+      vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+      if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_NO_CREATE_SESSION, 1);
+        current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP];
+        to_local[n_local] = bi[0];
+        n_local++;
+        current_next++;
+        goto next;
+      }
+      /* if there is collision, we just reiterate */
+      if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
+        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
+        continue;
+      }
     } else {
       // Match. Figure out if this is local or remote thread
-      lv[0] ^= kv.value;
+      lv[0] |= kv.value;
       hit_count++;
-      u32 flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
-      if (flow_thread_index == thread_index) {
-        /* known flow which belongs to this thread */
-        u32 flow_index = lv[0] & (~(u32) 0);
-        to_local[n_local] = bi[0];
-        session_index = flow_index >> 1;
-        session = vcdp_session_at_index(ptd, session_index);
-        u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
-        vcdp_buffer(b[0])->service_bitmap = pbmp;
+    }
 
-        /* The tenant of the buffer is the tenant of the session */
-        vcdp_buffer(b[0])->tenant_index = session->tenant_idx;
-        vcdp_next(b[0], current_next);
-        current_next += 1;
-        n_local++;
-      } else {
-        /* known flow which belongs to remote thread */
-        to_remote[n_remote] = bi[0];
-        thread_indices[n_remote] = flow_thread_index;
-        n_remote++;
-      }
+    u32 flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
+    if (flow_thread_index == thread_index) {
+      /* known flow which belongs to this thread */
+      u32 flow_index = lv[0] & (~(u32) 0);
+      to_local[n_local] = bi[0];
+      session_index = flow_index >> 1;
+      b[0]->flow_id = lv[0] & (~(u32) 0);
+
+      session = vcdp_session_at_index(ptd, session_index);
+      u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
+      vcdp_buffer(b[0])->service_bitmap = pbmp;
+
+      /* The tenant of the buffer is the tenant of the session */
+      vcdp_buffer(b[0])->tenant_index = session->tenant_idx;
+      vcdp_next(b[0], current_next);
+      current_next += 1;
+      n_local++;
+    } else {
+      /* known flow which belongs to remote thread */
+      to_remote[n_remote] = bi[0];
+      thread_indices[n_remote] = flow_thread_index;
+      n_remote++;
     }
 
     b[0]->flow_id = lv[0] & (~(u32) 0);
+
+  next:
     b += 1;
     n_left -= 1;
     h += 1;
@@ -454,12 +380,6 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = ARRAY_LEN(vcdp_lookup_error_counters),
   .error_counters = vcdp_lookup_error_counters,
-  // .n_next_nodes = VCDP_LOOKUP_N_NEXT,
-  // .next_nodes =
-  //   {
-  //     [VCDP_LOOKUP_NEXT_SLOWPATH] = "vcdp-lookup-slowpath",
-  //     [VCDP_LOOKUP_NEXT_DROP] = "error-drop",
-  //   },
 };
 
 VLIB_REGISTER_NODE(vcdp_handoff_node) = {
@@ -470,15 +390,4 @@ VLIB_REGISTER_NODE(vcdp_handoff_node) = {
   .n_errors = ARRAY_LEN(vcdp_handoff_error_counters),
   .error_counters = vcdp_handoff_error_counters,
   .sibling_of = "vcdp-lookup-ip4",
-};
-
-VLIB_REGISTER_NODE(vcdp_slowpath_node) = {
-  .name = "vcdp-lookup-slowpath",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_lookup_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_slowpath_error_counters),
-  .error_counters = vcdp_slowpath_error_counters,
-  .sibling_of = "vcdp-lookup-ip4",
-
 };

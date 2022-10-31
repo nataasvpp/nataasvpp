@@ -163,7 +163,7 @@ typedef struct {
 } vcdp_tenant_t;
 
 // VCDP lookup next nodes
-enum { VCDP_LOOKUP_NEXT_SLOWPATH, VCDP_LOOKUP_NEXT_DROP, VCDP_LOOKUP_N_NEXT};
+enum { VCDP_LOOKUP_NEXT_DROP, VCDP_LOOKUP_N_NEXT};
 
 typedef struct {
   /* key = (u64) tenant_id; val= (u64) tenant_idx; */

@@ -2,7 +2,6 @@
 
 // Interface-less tunnels.
 
-#include <arpa/inet.h>
 #include "tunnel.h"
 #include <vnet/adj/adj_nbr.h>
 #include <vnet/vxlan/vxlan_packet.h>
@@ -11,7 +10,7 @@
 vcdp_tunnel_main_t vcdp_tunnel_main;
 uword *uuid_hash;
 
-// Unidirectional session. Only accepting flows in forward direction>!>!>!>
+// Unidirectional session. Only accepting flows in forward direction
 // Adds session state to all threads.
 void
 make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport,
@@ -92,18 +91,14 @@ vcdp_tunnel_get(u32 index)
 static u8 *
 vcdp_tunnel_vxlan_dummy_l2_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
 {
-  ip4_header_t *ip;
-  udp_header_t *udp;
-  vxlan_header_t *vxlan;
-  ethernet_header_t *ethernet;
   u8 *rewrite = 0;
 
   *encap_len = sizeof(ip4_header_t) + sizeof(udp_header_t) + sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
   vec_validate(rewrite, *encap_len - 1);
-  ip = (ip4_header_t *) rewrite;
-  udp = (udp_header_t *) (ip + 1);
-  vxlan = (vxlan_header_t *) (udp + 1);
-  ethernet = (ethernet_header_t *) (vxlan + 1);
+  ip4_header_t *ip = (ip4_header_t *) rewrite;
+  udp_header_t *udp = (udp_header_t *) (ip + 1);
+  vxlan_header_t *vxlan = (vxlan_header_t *) (udp + 1);
+  ethernet_header_t *ethernet = (ethernet_header_t *) (vxlan + 1);
 
   ip->ip_version_and_header_length = 0x45;
   ip->ttl = 64;
@@ -115,12 +110,12 @@ vcdp_tunnel_vxlan_dummy_l2_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
   ip->checksum = 0;
 
   udp->checksum = 0;
-  udp->src_port = htons(t->sport);
-  udp->dst_port = htons(t->dport);
+  udp->src_port = clib_host_to_net_u16(t->sport);
+  udp->dst_port = clib_host_to_net_u16(t->dport);
   udp->length = 0;
 
   vnet_set_vni_and_flags(vxlan, t->tenant_id);
-  ethernet->type = htons(ETHERNET_TYPE_IP4);
+  ethernet->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
 
   return (rewrite);
 }
@@ -144,8 +139,9 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   }
 
   // check input
-  if (!tunnel_id)
+  if (!tunnel_id) {
     return -1;
+  }
 
   size_t uuid_len = strnlen_s(tunnel_id, sizeof(t->tunnel_id));
   if (uuid_len == 0 || uuid_len == sizeof(t->tunnel_id)) {
@@ -158,7 +154,7 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   // Check for duplicate in session table
   int rv;
   u64 value;
-  rv = vcdp_tunnel_lookup(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, htons(sport), htons(dport), &value);
+  rv = vcdp_tunnel_lookup(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), &value);
   if (rv == 0) {
     return -1;
   }
@@ -176,7 +172,7 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   hash_set(uuid_hash, tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
-  rv = vcdp_tunnel_add(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, htons(sport), htons(dport), t - tm->tunnels);
+  rv = vcdp_tunnel_add(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);
   if (rv != 0) {
     // error rollback
     pool_put(tm->tunnels, t);

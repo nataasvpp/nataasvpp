@@ -13,12 +13,7 @@
 #include <vpp_plugins/geneve/geneve_packet.h>
 #include "tunnel.h"
 
-typedef struct {
-  bool is_encap;
-  u32 tunnel_index;
-  u16 tenant_index;
-} vcdp_tunnel_trace_t;
-
+extern vlib_error_desc_t vcdp_tunnel_input_error_counters[];
 static inline u8 *
 format_vcdp_tunnel_trace(u8 *s, va_list *args)
 {
@@ -26,8 +21,8 @@ format_vcdp_tunnel_trace(u8 *s, va_list *args)
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
   vcdp_tunnel_trace_t *t = va_arg(*args, vcdp_tunnel_trace_t *);
 
-  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d", t->is_encap ? "encap" : "decap", t->tunnel_index,
-             t->tenant_index);
+  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d, next-index: %d error index: %d",
+             t->is_encap ? "encap" : "decap", t->tunnel_index, t->tenant_index, t->next_index, t->error_index);
   return s;
 }
 
@@ -39,9 +34,9 @@ typedef enum {
 } vcdp_tunnel_input_next_t;
 
 #define foreach_vcdp_tunnel_input_error                                                                                \
-  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")                                                \
-  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                                                                       \
-  _(NOT_IP, not_ip, INFO, "not ip packet")
+  _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
+  _(TRUNCATED, truncated, ERROR, "truncated")                                                                          \
+  _(NOT_SUPPORTED, not_supported, ERROR, "not supported inner protocol")
 
 // Error counters
 typedef enum {
@@ -100,6 +95,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
       bytes_to_inner_ip = ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(geneve_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
+        b[0]->error = node->errors[VCDP_TUNNEL_INPUT_ERROR_TRUNCATED];
         goto next;
       }
       geneve_header_t *geneve = (geneve_header_t *) (udp + 1);
@@ -119,6 +115,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
         ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
+        b[0]->error = node->errors[VCDP_TUNNEL_INPUT_ERROR_TRUNCATED];
         goto next;
       }
       vxlan_header_t *vxlan = (vxlan_header_t *) (udp + 1);
@@ -126,6 +123,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
       ethernet_header_t *eth = (ethernet_header_t *) (vxlan + 1);
       if (clib_net_to_host_u16(eth->type) != ETHERNET_TYPE_IP4) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
+        b[0]->error = node->errors[VCDP_TUNNEL_INPUT_ERROR_NOT_SUPPORTED];
         goto next;
       }
       break;
@@ -133,6 +131,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     default:
       // unknown tunnel type
       next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
+      b[0]->error = node->errors[VCDP_TUNNEL_INPUT_ERROR_NOT_SUPPORTED];
       goto next;
     }
 
@@ -142,6 +141,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     tenant = vcdp_tenant_get_by_id(tenant_id, tenant_idx);
     if (!tenant) {
       next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
+      b[0]->error = node->errors[VCDP_TUNNEL_INPUT_ERROR_NO_TENANT];
       goto next;
     }
 
@@ -169,15 +169,19 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     b = bufs;
     tunnel_idx = tunnel_indicies;
     tenant_idx = tenant_indicies;
+    next = nexts;
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
         vcdp_tunnel_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
         t->is_encap = false;
         t->tunnel_index = tunnel_idx[0];
         t->tenant_index = tenant_idx[0];
+        t->next_index = next[0];
+        t->error_index = b[0]->error;
         b++;
         tunnel_idx++;
         tenant_idx++;
+        next++;
       } else
         break;
     }
@@ -198,10 +202,7 @@ typedef enum {
   VCDP_TUNNEL_OUTPUT_N_NEXT
 } vcdp_tunnel_output_next_t;
 
-#define foreach_vcdp_tunnel_output_error                                                                               \
-  _(BUFFER_ALLOC_FAIL, buffer_alloc, ERROR, "buffer allocation failed")                                                \
-  _(BAD_DESC, bad_desc, ERROR, "bad descriptor")                                                                       \
-  _(NOT_IP, not_ip, INFO, "not ip packet")
+#define foreach_vcdp_tunnel_output_error _(NO_TENANT, no_tenant, ERROR, "no tenant")
 
 // Error counters
 typedef enum {
@@ -257,6 +258,7 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     tenant_idx[0] = session->tenant_idx;
     if (t == 0) {
       to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_DROP;
+      b[0]->error = node->errors[VCDP_TUNNEL_OUTPUT_ERROR_NO_TENANT];
       goto done;
     }
     b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID | VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
