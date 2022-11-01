@@ -125,6 +125,8 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   return 0;
 }
 
+VCDP_SERVICE_DECLARE(drop)
+
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -184,31 +186,31 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
       // Miss
-
-
-      // current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_SLOWPATH];
-
       u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
       if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
         vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_NO_CREATE_SESSION, 1);
-        current_next[0] = vcdp->lookup_next_nodes[VCDP_LOOKUP_NEXT_DROP]; // TODO: Replace this with vcdp_drop?
+        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        vcdp_next(b[0], current_next);
+
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
         goto next;
       }
+
       /* if there is collision, we just reiterate */
       if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
         vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
         continue;
       }
     } else {
-      // Match. Figure out if this is local or remote thread
+      // Match
       lv[0] |= kv.value;
       hit_count++;
     }
 
+    // Figure out if this is local or remote thread
     u32 flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
     if (flow_thread_index == thread_index) {
       /* known flow which belongs to this thread */

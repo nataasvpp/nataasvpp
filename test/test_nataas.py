@@ -4,6 +4,7 @@
 
 """NATaaS tests"""
 
+from curses import echo
 import unittest
 from scapy.layers.inet6 import Ether, IP, UDP, TCP, IPv6
 from scapy.layers.inet import ICMP
@@ -56,7 +57,7 @@ class TestNATaaS(VppTestCase):
             / pkt
         )
 
-    def gen_packets(self, pool, dst):
+    def gen_packets(self, pool, dst, dport, vni):
         # in2out packets
         tests = [
 
@@ -64,9 +65,7 @@ class TestNATaaS(VppTestCase):
                 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
                 'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
                 'npackets': 2,
-
-             },
-
+            },
             {
                 'send':   IP(src='10.10.10.10', dst=dst)/TCP(),
                 'expect': IP(src=pool, dst=dst)/TCP(),
@@ -76,10 +75,16 @@ class TestNATaaS(VppTestCase):
                 'send': IP(src='10.10.10.10', dst=dst)/ICMP(id=1234),
                 'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
                 'npackets': 2,
-             },
+            },
+            # {
+            #     # Verify that mid-stream TCP packet creates session
+            #     'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags='A', sport=123, dport=8080),
+            #     'expect': IP(src=pool, dst=dst)/TCP(sport=123, dport=8080),
+            #     'npackets': 1,
+            #     'nframe': 1,
+            # },
         ]
-        dport = 4789
-        vni = 123
+
         for t in tests:
             t['send'] = self.encapsulate(dport, vni, t['send'])
             t['expect'][IP].ttl -= 1
@@ -96,49 +101,44 @@ class TestNATaaS(VppTestCase):
     def payload(self, len):
         return "x" * len
 
+    def make_reply(self, pkt):
+        pkt[Ether].src, pkt[Ether].dst = pkt[Ether].dst, pkt[Ether].src
+        pkt[IP].src, pkt[IP].dst = pkt[IP].dst, pkt[IP].src
+        if pkt[IP].proto == 6:
+            pkt[TCP].sport, pkt[TCP].dport = pkt[TCP].dport, pkt[TCP].sport
+            pkt[IP][TCP].flags = 'SA'
+        elif pkt[IP].proto == 17:
+            pkt[UDP].sport, pkt[UDP].dport = pkt[UDP].dport, pkt[UDP].sport
+        elif pkt[IP].proto == 1:
+            if pkt[IP][ICMP].type == 8: #echo-request
+                pkt[IP][ICMP].type = 0 #echo-reply
+        return pkt
+
     def send_packet_through_nat(self, pool, tunnel_dport):
         "pg0 is inside nat, pg1 is outside"
         # Send a VXLAN packet and validate that is passes through the service chain and is natively forwarded
-        self.gen_packets(pool, self.pg1.remote_ip4) # Move to setup
+        self.gen_packets(pool, self.pg1.remote_ip4, tunnel_dport, 123) # Move to setup
 
-        # slowpath
+        # first frame is slowpath second frame is through the fastpath
         for t in self.nataas_tests:
-            print('SENT PACKET:')
-            t['send'].show2()
-            rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
-            print(self.vapi.cli("show vcdp session-table"))
-            for p in rx:
-                print('RECEIVED PACKET:')
-                p.show2()
-                self.validate(p[1], t['expect'])
+            for f in range(t.get('nframes', 2)):
+                print('SENT PACKET:')
+                t['send'].show2()
+                rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
+                print(self.vapi.cli("show vcdp session-table"))
+                for p in rx:
+                    print('RECEIVED PACKET:')
+                    p.show2()
+                    self.validate(p[1], t['expect'])
 
-        # fastpath
-        for t in self.nataas_tests:
-            print('SENT PACKET:')
-            t['send'].show2()
-            rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
-            print(self.vapi.cli("show vcdp session-table"))
-            for p in rx:
-                print('RECEIVED PACKET:')
-                p.show2()
-                self.validate(p[1], t['expect'])
+                    # Send reply back through the opened sessions
+                    reply = self.make_reply(p)
+                    print('REPLY')
+                    reply.show2()
+                    rx = self.send_and_expect(self.pg1, reply, self.pg0)
+                    print('OUT2IN PACKET:')
+                    rx[0].show2()
 
-
-        # # Send two packets in two frames to test both slowpath and fastpath
-        # rx = self.send_and_expect(self.pg0, pkt_to_send*2, self.pg1)
-        # rx = self.send_and_expect(self.pg0, pkt_to_send*2, self.pg1)
-        # rx[0].show2()
-        # print(self.vapi.cli("show vcdp session-table"))
-
-        # reply = rx[0][IP]
-        # reply.show2()
-        # tmp = reply.src
-        # reply.src = reply.dst
-        # reply.dst = tmp
-        # tmp = reply[TCP].sport
-        # reply[TCP].sport = reply[TCP].dport
-        # reply[TCP].dport = tmp
-        # reply.show2()
 
         # pkt_to_send = Ether(src=self.pg1.remote_mac, dst=self.pg1.local_mac) / reply
 
@@ -190,6 +190,7 @@ class TestNATaaS(VppTestCase):
         print(self.vapi.cli("show vcdp session-table"))
 
         print(self.vapi.cli('show vcdp tenant'))
+        print(self.vapi.cli('show vcdp tcp session-table'))
 
         # Send IPv6 packet
         pkt = IPv6(src='1::1', dst='2::2')/TCP(sport=dport)
