@@ -98,15 +98,22 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
   uword thread_index = ptd - vcdp_main.per_thread_data;
-  vcdp_session_ip4_key_t skey;
+  vcdp_session_ip4_key_t *skey;
 
   /* TODO: deal with secondary keys */
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
   s = format(s, "  thread index: %d\n", thread_index);
   s = format(s, "  session index: %d\n", session_index);
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
-    s = format(s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey.proto, format_ip4_address,
-               &skey.src, skey.sport, format_ip4_address, &skey.dst, skey.dport);
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
+    skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+    s = format(s, "  primary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
+               &skey->src, skey->sport, format_ip4_address, &skey->dst, skey->dport);
+  }
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
+    skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+    s = format(s, "  secondary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
+               &skey->src, skey->sport, format_ip4_address, &skey->dst, skey->dport);
+  }
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format(s, "  expires after: %fs\n", remaining_time);
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);

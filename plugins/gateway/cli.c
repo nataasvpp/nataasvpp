@@ -112,6 +112,8 @@ vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comman
   u32 method = ~0;
   u32 tenant_id = ~0;
   char *tunnel_id = 0;
+  mac_address_t src_mac = {0};
+  mac_address_t dst_mac = {0};
 
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
@@ -133,12 +135,16 @@ vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comman
       ;
     else if (unformat(line_input, "id %s", &tunnel_id))
       ;
+    else if (unformat(line_input, "src-mac %U", unformat_ethernet_address, &src_mac))
+      ;
+    else if (unformat(line_input, "dst-mac %U", unformat_ethernet_address, &dst_mac))
+      ;
     else {
       err = unformat_parse_error(line_input);
       goto done;
     }
   }
-  int rv = vcdp_tunnel_create(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu);
+  int rv = vcdp_tunnel_create(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu, &src_mac, &dst_mac);
   if (rv) {
     err = clib_error_return(0, "missing tunnel parameters");
   }
@@ -154,7 +160,7 @@ done:
 VLIB_CLI_COMMAND(vcdp_tunnel_command, static) = {
   .path = "set vcdp tunnel",
   .short_help = "set vcdp tunnel id <id> tenant <tenant-id> method "
-                "<geneve-l3|vxlan-dummy-l2> src "
-                "<src> dst <dst> [sport <sport>] dport <dport> [mtu <mtu>]",
+                "<geneve-l3|vxlan-dummy-l2|vxlan-gpe> src "
+                "<src> dst <dst> [sport <sport>] dport <dport> [mtu <mtu>] [src-mac <mac-address> dst-mac <mac-address>]",
   .function = vcdp_tunnel_command_fn,
 };

@@ -116,6 +116,8 @@ vcdp_tunnel_vxlan_dummy_l2_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
 
   vnet_set_vni_and_flags(vxlan, t->tenant_id);
   ethernet->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+  clib_memcpy(&ethernet->src_address, &t->src_mac.bytes, sizeof(ethernet->src_address));
+  clib_memcpy(&ethernet->dst_address, &t->dst_mac.bytes, sizeof(ethernet->dst_address));
 
   return (rewrite);
 }
@@ -129,7 +131,7 @@ vcdp_tunnel_geneve_l3_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
 
 int
 vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
-                   u16 sport, u16 dport, u16 mtu)
+                   u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
@@ -169,6 +171,8 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   t->dport = dport;
   t->mtu = mtu;
   t->method = method;
+  clib_memcpy(&t->src_mac, src_mac, sizeof(t->src_mac));
+  clib_memcpy(&t->dst_mac, dst_mac, sizeof(t->dst_mac));
   hash_set(uuid_hash, tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
