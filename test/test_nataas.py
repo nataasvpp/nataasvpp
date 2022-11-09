@@ -85,8 +85,8 @@ class TestNATaaS(VppTestCase):
             },
             {
                 'name': 'Basic ICMP',
-                'send': IP(src='10.10.10.10', dst=dst)/ICMP(id=1234),
-                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'send': IP(src='210.10.10.10', dst=dst)/ICMP(id=1235),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1235),
                 'npackets': 2,
             },
             {
@@ -113,8 +113,8 @@ class TestNATaaS(VppTestCase):
 
         self.nataas_tests = tests
 
-    def validate(self, rx, expected):
-        self.assertEqual(rx, expected.__class__(expected))
+    def validate(self, rx, expected, msg=None):
+        self.assertEqual(rx, expected.__class__(expected), msg=msg)
 
     def validate_bytes(self, rx, expected):
         self.assertEqual(rx, expected)
@@ -158,7 +158,7 @@ class TestNATaaS(VppTestCase):
                     for p in rx:
                         print('RECEIVED PACKET:')
                         p.show2()
-                        self.validate(p[1], t['expect'])
+                        self.validate(p[1], t['expect'], msg=t)
 
                         # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
                         # Send reply back through the opened sessions
@@ -220,16 +220,16 @@ class TestNATaaS(VppTestCase):
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
-        # pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
-        # pkt_to_send = self.encapsulate(666, 123, pkt)
-        # no_session_pkt = pkt_to_send
-        # no_session_pkt[TCP].dport = 666
-        # print('SENDING PACKET FROM OUTSIDE')
-        # self.send_and_assert_no_replies(self.pg1, no_session_pkt)
-        # print(self.vapi.cli("show vcdp session-table"))
+        pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
+        pkt_to_send = self.encapsulate(666, 123, pkt)
+        no_session_pkt = pkt_to_send
+        no_session_pkt[TCP].dport = 666
+        print('SENDING PACKET FROM OUTSIDE')
+        self.send_and_assert_no_replies(self.pg1, no_session_pkt)
+        print(self.vapi.cli("show vcdp session-table"))
 
-        # print(self.vapi.cli('show vcdp tenant'))
-        # print(self.vapi.cli('show vcdp tcp session-table'))
+        print(self.vapi.cli('show vcdp tenant'))
+        print(self.vapi.cli('show vcdp tcp session-table'))
 
 
 def generator(t):
