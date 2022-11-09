@@ -36,17 +36,15 @@ vcdp_table_format_insert_tcp_check_session(table_t *t, u32 n, vcdp_main_t *vcdp,
   /* Session flags */
   table_format_cell(t, n, 4, "%U", format_vcdp_tcp_check_session_flags, tcp_session->flags);
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
     table_format_cell(t, n, 5, "%d", skey.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.src, skey.sport);
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.dst, skey.dport);
   }
   n += 1;
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_SECONDARY);
     table_format_cell(t, n, 5, "%d", skey.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.src, skey.sport);
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.dst, skey.dport);
     n += 1;
   }
   return n;

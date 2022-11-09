@@ -119,7 +119,6 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_in
   for (int i = 0; i < n_keys; i++) {
     if ((i == 0 && session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
         (i == 1 && session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
-      vcdp_normalise_ip4_key(session, &skey, i);
       vcdp_session_ip4_key_encode(&skey, &mp->keys[i]);
     }
   }

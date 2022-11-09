@@ -112,8 +112,8 @@ enum {
 
 typedef union {
   struct {
-    u32 ip_addr_lo, ip_addr_hi;
-    u16 port_lo, port_hi;
+    u32 src, dst;
+    u16 sport, dport;
     u32 context_id : 24;
     u8 proto;
   };
@@ -135,7 +135,6 @@ typedef struct {
   u16 tenant_idx;               // 2
   u8 state; /* see vcdp_session_state_t */ // 1
   u8 proto;                     // 1
-  u8 pseudo_dir[VCDP_SESSION_N_KEY];    // 2
   u8 type; /* see vcdp_session_type_t */ // 1
   u8 key_flags;                         // 1
 } vcdp_session_t; /* TODO: optimise mem layout, this is bad */
@@ -194,6 +193,7 @@ format_function_t format_vcdp_session_state;
 format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
+format_function_t format_vcdp_session_key;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
 
@@ -275,9 +275,6 @@ clib_error_t *
 vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
 clib_error_t *
 vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
-
-void vcdp_normalise_ip4_key (vcdp_session_t *session,
-			     vcdp_session_ip4_key_t *result, u8 key_idx);
 
 u32
 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);

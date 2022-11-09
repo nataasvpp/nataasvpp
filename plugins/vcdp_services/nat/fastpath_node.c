@@ -160,7 +160,7 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
     session = vcdp_session_at_index(ptd, session_idx);
-    nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id);
+    nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id); // broken
 
     nat_fastpath_process_one(nat_rewrite, session, to_next, b, is_terminal);
     n_left -= 1;

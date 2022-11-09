@@ -22,13 +22,10 @@ typedef struct
 
 // TODO: Remove lookup_val
 static_always_inline void
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *lookup_val, u64 *h)
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
   ip4_header_t *ip = vlib_buffer_get_current(b);
-  u32 src = ntohl(ip->src_address.as_u32);
-  u32 dst = ntohl(ip->dst_address.as_u32);
-  u32 ip_addr_lo, ip_addr_hi;
-  u16 port_lo, port_hi, sport = 0, dport = 0;
+  u16 sport = 0, dport = 0;
 
   if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
     udp_header_t *udp = (udp_header_t *) ip4_next_header(ip);
@@ -41,32 +38,15 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
       nat_icmp_echo_header_t *echo = (nat_icmp_echo_header_t *) (icmp + 1);
       sport = dport = echo->identifier;
-
     }
-  }
-
-  lookup_val[0] = 0;
-
-  if (src < dst) {
-    ip_addr_lo = src;
-    port_lo = sport;
-    ip_addr_hi = dst;
-    port_hi = dport;
-  } else {
-    /* Normalize */
-    ip_addr_lo = dst;
-    port_lo = dport;
-    ip_addr_hi = src;
-    port_hi = sport;
-    lookup_val[0] |= 0x1;
   }
 
   *skey = (vcdp_session_ip4_key_t){0};
   skey->context_id = context_id;
-  skey->ip_addr_lo = htonl(ip_addr_lo);
-  skey->port_lo = port_lo;
-  skey->port_hi = port_hi;
-  skey->ip_addr_hi = htonl(ip_addr_hi);
+  skey->src = ip->src_address.as_u32;
+  skey->dst = ip->dst_address.as_u32;
+  skey->sport = sport;
+  skey->dport = dport;
   skey->proto = ip->protocol;
 
   // figure out who uses this:

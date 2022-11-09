@@ -62,20 +62,10 @@ typedef struct {
   u32 flow_id;
 } vcdp_handoff_trace_t;
 
-u8 *
-format_vcdp_session_key(u8 *s, va_list *args)
-{
-  vcdp_session_ip4_key_t *k = va_arg(*args, vcdp_session_ip4_key_t *);
-  s = format(s, "%d: %U:%d %U %U:%d", k->context_id, format_ip4_address, &k->ip_addr_lo, ntohs(k->port_lo), format_ip_protocol,
-             k->proto, format_ip4_address, &k->ip_addr_hi, ntohs(k->port_hi));
-  return s;
-}
-
 static_always_inline int
 vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 			vcdp_tenant_t *tenant, u16 tenant_idx,
-			u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u64 *h,
-			u64 *lookup_val)
+			u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
 {
   clib_bihash_kv_16_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
@@ -87,7 +77,7 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   u64 session_id;
   pool_get(ptd->sessions, session);
   session_idx = session - ptd->sessions;
-  pseudo_flow_idx = (lookup_val[0] & 0x1) | (session_idx << 1);
+  pseudo_flow_idx = (session_idx << 1);
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
   kv.key[0] = k->as_u64[0];
   kv.key[1] = k->as_u64[1];
@@ -99,6 +89,7 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
     pool_put(ptd->sessions, session);
     return 1;
   }
+  lookup_val[0] = kv.value;
   session->type = VCDP_SESSION_TYPE_IP4;
   session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
 
@@ -113,13 +104,11 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
   clib_memcpy_fast(session->bitmaps, tenant->bitmaps, sizeof(session->bitmaps));
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], k, sizeof(session->keys[0]));
-  session->pseudo_dir[VCDP_SESSION_KEY_PRIMARY] = lookup_val[0] & 0x1;
   session->proto = proto;
 
   vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
-  lookup_val[0] |= value;
   vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED], thread_index,
                                 tenant_idx, 1);
   return 0;
@@ -145,9 +134,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4= keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   f64 time_now = vlib_time_now(vm);
-
-  /* lookup_vals contains: (Phase 1) packet_dir, (Phase 2) thread_index|||
-   * flow_index */
   u64 __attribute__((aligned(32))) lookup_vals[VLIB_FRAME_SIZE], *lv = lookup_vals;
   u16 hit_count = 0;
 
@@ -162,21 +148,21 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-    vcdp_calc_key_v4 (b[0], b[0]->flow_id, k4, lv, h);
+    vcdp_calc_key_v4 (b[0], b[0]->flow_id, k4, h);
+
     h += 1;
     k4 += 1;
     b += 1;
-    lv += 1;
     n_left -= 1;
   }
 
   h = hashes;
   k4 = keys;
   b = bufs;
-  lv = lookup_vals;
   u16 *current_next = local_next_indices;
   bi = from;
   n_left = frame->n_vectors;
+  lv = lookup_vals;
 
   while (n_left) {
     // clib_memcpy_fast(&kv, k4, 16);
@@ -205,8 +191,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         continue;
       }
     } else {
-      // Match
-      lv[0] |= kv.value;
+      lv[0] = kv.value;
       hit_count++;
     }
 
@@ -217,7 +202,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u32 flow_index = lv[0] & (~(u32) 0);
       to_local[n_local] = bi[0];
       session_index = flow_index >> 1;
-      b[0]->flow_id = lv[0] & (~(u32) 0);
+      b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
       u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];

@@ -27,12 +27,21 @@ format_vcdp_session_type(u8 *s, va_list *args)
   return s;
 }
 
+u8 *
+format_vcdp_session_key(u8 *s, va_list *args)
+{
+  vcdp_session_ip4_key_t *k = va_arg(*args, vcdp_session_ip4_key_t *);
+  s = format(s, "%d: %U:%d %U %U:%d", k->context_id, format_ip4_address, &k->src, clib_net_to_host_u16(k->sport), format_ip_protocol,
+             k->proto, format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
+  return s;
+}
+
 u32
 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now)
 {
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
-  vcdp_session_ip4_key_t skey;
+  vcdp_session_ip4_key_t *skey;
 
   /* Session id */
   table_format_cell(t, n, 0, "0x%U", format_hex_bytes, &session_net, sizeof(session_net));
@@ -50,17 +59,17 @@ vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_sess
   table_format_cell(t, n, 9, "%f", remaining_time);
 
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
-    table_format_cell(t, n, 5, "%d", skey.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
+    skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+    table_format_cell(t, n, 5, "%d", skey->context_id);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey->src, clib_net_to_host_u16(skey->sport));
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
   }
   n += 1;
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
-    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_SECONDARY);
-    table_format_cell(t, n, 5, "%d", skey.context_id);
-    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey.ip_addr_lo, skey.port_lo);
-    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
+    skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+    table_format_cell(t, n, 5, "%d", skey->context_id);
+    table_format_cell(t, n, 6, "%U:%u", format_ip4_address, &skey->src, clib_net_to_host_u16(skey->sport));
+    table_format_cell(t, n, 7, "%U:%u", format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
     n += 1;
   }
   return n;
@@ -92,15 +101,12 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   vcdp_session_ip4_key_t skey;
 
   /* TODO: deal with secondary keys */
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
-    vcdp_normalise_ip4_key(session, &skey, VCDP_SESSION_KEY_PRIMARY);
-
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
   s = format(s, "  thread index: %d\n", thread_index);
   s = format(s, "  session index: %d\n", session_index);
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4)
     s = format(s, "  specification: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey.proto, format_ip4_address,
-               &skey.ip_addr_lo, skey.port_lo, format_ip4_address, &skey.ip_addr_hi, skey.port_hi);
+               &skey.src, skey.sport, format_ip4_address, &skey.dst, skey.dport);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format(s, "  expires after: %fs\n", remaining_time);
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);

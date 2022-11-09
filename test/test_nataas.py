@@ -23,30 +23,24 @@ class TestNATaaS(VppTestCase):
     """NATaaS Test Case"""
 
     maxDiff = None
-
     @classmethod
     def setUpClass(cls):
         super(TestNATaaS, cls).setUpClass()
         cls.create_pg_interfaces(range(2))
         cls.interfaces = list(cls.pg_interfaces)
-
-    @classmethod
-    def tearDownClass(cls):
-        super(TestNATaaS, cls).tearDownClass()
-
-    def setUp(self):
-        super(TestNATaaS, self).setUp()
-        for i in self.interfaces:
+        for i in cls.interfaces:
             i.admin_up()
             i.config_ip4()
             i.resolve_arp()
 
-    def tearDown(self):
-        super(TestNATaaS, self).tearDown()
-        if not self.vpp_dead:
-            for i in self.pg_interfaces:
-                i.unconfig_ip4()
-                i.admin_down()
+
+    @classmethod
+    def tearDownClass(cls):
+        super(TestNATaaS, cls).tearDownClass()
+        # if not cls.vpp_dead:
+        #     for i in cls.pg_interfaces:
+        #         i.unconfig_ip4()
+        #         i.admin_down()
 
     def encapsulate(self, dport, vni, pkt):
         return (
@@ -57,27 +51,53 @@ class TestNATaaS(VppTestCase):
             / pkt
         )
 
+
     def gen_packets(self, pool, dst, dport, vni):
         # in2out packets
+        # TODO:Separate test table for out2in packets.
         tests = [
-
             {
+                'name': 'Basic UDP',
                 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
                 'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
                 'npackets': 2,
+                'reply': True,
             },
             {
-                'send':   IP(src='10.10.10.10', dst=dst)/TCP(),
-                'expect': IP(src=pool, dst=dst)/TCP(),
+                'name': 'Basic UDP',
+                'send': IP(src='210.10.10.10', dst=dst)/UDP(sport=124, dport=456),
+                'expect': IP(src=pool, dst=dst)/UDP(sport=124, dport=456),
                 'npackets': 2,
             },
             {
+                'name': 'Basic TCP',
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(),
+                'expect': IP(src=pool, dst=dst)/TCP(),
+                'npackets': 2,
+                'reply': True,
+            },
+            {
+                # Test normalisation too
+                'name': 'Basic ICMP',
                 'send': IP(src='10.10.10.10', dst=dst)/ICMP(id=1234),
                 'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
                 'npackets': 2,
             },
+            {
+                'name': 'Basic ICMP',
+                'send': IP(src='10.10.10.10', dst=dst)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 2,
+            },
+            {
+                'name': 'Send unsupported packet',
+                'send': IPv6(src='1::1', dst='2::2')/TCP(sport=dport),
+                'expect': None,
+                'npackets': 1,
+            },
+
             # {
-            #     # Verify that mid-stream TCP packet creates session
+            #     'name': 'Verify mid-stream TCP creates session',
             #     'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags='A', sport=123, dport=8080),
             #     'expect': IP(src=pool, dst=dst)/TCP(sport=123, dport=8080),
             #     'npackets': 1,
@@ -87,7 +107,8 @@ class TestNATaaS(VppTestCase):
 
         for t in tests:
             t['send'] = self.encapsulate(dport, vni, t['send'])
-            t['expect'][IP].ttl -= 1
+            if t['expect']: # If a reply is expected
+                t['expect'][IP].ttl -= 1
 
 
         self.nataas_tests = tests
@@ -121,23 +142,41 @@ class TestNATaaS(VppTestCase):
 
         # first frame is slowpath second frame is through the fastpath
         for t in self.nataas_tests:
-            for f in range(t.get('nframes', 2)):
-                print('SENT PACKET:')
-                t['send'].show2()
-                rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
-                print(self.vapi.cli("show vcdp session-table"))
-                for p in rx:
-                    print('RECEIVED PACKET:')
-                    p.show2()
-                    self.validate(p[1], t['expect'])
+            with self.subTest(msg=f"*******************Test: {t['name']}", t=t):
+                for f in range(t.get('nframes', 1)):
+                    print('SENT PACKET:')
+                    t['send'].show2()
+                    if t['expect'] == None:
+                        self.send_and_assert_no_replies(self.pg0, t['send'] * t['npackets'])
+                        continue
+                    else:
+                        try:
+                            rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
+                        except:
+                            self.fail(f"No packet received for test {t['name']}")
+                    print(self.vapi.cli("show vcdp session-table"))
+                    for p in rx:
+                        print('RECEIVED PACKET:')
+                        p.show2()
+                        self.validate(p[1], t['expect'])
 
-                    # Send reply back through the opened sessions
-                    reply = self.make_reply(p)
-                    print('REPLY')
-                    reply.show2()
-                    rx = self.send_and_expect(self.pg1, reply, self.pg0)
-                    print('OUT2IN PACKET:')
-                    rx[0].show2()
+                        # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
+                        # Send reply back through the opened sessions
+                        if t.get('reply', False):
+                            reply = self.make_reply(p)
+                            expected_reply = self.make_reply(t['send'])
+                            print('EXPECTED PACKET:')
+                            expected_reply.show2()
+                            print('REPLY TO SEND')
+                            reply.show2()
+                            try:
+                                rx = self.send_and_expect(self.pg1, reply, self.pg0)
+                            except:
+                                print('FAIL:', t)
+                                raise
+                            print('OUT2IN PACKET:')
+                            rx[0].show2()
+                            #self.validate(rx[0][1], expected_reply)
 
 
         # pkt_to_send = Ether(src=self.pg1.remote_mac, dst=self.pg1.local_mac) / reply
@@ -159,7 +198,7 @@ class TestNATaaS(VppTestCase):
         dport=4789
         dport2=4790
         vrf=0
-        pool = '1.1.1.1'
+        pool = '222.1.1.1'
 
         self.vapi.cli(f'vcdp tenant add {tenant} context 0')
         self.vapi.cli(f'vcdp tenant add {outside_tenant} context 0 no-create')
@@ -175,27 +214,36 @@ class TestNATaaS(VppTestCase):
         self.vapi.cli(f"set vcdp nat snat tenant {tenant} alloc-pool 4242")
 
         self.send_packet_through_nat(pool, dport)
-        self.send_packet_through_nat(pool, dport2)
+        # self.send_packet_through_nat(pool, dport2)
 
         # TODO: What is supposed to happen if same packet is sent on two different tunnels? Drop or return traffic back on the original one?
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
-        pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
-        pkt_to_send = self.encapsulate(666, 123, pkt)
-        no_session_pkt = pkt_to_send
-        no_session_pkt[TCP].dport = 666
-        print('SENDING PACKET FROM OUTSIDE')
-        self.send_and_assert_no_replies(self.pg1, no_session_pkt)
-        print(self.vapi.cli("show vcdp session-table"))
+        # pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
+        # pkt_to_send = self.encapsulate(666, 123, pkt)
+        # no_session_pkt = pkt_to_send
+        # no_session_pkt[TCP].dport = 666
+        # print('SENDING PACKET FROM OUTSIDE')
+        # self.send_and_assert_no_replies(self.pg1, no_session_pkt)
+        # print(self.vapi.cli("show vcdp session-table"))
 
-        print(self.vapi.cli('show vcdp tenant'))
-        print(self.vapi.cli('show vcdp tcp session-table'))
-
-        # Send IPv6 packet
-        pkt = IPv6(src='1::1', dst='2::2')/TCP(sport=dport)
-        self.send_and_assert_no_replies(self.pg0, self.encapsulate(dport, 0, pkt))
+        # print(self.vapi.cli('show vcdp tenant'))
+        # print(self.vapi.cli('show vcdp tcp session-table'))
 
 
-if __name__ == "__main__":
-    unittest.main(testRunner=VppTestRunner)
+def generator(t):
+    def test(self):
+        self.assertEqual(1,2)
+    return test
+
+
+# if __name__ == "__main__":
+#     for t in tests:
+#         test_name = f"test_{t['name']}"
+#         print('TETNAME', test_name)
+#         test = generator(t)
+#         setattr(TestNATaaS, test_name, test)
+
+
+#     unittest.main(testRunner=VppTestRunner)

@@ -211,29 +211,6 @@ vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_
   return 0;
 }
 
-void
-vcdp_normalise_ip4_key(vcdp_session_t *session, vcdp_session_ip4_key_t *result, u8 key_idx)
-{
-  vcdp_session_ip4_key_t *skey = &session->keys[key_idx];
-  u8 pseudo_dir = session->pseudo_dir[key_idx];
-  u8 proto = session->proto;
-  u8 with_port = proto == IP_PROTOCOL_UDP || proto == IP_PROTOCOL_TCP || proto == IP_PROTOCOL_ICMP;
-
-  result->as_u64[0] = skey->as_u64[0];
-  result->as_u64[1] = skey->as_u64[1];
-  if (with_port && pseudo_dir) {
-    result->ip_addr_lo = skey->ip_addr_hi;
-    result->port_lo = clib_net_to_host_u16(skey->port_hi);
-    result->ip_addr_hi = skey->ip_addr_lo;
-    result->port_hi = clib_net_to_host_u16(skey->port_lo);
-  } else {
-    result->ip_addr_lo = skey->ip_addr_lo;
-    result->port_lo = clib_net_to_host_u16(skey->port_lo);
-    result->ip_addr_hi = skey->ip_addr_hi;
-    result->port_hi = clib_net_to_host_u16(skey->port_hi);
-  }
-}
-
 int
 vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add)
 {
