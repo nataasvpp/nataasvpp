@@ -5,29 +5,12 @@
 #include <vnet/vnet.h>
 #include <vcdp/service.h>
 
-/*
- * add CLI:
- * vcdp tenant <add/del> <tenant-id>
- *
- * it creates entry in the tenant pool. Default service chains in both
- * directions is "vcdp-drop"
- *
- *
- * add CLI:
- * set vcdp services tenant <tenant-id> (SERVICE_NAME)+ <forward|reverse>
- *
- * configure tenant with a service chain for a given direction (forward or
- * reverse)
- *
- */
-
 static clib_error_t *
-vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-  u8 is_del = 0;
   u32 tenant_id = ~0;
   u32 context_id = ~0;
   vcdp_tenant_flags_t flags = 0;
@@ -35,10 +18,8 @@ vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "add %d", &tenant_id))
-      is_del = 0;
-    else if (unformat(line_input, "del %d", &tenant_id))
-      is_del = 1;
+    if (unformat(line_input, "%d", &tenant_id))
+      ;
     else if (unformat(line_input, "context %d", &context_id))
       ;
     else if (unformat(line_input, "no-create"))
@@ -54,7 +35,7 @@ vcdp_tenant_add_del_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   }
   if (context_id == ~0)
     context_id = tenant_id;
-  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, flags, is_del);
+  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, flags, 0);
 done:
   unformat_free(line_input);
   return err;
@@ -267,9 +248,9 @@ vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vli
 }
 
 VLIB_CLI_COMMAND(vcdp_tenant_add_del_command, static) = {
-  .path = "vcdp tenant",
-  .short_help = "vcdp tenant <add|del> <tenant-id> context <context-id> [<flags>]",
-  .function = vcdp_tenant_add_del_command_fn,
+  .path = "set vcdp tenant",
+  .short_help = "set vcdp tenant <tenant-id> context <context-id> [<flags>]",
+  .function = vcdp_tenant_add_command_fn,
 };
 
 VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {

@@ -13,10 +13,9 @@
 
 #define foreach_vcdp_lookup_error                                                                                      \
   _(MISS, miss, ERROR, "flow miss")                                                                                    \
-  _(LOCAL, local, INFO, "local flow")                                                                                  \
   _(REMOTE, remote, INFO, "remote flow")                                                                               \
   _(COLLISION, collision, ERROR, "hash add collision")                                                                 \
-  _(CON_DROP, con_drop, ERROR, "handoff drop")                                                                         \
+  _(CON_DROP, con_drop, INFO, "handoff drop")                                                                         \
   _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")
 
 typedef enum
@@ -65,7 +64,7 @@ typedef struct {
 static_always_inline int
 vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 			vcdp_tenant_t *tenant, u16 tenant_idx,
-			u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u64 *h, u64 *lookup_val)
+			u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val)
 {
   clib_bihash_kv_16_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
@@ -99,6 +98,7 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
   session->state = VCDP_SESSION_STATE_FSOL;
+  session->rx_id = rx_id;
   kv2.key = session_id;
   kv2.value = value;
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
@@ -186,7 +186,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       }
 
       /* if there is collision, we just reiterate */
-      if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, h, lv)) {
+      if (vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv)) {
         vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
         continue;
       }
@@ -213,6 +213,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       vcdp_next(b[0], current_next);
       current_next += 1;
       n_local++;
+      session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
+      session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
     } else {
       /* known flow which belongs to remote thread */
       to_remote[n_remote] = bi[0];
@@ -242,7 +244,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   /* enqueue local */
   if (n_local) {
     vlib_buffer_enqueue_to_next(vm, node, to_local, local_next_indices, n_local);
-    vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_LOCAL, n_local);
   }
 
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
@@ -297,7 +298,6 @@ VLIB_NODE_FN(vcdp_handoff_node)
   b = bufs;
   current_next = next_indices;
 
-  /*TODO: prefetch, quad or octo loop...*/
   while (n_left) {
     u32 flow_index = b[0]->flow_id;
     u32 session_index = flow_index >> 1;

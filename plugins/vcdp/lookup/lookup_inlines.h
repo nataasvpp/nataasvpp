@@ -20,7 +20,6 @@ typedef struct
   u16 sequence;
 } nat_icmp_echo_header_t;
 
-// TODO: Remove lookup_val
 static_always_inline void
 vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
@@ -41,7 +40,7 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     }
   }
 
-  *skey = (vcdp_session_ip4_key_t){0};
+  // *skey = (vcdp_session_ip4_key_t){0};
   skey->context_id = context_id;
   skey->src = ip->src_address.as_u32;
   skey->dst = ip->dst_address.as_u32;

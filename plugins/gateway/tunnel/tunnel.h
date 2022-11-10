@@ -52,6 +52,7 @@ typedef struct {
 } __clib_packed vcdp_tunnel_key_t;
 STATIC_ASSERT_SIZEOF(vcdp_tunnel_key_t, 16);
 
+// TODO: move these to main vcdp.
 #define vcdp_log_err(...)    vlib_log(VLIB_LOG_LEVEL_ERR, vcdp_tunnel_main.log_default, __VA_ARGS__)
 #define vcdp_log_warn(...)   vlib_log(VLIB_LOG_LEVEL_WARNING, vcdp_tunnel_main.log_default, __VA_ARGS__)
 #define vcdp_log_notice(...) vlib_log(VLIB_LOG_LEVEL_NOTICE, vcdp_tunnel_main.log_default, __VA_ARGS__)

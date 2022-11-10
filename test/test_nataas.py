@@ -14,7 +14,6 @@ from vpp_ip import DpoProto
 from vpp_ip_route import VppIpRoute, VppRoutePath, FibPathProto
 from socket import AF_INET, AF_INET6, inet_pton
 
-
 """
 Tests for NATaaS.
 """
@@ -24,15 +23,37 @@ class TestNATaaS(VppTestCase):
 
     maxDiff = None
     @classmethod
-    def setUpClass(cls):
-        super(TestNATaaS, cls).setUpClass()
-        cls.create_pg_interfaces(range(2))
-        cls.interfaces = list(cls.pg_interfaces)
-        for i in cls.interfaces:
+    def setUpClass(self):
+        super(TestNATaaS, self).setUpClass()
+        self.create_pg_interfaces(range(2))
+        self.interfaces = list(self.pg_interfaces)
+        for i in self.interfaces:
             i.admin_up()
             i.config_ip4()
             i.resolve_arp()
 
+        tenant=0
+        outside_tenant=1000
+        dport=4789
+        dport2=4790
+        vrf=0
+        pool = '222.1.1.1'
+
+        self.vapi.cli(f'set vcdp tenant {tenant} context 0')
+        self.vapi.cli(f'set vcdp tenant {outside_tenant} context 0 no-create')
+        self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {outside_tenant}")
+        self.vapi.cli(f"set vcdp gateway tunnel {self.pg0.name}")
+        self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
+        self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
+        self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
+        self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
+        self.vapi.cli("vcdp nat alloc-pool add 4243 2.2.2.2")
+        self.vapi.cli(f"vcdp nat alloc-pool add 4242 {pool}")
+        self.vapi.cli(f"set vcdp nat snat tenant {tenant} alloc-pool 4242")
+
+        self.vxlan_pool = pool
+        self.vxlan_dport = dport
+        self.vxlan_dport2 = dport2
 
     @classmethod
     def tearDownClass(cls):
@@ -60,7 +81,7 @@ class TestNATaaS(VppTestCase):
                 'name': 'Basic UDP',
                 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
                 'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
-                'npackets': 2,
+                'npackets': 1,
                 'reply': True,
             },
             {
@@ -111,7 +132,7 @@ class TestNATaaS(VppTestCase):
                 t['expect'][IP].ttl -= 1
 
 
-        self.nataas_tests = tests
+        return tests
 
     def validate(self, rx, expected, msg=None):
         self.assertEqual(rx, expected.__class__(expected), msg=msg)
@@ -123,6 +144,7 @@ class TestNATaaS(VppTestCase):
         return "x" * len
 
     def make_reply(self, pkt):
+        pkt = pkt.copy()
         pkt[Ether].src, pkt[Ether].dst = pkt[Ether].dst, pkt[Ether].src
         pkt[IP].src, pkt[IP].dst = pkt[IP].dst, pkt[IP].src
         if pkt[IP].proto == 6:
@@ -135,17 +157,29 @@ class TestNATaaS(VppTestCase):
                 pkt[IP][ICMP].type = 0 #echo-reply
         return pkt
 
-    def send_packet_through_nat(self, pool, tunnel_dport):
+    def validate_reply_packet(self, received, sent):
+        # A little rough validation that we received the packet on same tunnel as sent on
+        try:
+            self.assertEqual(sent[UDP].dport, received[UDP].dport)
+            self.assertEqual(sent[IP].src, received[IP].dst)
+            self.assertEqual(sent[IP].dst, received[IP].src)
+        except AssertionError:
+            print('SENT VXLAN ENCAPSULATED PACKET:')
+            sent.show2()
+            print('RECEIVED VXLAN ENCAPSULATED PACKET:')
+            received.show2()
+            raise
+
+    def run_tests(self, tests, pool, tunnel_dport, nframes):
         "pg0 is inside nat, pg1 is outside"
         # Send a VXLAN packet and validate that is passes through the service chain and is natively forwarded
-        self.gen_packets(pool, self.pg1.remote_ip4, tunnel_dport, 123) # Move to setup
 
         # first frame is slowpath second frame is through the fastpath
-        for t in self.nataas_tests:
+        for t in tests:
             with self.subTest(msg=f"*******************Test: {t['name']}", t=t):
-                for f in range(t.get('nframes', 1)):
+                for f in range(nframes):
                     print('SENT PACKET:')
-                    t['send'].show2()
+                    # t['send'].show2()
                     if t['expect'] == None:
                         self.send_and_assert_no_replies(self.pg0, t['send'] * t['npackets'])
                         continue
@@ -157,7 +191,7 @@ class TestNATaaS(VppTestCase):
                     print(self.vapi.cli("show vcdp session-table"))
                     for p in rx:
                         print('RECEIVED PACKET:')
-                        p.show2()
+                        # p.show2()
                         self.validate(p[1], t['expect'], msg=t)
 
                         # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
@@ -166,16 +200,17 @@ class TestNATaaS(VppTestCase):
                             reply = self.make_reply(p)
                             expected_reply = self.make_reply(t['send'])
                             print('EXPECTED PACKET:')
-                            expected_reply.show2()
+                            # expected_reply.show2()
                             print('REPLY TO SEND')
-                            reply.show2()
+                            # reply.show2()
                             try:
                                 rx = self.send_and_expect(self.pg1, reply, self.pg0)
                             except:
                                 print('FAIL:', t)
                                 raise
                             print('OUT2IN PACKET:')
-                            rx[0].show2()
+                            # rx[0].show2()
+                            self.validate_reply_packet(rx[0], t['send'])
                             #self.validate(rx[0][1], expected_reply)
 
 
@@ -192,28 +227,11 @@ class TestNATaaS(VppTestCase):
 
     def test_vxlan(self):
         """VXLAN gateway through NAT"""
-        # Create tunnel
-        tenant=0
-        outside_tenant=1000
-        dport=4789
-        dport2=4790
-        vrf=0
-        pool = '222.1.1.1'
 
-        self.vapi.cli(f'vcdp tenant add {tenant} context 0')
-        self.vapi.cli(f'vcdp tenant add {outside_tenant} context 0 no-create')
-        self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {outside_tenant}")
+        tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-        self.vapi.cli(f"set vcdp gateway tunnel {self.pg0.name}")
-        self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
-        self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
-        self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
-        self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
-        self.vapi.cli("vcdp nat alloc-pool add 4243 2.2.2.2")
-        self.vapi.cli(f"vcdp nat alloc-pool add 4242 {pool}")
-        self.vapi.cli(f"set vcdp nat snat tenant {tenant} alloc-pool 4242")
-
-        self.send_packet_through_nat(pool, dport)
+        self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
+#        self.test_runner(self.nataas_tests, self.vxlan_pool, self.vxlan_dport2, 1)
         # self.send_packet_through_nat(pool, dport2)
 
         # TODO: What is supposed to happen if same packet is sent on two different tunnels? Drop or return traffic back on the original one?
@@ -230,20 +248,3 @@ class TestNATaaS(VppTestCase):
 
         print(self.vapi.cli('show vcdp tenant'))
         print(self.vapi.cli('show vcdp tcp session-table'))
-
-
-def generator(t):
-    def test(self):
-        self.assertEqual(1,2)
-    return test
-
-
-# if __name__ == "__main__":
-#     for t in tests:
-#         test_name = f"test_{t['name']}"
-#         print('TETNAME', test_name)
-#         test = generator(t)
-#         setattr(TestNATaaS, test_name, test)
-
-
-#     unittest.main(testRunner=VppTestRunner)
