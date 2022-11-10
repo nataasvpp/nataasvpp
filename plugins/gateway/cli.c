@@ -164,3 +164,39 @@ VLIB_CLI_COMMAND(vcdp_tunnel_command, static) = {
                 "<src> dst <dst> [sport <sport>] dport <dport> [mtu <mtu>] [src-mac <mac-address> dst-mac <mac-address>]",
   .function = vcdp_tunnel_command_fn,
 };
+
+static clib_error_t *
+vcdp_tunnel_show_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  // unformat_input_t line_input_, *line_input = &line_input_;
+  clib_error_t *err = 0;
+  // vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_tunnel_t *tunnel;
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
+
+  table_t _t = {}, *t = &_t;
+  u32 /*n_row = 0, */col = 0;
+  table_add_header_row (t, 0);
+  table_add_header_col(t, 8, "id", "tenant", "method", "src", "dst", "src mac", "dst mac", "mtu");
+  pool_foreach (tunnel, tm->tunnels) {
+    table_format_cell(t, col, 0, "%s", tunnel->tunnel_id);
+    table_format_cell(t, col, 1, "%d", tunnel->tenant_id);
+    table_format_cell(t, col, 2, "%d", tunnel->method);
+    table_format_cell(t, col, 3, "%U:%u", format_ip_address, &tunnel->src, tunnel->sport);
+    table_format_cell(t, col, 4, "%U:%u", format_ip_address, &tunnel->dst, tunnel->dport);
+    table_format_cell(t, col, 5, "%U", format_mac_address, &tunnel->src_mac);
+    table_format_cell(t, col, 6, "%U", format_mac_address, &tunnel->dst_mac);
+    table_format_cell(t, col, 7, "%d", tunnel->mtu);
+    col++;
+  }
+  vlib_cli_output(vm, "%U", format_table, t);
+  table_free(t);
+
+  return err;
+}
+
+VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
+  .path = "show vcdp tunnels",
+  .short_help = "show vcdp tunnels",
+  .function = vcdp_tunnel_show_command_fn,
+};
