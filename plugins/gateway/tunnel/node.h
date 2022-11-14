@@ -68,6 +68,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
   while (n_left_from > 0) {
     /* By default pass packet to next node in the feature chain */
     vnet_feature_next_u16(next, b[0]);
+    b[0]->error = 0;
 
     // Do we have enough bytes to do the lookup?
     // No support for reassembly so pass-through for non-first fragments

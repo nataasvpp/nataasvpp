@@ -125,6 +125,19 @@ class TestNATaaS(VppTestCase):
                 'expect': None,
                 'npackets': 1,
             },
+            {
+                'name': 'Truncated packet',
+                'send': IP(src='210.10.10.10', dst=dst),
+                'expect': None,
+                'npackets': 1,
+            },
+
+            # {
+            #     'name': 'Send non TCP/UDP/ICMP packet',
+            #     'send': IP(src='210.10.10.10', dst=dst)/IP(),
+            #     'expect': IP(src=pool, dst=dst)/IP(),
+            #     'npackets': 1,
+            # },
 
             # {
             #     'name': 'Verify mid-stream TCP creates session',

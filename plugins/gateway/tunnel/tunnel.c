@@ -108,6 +108,7 @@ vcdp_tunnel_vxlan_dummy_l2_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
   /* fixup ip4/udp header length and checksum after-the-fact */
   ip->src_address.as_u32 = t->src.ip.ip4.as_u32;
   ip->dst_address.as_u32 = t->dst.ip.ip4.as_u32;
+  ip4_header_set_df(ip);
   ip->checksum = 0;
 
   udp->checksum = 0;
