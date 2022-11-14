@@ -18,6 +18,15 @@ from socket import AF_INET, AF_INET6, inet_pton
 Tests for NATaaS.
 """
 
+DEBUG = False
+def log_packet(msg, pkt):
+    if DEBUG:
+        print(msg)
+        pkt.show2()
+def log_error_packet(msg, pkt):
+    print(msg)
+    pkt.show2()
+
 class TestNATaaS(VppTestCase):
     """NATaaS Test Case"""
 
@@ -164,10 +173,8 @@ class TestNATaaS(VppTestCase):
             self.assertEqual(sent[IP].src, received[IP].dst)
             self.assertEqual(sent[IP].dst, received[IP].src)
         except AssertionError:
-            print('SENT VXLAN ENCAPSULATED PACKET:')
-            sent.show2()
-            print('RECEIVED VXLAN ENCAPSULATED PACKET:')
-            received.show2()
+            log_error_packet('Sent VXLAN encapsulated packet', sent)
+            log_error_packet('Received VXLAN encapsulated packet', received)
             raise
 
     def run_tests(self, tests, pool, tunnel_dport, nframes):
@@ -178,8 +185,7 @@ class TestNATaaS(VppTestCase):
         for t in tests:
             with self.subTest(msg=f"*******************Test: {t['name']}", t=t):
                 for f in range(nframes):
-                    print('SENT PACKET:')
-                    # t['send'].show2()
+                    log_packet('Sent packet', t['send'])
                     if t['expect'] == None:
                         self.send_and_assert_no_replies(self.pg0, t['send'] * t['npackets'])
                         continue
@@ -190,8 +196,7 @@ class TestNATaaS(VppTestCase):
                             self.fail(f"No packet received for test {t['name']}")
                     print(self.vapi.cli("show vcdp session-table"))
                     for p in rx:
-                        print('RECEIVED PACKET:')
-                        # p.show2()
+                        log_packet('Received packet', p)
                         self.validate(p[1], t['expect'], msg=t)
 
                         # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
@@ -199,17 +204,14 @@ class TestNATaaS(VppTestCase):
                         if t.get('reply', False):
                             reply = self.make_reply(p)
                             expected_reply = self.make_reply(t['send'])
-                            print('EXPECTED PACKET:')
-                            # expected_reply.show2()
-                            print('REPLY TO SEND')
-                            # reply.show2()
+                            log_packet('Expected packet', expected_reply)
+                            log_packet('Reply to send', reply)
                             try:
                                 rx = self.send_and_expect(self.pg1, reply, self.pg0)
                             except:
                                 print('FAIL:', t)
                                 raise
-                            print('OUT2IN PACKET:')
-                            # rx[0].show2()
+                            log_packet('Out2in packet', rx[0])
                             self.validate_reply_packet(rx[0], t['send'])
                             #self.validate(rx[0][1], expected_reply)
 
@@ -242,9 +244,12 @@ class TestNATaaS(VppTestCase):
         pkt_to_send = self.encapsulate(666, 123, pkt)
         no_session_pkt = pkt_to_send
         no_session_pkt[TCP].dport = 666
-        print('SENDING PACKET FROM OUTSIDE')
         self.send_and_assert_no_replies(self.pg1, no_session_pkt)
-        print(self.vapi.cli("show vcdp session-table"))
 
+        print(self.vapi.cli("show vcdp session-table"))
         print(self.vapi.cli('show vcdp tenant'))
         print(self.vapi.cli('show vcdp tcp session-table'))
+
+        self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)
+
+        print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])

@@ -33,14 +33,22 @@ typedef struct {
   u16 encap_size;
 } vcdp_tunnel_t;
 
+typedef enum {
+  VCDP_TUNNEL_COUNTER_RX,
+  VCDP_TUNNEL_COUNTER_TX,
+  VCDP_TUNNEL_N_COUNTERS
+} vcdp_tunnel_counter_t;
+
 typedef struct {
   vcdp_tunnel_t *tunnels; // pool of tunnels
   vlib_log_class_t log_default;
   clib_bihash_16_8_t tunnels_hash;
 
-  vlib_simple_counter_main_t *simple_counters;
-  vlib_combined_counter_main_t *combined_counters;
+  // vlib_simple_counter_main_t *simple_counters;
+  vlib_combined_counter_main_t combined_counters[VCDP_TUNNEL_N_COUNTERS];
 
+  u32 number_of_tunnels_gauge;
+  clib_spinlock_t counter_lock;
 } vcdp_tunnel_main_t;
 
 typedef struct {
@@ -67,63 +75,6 @@ typedef struct {
   u32 next_index;
   u32 error_index;
 } vcdp_tunnel_trace_t;
-
-typedef enum {
-  /* Simple counters. */
-  VCDP_TUNNEL_COUNTER_DROP = 0,
-  VCDP_TUNNEL_COUNTER_PUNT = 1,
-  VCDP_TUNNEL_COUNTER_IP4 = 2,
-  VCDP_TUNNEL_COUNTER_IP6 = 3,
-  VCDP_TUNNEL_COUNTER_RX_NO_BUF = 4,
-  VCDP_TUNNEL_COUNTER_RX_MISS = 5,
-  VCDP_TUNNEL_COUNTER_RX_ERROR = 6,
-  VCDP_TUNNEL_COUNTER_TX_ERROR = 7,
-  VCDP_TUNNEL_COUNTER_MPLS = 8,
-  VCDP_TUNNEL_N_SIMPLE_COUNTER = 9,
-  /* Combined counters. */
-  VCDP_TUNNEL_COUNTER_RX = 0,
-  VCDP_TUNNEL_COUNTER_RX_UNICAST = 1,
-  VCDP_TUNNEL_COUNTER_RX_MULTICAST = 2,
-  VCDP_TUNNEL_COUNTER_RX_BROADCAST = 3,
-  VCDP_TUNNEL_COUNTER_TX = 4,
-  VCDP_TUNNEL_COUNTER_TX_UNICAST = 5,
-  VCDP_TUNNEL_COUNTER_TX_MULTICAST = 6,
-  VCDP_TUNNEL_COUNTER_TX_BROADCAST = 7,
-  VCDP_TUNNEL_N_COMBINED_COUNTER = 8,
-} vcdp_tunnel_counter_type_t;
-
-#define foreach_rx_combined_interface_counter(_x)               \
-  for (_x = VNET_INTERFACE_COUNTER_RX;                          \
-       _x <= VNET_INTERFACE_COUNTER_RX_BROADCAST;               \
-       _x++)
-
-#define foreach_tx_combined_interface_counter(_x)               \
-  for (_x = VNET_INTERFACE_COUNTER_TX;                          \
-       _x <= VNET_INTERFACE_COUNTER_TX_BROADCAST;               \
-       _x++)
-
-#define foreach_simple_interface_counter_name	\
-  _(DROP, drops, if)				\
-  _(PUNT, punt, if)				\
-  _(IP4, ip4, if)				\
-  _(IP6, ip6, if)				\
-  _(RX_NO_BUF, rx-no-buf, if)			\
-  _(RX_MISS, rx-miss, if)			\
-  _(RX_ERROR, rx-error, if)			\
-  _(TX_ERROR, tx-error, if)         \
-  _(MPLS, mpls, if)
-
-#define foreach_combined_interface_counter_name	\
-  _(RX, rx, if)					\
-  _(RX_UNICAST, rx-unicast, if)			\
-  _(RX_MULTICAST, rx-multicast, if)		\
-  _(RX_BROADCAST, rx-broadcast, if)		\
-  _(TX, tx, if)					\
-  _(TX_UNICAST, tx-unicast, if)			\
-  _(TX_MULTICAST, tx-multicast, if)		\
-  _(TX_BROADCAST, tx-broadcast, if)
-
-
 
 clib_error_t *vcdp_tunnel_init(vlib_main_t *vm);
 vcdp_tunnel_t *vcdp_tunnel_lookup_by_uuid(char *);

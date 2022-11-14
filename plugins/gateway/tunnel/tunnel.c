@@ -6,6 +6,7 @@
 #include <vnet/adj/adj_nbr.h>
 #include <vnet/vxlan/vxlan_packet.h>
 #include <vpp_plugins/geneve/geneve_packet.h>
+#include <vlib/stats/stats.h>
 
 vcdp_tunnel_main_t vcdp_tunnel_main;
 uword *uuid_hash;
@@ -129,6 +130,22 @@ vcdp_tunnel_geneve_l3_build_rewrite(vcdp_tunnel_t *t, u16 *encap_len)
   return 0;
 }
 
+static void
+vcdp_tunnel_counter_lock(void)
+{
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
+  if (tm->counter_lock)
+    clib_spinlock_lock (&tm->counter_lock);
+}
+static void
+vcdp_tunnel_counter_unlock (void)
+{
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
+
+  if (tm->counter_lock)
+    clib_spinlock_unlock (&tm->counter_lock);
+}
+
 int
 vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
                    u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
@@ -197,6 +214,14 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   // Add tenant if needed
   // clib_error_t *err = vcdp_tenant_add_del(&vcdp_main, tenant_id, ~0, false);
   // if (err) rv = -1;
+  vlib_stats_set_gauge (tm->number_of_tunnels_gauge, pool_elts(tm->tunnels));
+
+  vcdp_tunnel_counter_lock();
+  for (int i = 0; i < ARRAY_LEN(tm->combined_counters); i++) {
+    vlib_validate_combined_counter(&tm->combined_counters[i], t - tm->tunnels);
+    vlib_zero_combined_counter(&tm->combined_counters[i], t - tm->tunnels);
+  }
+  vcdp_tunnel_counter_unlock();
   return rv;
 }
 
@@ -217,6 +242,7 @@ vcdp_tunnel_delete(char *tunnel_id)
 
   // Remove from pool
   pool_put(tm->tunnels, t);
+  vlib_stats_set_gauge (tm->number_of_tunnels_gauge, pool_elts(tm->tunnels));
 
   return 0;
 }
@@ -231,9 +257,16 @@ vcdp_tunnel_enable_disable_input(u32 sw_if_index, bool is_enable)
 clib_error_t *
 vcdp_tunnel_init(vlib_main_t *vm)
 {
-  vcdp_tunnel_main.log_default = vlib_log_register_class("vcdp", 0);
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
+  tm->log_default = vlib_log_register_class("vcdp", 0);
   uuid_hash = hash_create_string(0, sizeof(uword));
-  clib_bihash_init_16_8(&vcdp_tunnel_main.tunnels_hash, "vcdp ipv4 static session table", VCDP_TUNNELS_NUM_BUCKETS, 0);
+  clib_bihash_init_16_8(&tm->tunnels_hash, "vcdp ipv4 static session table", VCDP_TUNNELS_NUM_BUCKETS, 0);
+  tm->number_of_tunnels_gauge = vlib_stats_add_gauge ("/vcdp/tunnels/no");
+
+  clib_spinlock_init(&tm->counter_lock);
+
+  tm->combined_counters[VCDP_TUNNEL_COUNTER_RX].stat_segment_name = "/vcdp/tunnels/rx";
+  tm->combined_counters[VCDP_TUNNEL_COUNTER_TX].stat_segment_name = "/vcdp/tunnels/tx";
 
   return 0;
 }

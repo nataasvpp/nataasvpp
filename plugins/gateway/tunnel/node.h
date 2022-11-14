@@ -50,6 +50,8 @@ typedef enum {
 static inline uword
 vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
+  u32 thread_index = vm->thread_index;
   u32 n_left_from, *from;
   u16 nexts[VLIB_FRAME_SIZE] = {0}, *next = nexts;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
@@ -74,6 +76,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     if (vlib_buffer_has_space(b[0], min_lookup_bytes) == 0 || ip4_is_fragment(ip)) {
       goto next;
     }
+    u16 orglen = vlib_buffer_length_in_chain(vm, b[0]);
 
     udp_header_t *udp = ip4_next_header(ip);
     u32 context_id = 0;
@@ -153,6 +156,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     vcdp_buffer(b[0])->rx_id = value; // Store tunnel index in buffer
 
     next[0] = VCDP_TUNNEL_INPUT_NEXT_IP4_LOOKUP;
+    vlib_increment_combined_counter(&tm->combined_counters[VCDP_TUNNEL_COUNTER_RX], thread_index, tunnel_idx[0], 1, orglen);
 
   next:
     next += 1;
@@ -234,6 +238,7 @@ vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b, ip4_header_t *inner
 static inline uword
 vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
+  vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   u32 tunnel_indicies[VLIB_FRAME_SIZE] = {0},
       *tunnel_idx = tunnel_indicies; // Used only for tracing
@@ -271,6 +276,9 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     clib_memcpy_fast(ip, t->rewrite, t->encap_size);
     vcdp_vxlan_dummy_l2_fixup(vm, b[0], inner_ip);
     to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP;
+
+    vlib_increment_combined_counter(&tm->combined_counters[VCDP_TUNNEL_COUNTER_TX], thread_index, tunnel_idx[0], 1,
+                                    vlib_buffer_length_in_chain(vm, b[0]));
 
   done:
     to_next++;
