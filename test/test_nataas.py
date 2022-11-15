@@ -255,15 +255,17 @@ class TestNATaaS(VppTestCase):
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
-        pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
-        pkt_to_send = self.encapsulate(666, 123, pkt)
-        no_session_pkt = pkt_to_send
-        no_session_pkt[TCP].dport = 666
-        self.send_and_assert_no_replies(self.pg1, no_session_pkt)
+        pkt = IP(src='10.10.10.10', dst=self.vxlan_pool)/TCP(sport=666)
+        # pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
+        pkt_to_send = Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac) / pkt
+
+        #no_session_pkt = pkt_to_send
+        #no_session_pkt[TCP].dport = 666
+        self.send_and_assert_no_replies(self.pg1, pkt_to_send)
 
         print(self.vapi.cli("show vcdp session-table"))
-        print(self.vapi.cli('show vcdp tenant'))
         print(self.vapi.cli('show vcdp tcp session-table'))
+        print(self.vapi.cli('show vcdp tenant'))
 
         self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)
 
