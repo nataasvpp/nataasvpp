@@ -12,6 +12,7 @@ add_vpp_library(vcdpcore
   vcdp/vcdp.c
   vcdp/service.c
   vcdp/timer/node.c
+  vcdp/bypass/node.c
 
   vcdp_services/tcp-check/node.c
   vcdp_services/tcp-check/tcp_check.c

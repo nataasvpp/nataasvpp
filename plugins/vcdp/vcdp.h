@@ -19,6 +19,7 @@
 
 #include <vcdp/timer/timer.h>
 
+// TODO: Make this configurable on startup
 #define VCDP_LOG2_SESSIONS_PER_THREAD 19
 #define VCDP_LOG2_TENANTS             15
 #define VCDP_SESSION_ID_TOTAL_BITS    64
@@ -32,17 +33,9 @@
 /* Convention session_index is 31 bit
  * Flow_index (embedded in vlib_buffer_t as "flow_id")
  * Flow_index = (session_index << 1) + !(is_forward)
-
- * A flow is "forward" if it's going from initiator to responder
- * The packet_direction is 1 if normalisation happened 0 otherwise
- * the stored_direction of a flow is the packet direction of its FSOL
- * Pseudo_flow_index = (session_index << 1) + stored_direction
- *
- * Note that for a packet belonging to a flow
- * ----------------------------------------------------------
- *     !(is_forward) = packet_direction ^ stored_direction
- *        Flow_index = Pseudo_flow_index ^ stored_direction
- * ----------------------------------------------------------
+ * A flow is "forward" if it's going from initiator to responder.
+ * Compared to upstream VCDP, no normalisation is done.
+ * Reverse direction always uses secondary key.
  */
 
 typedef enum {
@@ -134,10 +127,10 @@ typedef struct {
   session_version_t session_version;    // 2
   u16 tenant_idx;               // 2
   u8 state; /* see vcdp_session_state_t */ // 1
-  u8 proto;                     // 1
+  u8 proto;                     // 1 TODO: Needed?
   u8 type; /* see vcdp_session_type_t */ // 1
   u8 key_flags;                         // 1
-} vcdp_session_t; /* TODO: optimise mem layout, this is bad */
+} vcdp_session_t; /* TODO: optimise mem layout */
 STATIC_ASSERT_SIZEOF(vcdp_session_t, 128);
 
 typedef struct {
@@ -185,7 +178,6 @@ typedef struct {
 extern vcdp_main_t vcdp_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
-extern vlib_node_registration_t vcdp_slowpath_node;
 
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
@@ -269,18 +261,13 @@ vcdp_session_n_keys(vcdp_session_t *session)
     return 1;
 }
 
-clib_error_t *
-vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del);
-clib_error_t *
-vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
-clib_error_t *
-vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
+clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del);
+clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
+clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 
-u32
-vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
-int
-vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
+u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
+int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 
-#endif /* __included_vcdp_h__ */
+#endif

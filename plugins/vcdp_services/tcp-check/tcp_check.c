@@ -16,4 +16,6 @@ vcdp_tcp_check_init(vlib_main_t *vm)
   return 0;
 };
 
+// TODO: Only initialise these data structures when service is enabled
+// Consider moving to a sub-block?
 VLIB_INIT_FUNCTION(vcdp_tcp_check_init);

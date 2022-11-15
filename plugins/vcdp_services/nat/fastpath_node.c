@@ -121,8 +121,9 @@ nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *sessio
     if (ops & NAT_REWRITE_OP_ICMP_ID)
       *icmp_id = nat_session->rewrite.icmp_id;
   } else {
-    /*FIXME, must be done at the beginning!*/
+    /*FIXME:, must be done at the beginning!*/
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+    // b[0]->error = node->errors[UNSUPPORTED_PROTOCOL]
     goto end_of_packet;
   }
 

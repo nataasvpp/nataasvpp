@@ -5,6 +5,7 @@
 
 #include <vnet/vnet.h>
 
+// TODO: Is this used?
 #define foreach_vcdp_buffer_flag _(REASSEMBLED, "reassembled")
 
 enum {

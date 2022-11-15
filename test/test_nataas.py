@@ -4,15 +4,15 @@
 
 """NATaaS tests"""
 
-from curses import echo
 import unittest
-from scapy.layers.inet6 import Ether, IP, UDP, TCP, IPv6
-from scapy.layers.inet import ICMP
-from scapy.layers.vxlan import VXLAN
-from framework import VppTestCase, VppTestRunner
-from vpp_ip import DpoProto
-from vpp_ip_route import VppIpRoute, VppRoutePath, FibPathProto
 from socket import AF_INET, AF_INET6, inet_pton
+
+from framework import VppTestCase, VppTestRunner
+from scapy.layers.inet import ICMP
+from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
+from scapy.layers.vxlan import VXLAN
+from vpp_ip import DpoProto
+from vpp_ip_route import FibPathProto, VppIpRoute, VppRoutePath
 
 """
 Tests for NATaaS.
@@ -56,6 +56,7 @@ class TestNATaaS(VppTestCase):
         self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
         self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
         self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
+        self.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
         self.vapi.cli("vcdp nat alloc-pool add 4243 2.2.2.2")
         self.vapi.cli(f"vcdp nat alloc-pool add 4242 {pool}")
         self.vapi.cli(f"set vcdp nat snat tenant {tenant} alloc-pool 4242")
@@ -245,6 +246,7 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
+       # self.run_tests([tests[7]], self.vxlan_pool, self.vxlan_dport, 1)
         self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
 #        self.test_runner(self.nataas_tests, self.vxlan_pool, self.vxlan_dport2, 1)
         # self.send_packet_through_nat(pool, dport2)

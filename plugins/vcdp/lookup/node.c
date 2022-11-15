@@ -175,8 +175,11 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
       if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE) {
-        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_NO_CREATE_SESSION, 1);
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        // If the tenant no create session flag is set, use the configured service chain as the miss-chain.
+        // Typically drop or bypass, as most services cannot handle not having a session.
+        vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
+        // vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
         vcdp_next(b[0], current_next);
 
         to_local[n_local] = bi[0];

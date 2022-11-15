@@ -4,6 +4,7 @@
 #include <vcdp_services/nat/nat.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
+
 #define foreach_vcdp_nat_slowpath_error _(DROP, "drop")
 
 typedef enum {
@@ -47,6 +48,7 @@ format_vcdp_nat_slowpath_trace(u8 *s, va_list *args)
 VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_output)
+
 static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
                           u16 thread_index, nat_main_t *nm, nat_tenant_t *tenant, u32 session_index,
@@ -109,7 +111,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
 
   /* First try with original src port */
   ip4_new_port = ip4_old_port;
-
+  // TODO TODO TODO: Swap keys somehow somewhere???
+  // TODO: The secondary key should be added by create session and modified by the NAT node?????
   while ((++n_retries) < 5 && vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index,
                                                                  &new_key, &h)) {
     /* Use h to try a different port */
