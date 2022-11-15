@@ -133,12 +133,12 @@ class TestNATaaS(VppTestCase):
                 'npackets': 1,
             },
 
-            # {
-            #     'name': 'Send non TCP/UDP/ICMP packet',
-            #     'send': IP(src='210.10.10.10', dst=dst)/IP(),
-            #     'expect': IP(src=pool, dst=dst)/IP(),
-            #     'npackets': 1,
-            # },
+            {
+                'name': 'Send non TCP/UDP/ICMP packet',
+                'send': IP(src='210.10.10.10', dst=dst)/IP(),
+                'expect': IP(src=pool, dst=dst)/IP(),
+                'npackets': 1,
+            },
 
             # {
             #     'name': 'Verify mid-stream TCP creates session',
@@ -246,22 +246,16 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-       # self.run_tests([tests[7]], self.vxlan_pool, self.vxlan_dport, 1)
-        self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests([tests[7]], self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
 #        self.test_runner(self.nataas_tests, self.vxlan_pool, self.vxlan_dport2, 1)
         # self.send_packet_through_nat(pool, dport2)
 
-        # TODO: What is supposed to happen if same packet is sent on two different tunnels? Drop or return traffic back on the original one?
-
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
-        pkt = IP(src='10.10.10.10', dst=self.vxlan_pool)/TCP(sport=666)
-        # pkt = IP(src='10.10.10.10', dst=self.pg1.remote_ip4)/TCP(sport=666)
-        pkt_to_send = Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac) / pkt
-
-        #no_session_pkt = pkt_to_send
-        #no_session_pkt[TCP].dport = 666
-        self.send_and_assert_no_replies(self.pg1, pkt_to_send)
+        # pkt = IP(src='10.10.10.10', dst=self.vxlan_pool)/TCP(sport=666)
+        # pkt_to_send = Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac) / pkt
+        # self.send_and_assert_no_replies(self.pg1, pkt_to_send)
 
         print(self.vapi.cli("show vcdp session-table"))
         print(self.vapi.cli('show vcdp tcp session-table'))
