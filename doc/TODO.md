@@ -4,10 +4,13 @@
 - [ ] Services ordering? E.g. a vector of u32s?
 - [ ] Callback for session delete?
 - [ ] Hide bihash lookup in tenant_id to tenant_idx lookup
-- [ ]  Hide tenant datastructure behind wrappers
+- [ ] Hide tenant datastructure behind wrappers
 - [ ] Add VRF support back
-- [ ] Reason in vcdp-drop
 - [ ] Add more details to packet trace from vcdp-lookup (IP header)
+- [x] show vcdp services command disappeared??
+- [x] Policy node ahead of VCDP to handle sharing a single interface
+- [ ] Check out2in packets if they match a pool address?
+
 
 ## Tunnels
 Interface less tunnels infrastructure integrated with the session router.
@@ -16,7 +19,6 @@ Interface less tunnels infrastructure integrated with the session router.
 - [ ] Improve trace messages
 - [ ] Stack of DPO from UDP encap
 - [ ] Outer tunnel head-end full reassembly
-- [x] Set DF on outbound tunnel packets?
 - [ ] IPv6 encap / outer packet (if asked for)
 - [ ] ICMP error for tunnel packet. E.g. PMTUD?
 
@@ -36,13 +38,14 @@ Interface less tunnels infrastructure integrated with the session router.
 - [ ] Update CLI
 - [ ] Pool as DPO for hairpinning?
 - [ ] ICMP Error handling
+- [x] Non TCP/UDP handling
 - [ ] Hairpinning
 - [ ] - [ ] Send packet through NAT to myself via the tunnel. "BFD echo" style.
 - [ ] Tests
-	- [ ] TCP, UDP, ICMP
+	- [x] TCP, UDP, ICMP
 	- [ ] ICMP errors
 	- [ ] Fragments
-	- [ ] Other IP protocol
+	- [x] Other IP protocol
 
 ### TCP -lite state tracker
 -[ ] TCP lite service. Track TCP state like UDP
@@ -70,8 +73,17 @@ Interface less tunnels infrastructure integrated with the session router.
 
 ## Configuration
 - [ ] YAML based configuration file format
+- [ ] JSON schema for complete API
 - [ ] Prototype Python configuration agent reading YAML/JSON injecting into API.
 - [ ] Split setup-nat-cronsul to generate configuration in JSON file. And the actual configuration of Linux
+
+A tunnel maps to a NAT instance
+A native interface is 1:N NAT instances (based on session lookup)
+An interface shares many NATs
+
+A NAT instance has a single pool.
+Can multiple NAT instances share a pool ==> Yes
+
 ### API
 - [ ] Tunnels API
 - [ ] NAT API
