@@ -8,8 +8,8 @@
 #include <vnet/ip/ip46_address.h>
 
 #define NAT_INVALID_TENANT_IDX  (u16)(~0)
-#define NAT_ALLOC_POOL_ARRAY_SZ 13
 
+// TODO: What to do about the flags?
 #define foreach_nat_tenant_flag _(SNAT, 0x1, "snat")
 
 enum {
@@ -23,6 +23,11 @@ typedef struct {
   u16 flags;
   uword out_alloc_pool_idx;
 } nat_tenant_t;
+
+typedef struct {
+  char nat_id[36];
+  ip4_address_t *addresses; // vec
+} nat_instance_t;
 
 #define foreach_nat_rewrite_op                                                                                         \
   _(SADDR, 0x1, "src-addr")                                                                                            \
@@ -59,29 +64,20 @@ typedef struct {
 } nat_per_thread_data_t;
 
 typedef struct {
-  CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  u16 flags;
-  u16 num;
-  ip4_address_t addr[NAT_ALLOC_POOL_ARRAY_SZ];
-  ip4_address_t *remaining;
-} nat_alloc_pool_t;
-STATIC_ASSERT_SIZEOF(nat_alloc_pool_t, CLIB_CACHE_LINE_BYTES);
-
-typedef struct {
-  nat_tenant_t *tenants;        /* vec */
-  nat_alloc_pool_t *alloc_pool; /* pool of allocation pools */
+  nat_instance_t *instances;        /* vec */
+  uword *uuid_hash;
+  u16 *instance_by_tenant_idx;
   nat_per_thread_data_t *ptd;   /* vec */
-  uword *alloc_pool_idx_by_id;  /* hash */
   u16 msg_id_base;
 } nat_main_t;
 
 extern nat_main_t nat_main;
 
-clib_error_t *
-nat_alloc_pool_add_del(nat_main_t *nat, u32 alloc_pool_id, u8 is_del, ip4_address_t *addr);
-
-clib_error_t *
-nat_tenant_set_snat(nat_main_t *nat, u32 tenant_id, u32 alloc_pool_id, u8 unset);
 format_function_t format_vcdp_nat_rewrite;
+
+int vcdp_nat_add(char *natid, ip4_address_t *addr);
+int vcdp_nat_remove(char *nat_id);
+int vcdp_nat_tenant_to_instance_set_unset(u32 tenant_id, char *nat_id, bool is_set);
+nat_instance_t *vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx);
 
 #endif

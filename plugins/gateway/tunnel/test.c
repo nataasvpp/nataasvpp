@@ -266,7 +266,7 @@ main(int argc, char **argv)
   // Create tunnel
   ip_address_t src = {.version = AF_IP4, .ip.ip4 = {{1}}};
   ip_address_t dst = {.version = AF_IP4, .ip.ip4 = {{1}}};
-  int rv = vcdp_tunnel_create("tunnel1", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
+  int rv = vcdp_tunnel_add("tunnel1", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
 
   assert(rv == 0 && "creating tunnel");
   t = vcdp_tunnel_lookup_by_uuid("tunnel1");
@@ -278,15 +278,15 @@ main(int argc, char **argv)
 
   assert(rv == 0 && "Lookup by session parameters");
 
-  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
+  rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
 
   assert(rv == -1 && "creating duplicate tunnel");
 
-  rv = vcdp_tunnel_create("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4279, 0, 0, 0);
+  rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4279, 0, 0, 0);
 
   assert(rv == 0 && "creating tunnel 2");
 
-  rv = vcdp_tunnel_delete("tunnel1");
+  rv = vcdp_tunnel_remove("tunnel1");
   assert(rv == 0 && "delete tunnel");
   t = vcdp_tunnel_lookup_by_uuid("tunnel1");
   assert(t == 0 && "verify tunnel deleted");

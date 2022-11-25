@@ -41,6 +41,6 @@ gw_tenant_at_index(gw_main_t *gm, u32 idx)
   return vec_elt_at_index(gm->tenants, idx);
 }
 
-int gw_interface_input_enable(u32 sw_if_index, u32 tenant_id);
+int gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool is_enable);
 
 #endif /* included_gateway_h */

@@ -15,40 +15,36 @@
 #include <vlibapi/api_helper_macros.h>
 
 static void
-vl_api_vcdp_nat_alloc_pool_add_del_t_handler(vl_api_vcdp_nat_alloc_pool_add_del_t *mp)
+vl_api_vcdp_nat_add_t_handler(vl_api_vcdp_nat_add_t *mp)
 {
-  nat_main_t *nat = &nat_main;
-  u32 alloc_pool_id = clib_net_to_host_u32(mp->alloc_pool_id);
-  u8 is_del = mp->is_del;
-  uword n_addr = clib_net_to_host_u32(mp->n_addr);
+  vl_api_vcdp_nat_add_reply_t *rmp;
   ip4_address_t *addrs = 0;
-  clib_error_t *err;
-  int rv;
-  vl_api_vcdp_nat_alloc_pool_add_del_reply_t *rmp;
-  vec_resize(addrs, n_addr);
-  for (int i = 0; i < n_addr; i++)
-    ip4_address_decode(mp->addr[i], addrs + i);
+  nat_main_t *nat = &nat_main;
 
-  err = nat_alloc_pool_add_del(nat, alloc_pool_id, is_del, addrs);
+  vec_resize(addrs, mp->n_addr);
+  for (int i = 0; i < mp->n_addr; i++)
+    ip4_address_decode(mp->addr[i], addrs + i);
+  int rv = vcdp_nat_add((char *)mp->nat_id, addrs);
   vec_free(addrs);
-  rv = err ? -1 : 0;
-  REPLY_MACRO(VL_API_VCDP_NAT_ALLOC_POOL_ADD_DEL_REPLY);
+  REPLY_MACRO(VL_API_VCDP_NAT_ADD_REPLY);
 }
 
 static void
-vl_api_vcdp_nat_snat_set_unset_t_handler(vl_api_vcdp_nat_snat_set_unset_t *mp)
+vl_api_vcdp_nat_remove_t_handler(vl_api_vcdp_nat_remove_t *mp)
+{
+  vl_api_vcdp_nat_remove_reply_t *rmp;
+  nat_main_t *nat = &nat_main;
+  int rv = vcdp_nat_remove((char *)mp->nat_id);
+  REPLY_MACRO(VL_API_VCDP_NAT_REMOVE_REPLY);
+}
+
+static void
+vl_api_vcdp_nat_tenant_to_instance_set_unset_t_handler(vl_api_vcdp_nat_tenant_to_instance_set_unset_t *mp)
 {
   nat_main_t *nat = &nat_main;
-  u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
-  u32 alloc_pool_id = clib_net_to_host_u32(mp->alloc_pool_id);
-  u8 unset = mp->is_disable;
-  clib_error_t *err;
-  int rv;
-  vl_api_vcdp_nat_alloc_pool_add_del_reply_t *rmp;
-
-  err = nat_tenant_set_snat(nat, tenant_id, alloc_pool_id, unset);
-  rv = err ? -1 : 0;
-  REPLY_MACRO(VL_API_VCDP_NAT_SNAT_SET_UNSET_REPLY);
+  vl_api_vcdp_nat_tenant_to_instance_set_unset_reply_t *rmp;
+  int rv = vcdp_nat_tenant_to_instance_set_unset(mp->tenant_id, (char *)mp->nat_id, mp->is_set);
+  REPLY_MACRO(VL_API_VCDP_NAT_TENANT_TO_INSTANCE_SET_UNSET_REPLY);
 }
 
 #include <vcdp_services/nat/nat.api.c>

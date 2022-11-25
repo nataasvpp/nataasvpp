@@ -268,6 +268,9 @@ clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 
+u16 vcdp_tenant_idx_by_id(u32 tenant_id);
+void vcdp_init_main_if_needed(vcdp_main_t *vcdp);
+
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 
 #endif

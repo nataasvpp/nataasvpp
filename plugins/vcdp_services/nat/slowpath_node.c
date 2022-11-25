@@ -51,7 +51,7 @@ VCDP_SERVICE_DECLARE(nat_output)
 
 static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
-                          u16 thread_index, nat_main_t *nm, nat_tenant_t *tenant, u32 session_index,
+                          u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u32 session_index,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
   uword l3_sum_delta_forward = 0;
@@ -70,18 +70,19 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   u16 ip4_old_port;
   u16 ip4_new_port;
 
-  nat_alloc_pool_t *pool;
   u32 src_addr_index;
   u64 h;
   u32 pseudo_flow_index;
   // u32 old_fib_index;
 
+#if 0
   if (PREDICT_FALSE(!(tenant->flags & NAT_TENANT_FLAG_SNAT))) {
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
 
   pool = pool_elt_at_index(nm->alloc_pool, tenant->out_alloc_pool_idx);
+#endif
 
   if (PREDICT_FALSE(session->session_version == nat_session->version)) {
     /* NAT State is already created, certainly a packet in flight. Refresh
@@ -90,16 +91,17 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
     goto end_of_packet;
   }
 
+#if 0
   /* TODO: handle case with many addresses in pool (slowpath) */
   if (PREDICT_FALSE(pool->num > NAT_ALLOC_POOL_ARRAY_SZ))
     ASSERT(0);
-
+#endif
 //  new_key.context_id = tenant->reverse_context;
 
   /* Allocate a new source */
   ip4_old_src_addr = *ip4_key_src_addr;
-  src_addr_index = ip4_old_src_addr % pool->num;
-  ip4_new_src_addr = pool->addr[src_addr_index].as_u32;
+  src_addr_index = ip4_old_src_addr % vec_len(instance->addresses);
+  ip4_new_src_addr = instance->addresses[src_addr_index].as_u32;
   *ip4_key_src_addr = ip4_new_src_addr;
 
   pseudo_flow_index = (session_index << 1) | 0x1; // TODO: Always 1, since this is always the return flow
@@ -197,9 +199,10 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   vcdp_session_t *session;
-  nat_tenant_t *tenant;
+  nat_instance_t *instance;
   u32 session_idx;
   u32 tenant_idx;
+  u16 nat_idx;
   nat_rewrite_data_t *nat_rewrites; /* rewrite data in both directions */
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
@@ -211,12 +214,14 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     session = vcdp_session_at_index(ptd, session_idx);
     tenant_idx = vcdp_buffer(b[0])->tenant_index;
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
-    tenant = vec_elt_at_index(nat->tenants, tenant_idx);
-    ASSERT(tenant != 0 && "Tenant not configured");
-
-    // nat_slow_path_process_one (tenant, nat_rewrites, session, to_next, b);
-    nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, tenant, session_idx,
-                              nat_rewrites, session, to_next, b);
+    instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
+    if (instance) {
+      nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, session_idx,
+                                nat_rewrites, session, to_next, b);
+    } else {
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      vcdp_next(b[0], to_next);
+    }
     n_left -= 1;
     b += 1;
     to_next += 1;

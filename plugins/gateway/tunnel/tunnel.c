@@ -27,8 +27,8 @@ make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 prot
 
 // Create a new session.
 // The fields must be in big-endian.
-int
-vcdp_tunnel_add(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u32 value)
+static int
+vcdp_tunnel_add_hash(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u32 value)
 {
   vcdp_tunnel_key_t key = {0};
   clib_bihash_kv_16_8_t kv = {};
@@ -148,7 +148,7 @@ vcdp_tunnel_counter_unlock (void)
 }
 
 int
-vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
+vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
                    u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
@@ -194,7 +194,7 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
   hash_set(uuid_hash, tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
-  rv = vcdp_tunnel_add(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);
+  rv = vcdp_tunnel_add_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);
   if (rv != 0) {
     // error rollback
     pool_put(tm->tunnels, t);
@@ -227,7 +227,7 @@ vcdp_tunnel_create(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, 
 }
 
 int
-vcdp_tunnel_delete(char *tunnel_id)
+vcdp_tunnel_remove(char *tunnel_id)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);

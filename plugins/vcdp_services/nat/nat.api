@@ -5,23 +5,31 @@ option version = "0.0.1";
 import "vnet/ip/ip_types.api";
 import "vnet/interface_types.api";
 
-autoreply define vcdp_nat_alloc_pool_add_del
+autoreply autoendian define vcdp_nat_add
 {
   u32 client_index;
   u32 context;
 
-  u32 alloc_pool_id;
-  u8 is_del;
-  u32 n_addr;
+  string nat_id[36]; // UUID
+  u8 n_addr;
   vl_api_ip4_address_t addr[n_addr];
 };
 
-autoreply define vcdp_nat_snat_set_unset
+autoreply define vcdp_nat_remove
+{
+  u32 client_index;
+  u32 context;
+
+  string nat_id[36]; // UUID
+};
+
+autoreply autoendian define vcdp_nat_tenant_to_instance_set_unset
 {
   u32 client_index;
   u32 context;
 
   u32 tenant_id;
-  u32 alloc_pool_id;
-  u8 is_disable;
+  string nat_id[36];
+
+  bool is_set;
 };

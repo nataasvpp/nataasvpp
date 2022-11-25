@@ -1,16 +1,8 @@
-/* Copyright (c) 2019 Cisco and/or its affiliates. */
+/* Copyright (c) 2022 Cisco and/or its affiliates. */
 
 option version = "0.0.1";
 import "vnet/ip/ip_types.api";
 import "plugins/vcdp/vcdp_types.api";
-
-/** \brief
-    @param client_index - opaque cookie to identify the sender
-    @param context - sender context, to match reply w/ request
-    @param tenant_id - tenant id to add
-    @param context_id - context id for this tenant (optional, default to same as tenant id)
-    @param is_del
-*/
 
 autoreply define vcdp_tenant_add_del
 {
@@ -18,8 +10,9 @@ autoreply define vcdp_tenant_add_del
   u32 context;
 
   u32 tenant_id;
-  u32 context_id [default=0xffffffff];
-  bool is_del;
+  u32 context_id [default=0xffffffff]; // TODO: Should it be here?
+  string nat_id[36];
+  bool is_add;
 };
 
 autoreply define vcdp_set_services
@@ -85,9 +78,3 @@ autoreply define vcdp_set_timeout
   u32 timeout_id;
   u32 timeout_value;
 };
-
-/*
- * Local Variables:
- * eval: (c-set-style "gnu")
- * End:
- */

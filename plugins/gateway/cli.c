@@ -31,7 +31,7 @@ gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *inp
     err = clib_error_return(0, "missing arguments");
     goto done;
   }
-  int rv = gw_interface_input_enable(sw_if_index, tenant_id);
+  int rv = gw_interface_input_enable_disable(sw_if_index, tenant_id, true);
   if (rv != 0) {
     err = clib_error_return(0, "could not enable interface");
   }
@@ -144,7 +144,7 @@ vcdp_tunnel_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comman
       goto done;
     }
   }
-  int rv = vcdp_tunnel_create(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu, &src_mac, &dst_mac);
+  int rv = vcdp_tunnel_add(tunnel_id, tenant_id, method, &src, &dst, sport, dport, mtu, &src_mac, &dst_mac);
   if (rv) {
     err = clib_error_return(0, "missing tunnel parameters");
   }

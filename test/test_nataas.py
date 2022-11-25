@@ -45,7 +45,7 @@ class TestNATaaS(VppTestCase):
         outside_tenant=1000
         dport=4789
         dport2=4790
-        vrf=0
+        # vrf=0
         pool = '222.1.1.1'
 
         self.vapi.cli(f'set vcdp tenant {tenant} context 0')
@@ -57,9 +57,8 @@ class TestNATaaS(VppTestCase):
         self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
         self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
         self.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
-        self.vapi.cli("vcdp nat alloc-pool add 4243 2.2.2.2")
-        self.vapi.cli(f"vcdp nat alloc-pool add 4242 {pool}")
-        self.vapi.cli(f"set vcdp nat snat tenant {tenant} alloc-pool 4242")
+        self.vapi.cli(f"set vcdp nat id nat-instance-1 {pool}")
+        self.vapi.cli(f"set vcdp nat id nat-instance-1 tenant {tenant}")
 
         self.vxlan_pool = pool
         self.vxlan_dport = dport
@@ -246,8 +245,8 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-        self.run_tests([tests[7]], self.vxlan_pool, self.vxlan_dport, 1)
-        # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
 #        self.test_runner(self.nataas_tests, self.vxlan_pool, self.vxlan_dport2, 1)
         # self.send_packet_through_nat(pool, dport2)
 

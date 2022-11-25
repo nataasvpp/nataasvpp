@@ -19,8 +19,8 @@ vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp)
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u32 context_id = mp->context_id == ~0 ? tenant_id : clib_net_to_host_u32(mp->context_id);
-  u8 is_del = mp->is_del;
-  clib_error_t *err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, 0, is_del);
+  u8 is_add = mp->is_add;
+  clib_error_t *err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, 0, is_add);
   vl_api_vcdp_tenant_add_del_reply_t *rmp;
   int rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_TENANT_ADD_DEL_REPLY);

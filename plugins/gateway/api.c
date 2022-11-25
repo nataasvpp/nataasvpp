@@ -16,24 +16,56 @@
 #define REPLY_MSG_ID_BASE gw->msg_id_base
 #include <vlibapi/api_helper_macros.h>
 
-// NOT IMPLEMENTED
 static void
-vl_api_vcdp_tunnel_create_t_handler(vl_api_vcdp_tunnel_create_t *mp)
+vl_api_vcdp_tunnel_add_t_handler(vl_api_vcdp_tunnel_add_t *mp)
 {
   gw_main_t *gw = &gateway_main;
-  vl_api_vcdp_tunnel_create_reply_t *rmp;
-  int rv = 0;
-  REPLY_MACRO(VL_API_VCDP_TUNNEL_CREATE_REPLY);
+  vl_api_vcdp_tunnel_add_reply_t *rmp;
+
+  ip_address_t src, dst;
+  mac_address_t smac, dmac;
+  ip_address_decode2(&mp->src, &src);
+  ip_address_decode2(&mp->dst, &dst);
+  mac_address_decode (mp->src_mac, &smac);
+  mac_address_decode (mp->dst_mac, &dmac);
+
+  int rv = vcdp_tunnel_add((char *) mp->tunnel_id, mp->tenant_id, (vcdp_tunnel_method_t)mp->method, &src, &dst, mp->sport, mp->dport, mp->mtu,
+                           &smac, &dmac);
+
+  REPLY_MACRO_END(VL_API_VCDP_TUNNEL_ADD_REPLY);
 }
 
-// NOT IMPLEMENTED
 static void
-vl_api_vcdp_tunnel_delete_t_handler(vl_api_vcdp_tunnel_delete_t *mp)
+vl_api_vcdp_tunnel_remove_t_handler(vl_api_vcdp_tunnel_remove_t *mp)
 {
   gw_main_t *gw = &gateway_main;
-  vl_api_vcdp_tunnel_delete_reply_t *rmp;
-  int rv = 0;
-  REPLY_MACRO(VL_API_VCDP_TUNNEL_DELETE_REPLY);
+  vl_api_vcdp_tunnel_remove_reply_t *rmp;
+  int rv = vcdp_tunnel_remove((char *)mp->tunnel_id);
+  REPLY_MACRO_END(VL_API_VCDP_TUNNEL_REMOVE_REPLY);
+}
+
+static void
+vl_api_vcdp_gateway_enable_disable_t_handler(vl_api_vcdp_gateway_enable_disable_t *mp)
+{
+  gw_main_t *gw = &gateway_main;
+  vl_api_vcdp_gateway_enable_disable_reply_t *rmp;
+  int rv;
+  VALIDATE_SW_IF_INDEX (mp);
+  rv = gw_interface_input_enable_disable(mp->sw_if_index, mp->tenant_id, mp->is_enable);
+  BAD_SW_IF_INDEX_LABEL;
+  REPLY_MACRO_END(VL_API_VCDP_GATEWAY_ENABLE_DISABLE_REPLY);
+}
+
+static void
+vl_api_vcdp_gateway_tunnel_enable_disable_t_handler(vl_api_vcdp_gateway_tunnel_enable_disable_t *mp)
+{
+  gw_main_t *gw = &gateway_main;
+  vl_api_vcdp_gateway_tunnel_enable_disable_reply_t *rmp;
+  int rv;
+  VALIDATE_SW_IF_INDEX (mp);
+  rv = vcdp_tunnel_enable_disable_input(mp->sw_if_index, mp->is_enable);
+  BAD_SW_IF_INDEX_LABEL;
+  REPLY_MACRO_END(VL_API_VCDP_GATEWAY_TUNNEL_ENABLE_DISABLE_REPLY);
 }
 
 #include <gateway/gateway.api.c>

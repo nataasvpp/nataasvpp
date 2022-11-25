@@ -12,4 +12,6 @@
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
     },
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
 }

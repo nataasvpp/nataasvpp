@@ -55,7 +55,7 @@ vcdp_init_tenant_counters(vcdp_main_t *vcdp)
 #undef _
 }
 
-static void
+void
 vcdp_init_main_if_needed(vcdp_main_t *vcdp)
 {
   static u32 done = 0;
@@ -137,7 +137,7 @@ vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
 }
 
 clib_error_t *
-vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del)
+vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_add)
 {
   vcdp_init_main_if_needed(vcdp);
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
@@ -145,7 +145,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
   vcdp_tenant_t *tenant;
   u32 tenant_idx;
   u32 n_tenants = pool_elts(vcdp->tenants);
-  if (!is_del) {
+  if (is_add) {
     if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
       pool_get(vcdp->tenants, tenant);
       tenant_idx = tenant - vcdp->tenants;
@@ -179,8 +179,8 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
        * maybe cb list? */
     }
   }
-  if (!err && ((n_tenants == 1 && is_del) || (n_tenants == 0 && !is_del)))
-    vcdp_enable_disable_timer_expire_node(is_del);
+  if (!err && ((n_tenants == 1 && !is_add) || (n_tenants == 0 && is_add)))
+    vcdp_enable_disable_timer_expire_node(!is_add);
   return err;
 }
 
@@ -217,10 +217,26 @@ vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_
   return clib_bihash_add_del_inline_with_hash_16_8(h, kv, hash, is_add, 0, 0, 0, 0);
 }
 
+// TODO: Change to sparse vector or something more lightweight than bihash
+u16
+vcdp_tenant_idx_by_id(u32 tenant_id) {
+  vcdp_main_t *vcdp = &vcdp_main;
+  clib_bihash_kv_8_8_t kv = {.key = tenant_id};
+
+  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
+    /* Not found */
+    return ~0;
+  }
+  return kv.value;
+}
+
 vcdp_tenant_t *
 vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
 {
   vcdp_main_t *vcdp = &vcdp_main;
+
+  *tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
+
   clib_bihash_kv_8_8_t kv = {.key = tenant_id};
 
   if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
