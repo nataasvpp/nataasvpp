@@ -40,7 +40,17 @@ def callback(msgname, msg):
     '''In async mode this is called for every reply message from VPP'''
     print('NAME', msgname)
 
-def vppapirunner(api_calls, interface_list, boottime):
+def api_calls(vpp, interface_list, api_calls):
+    for api_call in api_calls:
+        (k, v), = api_call.items()
+        f = vpp.get_function(k)
+        if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+            v['sw_if_index'] = interface_list[v['sw_if_index']]
+        rv = f(**v)
+        if rv.retval != 0:
+            raise Exception(f'{k}({v}) failed with {rv}')
+
+def vppapirunner(added, removed, interface_list, boottime):
     '''
     Given a list of API calls, connect to VPP and call those APIs in order.
     If a call fails, abort. The state of VPP is then considered undefined.
@@ -63,15 +73,16 @@ def vppapirunner(api_calls, interface_list, boottime):
     # Hard code dependencies here. An improvement would be to follow dependencies and
     # resolve them dynamically. Could be JSON pointers in the document or references
     # from a JSON schema.
-    for subsection in ['nats', 'tenants', 'interfaces', 'tunnels']:
-        for api_call in api_calls[subsection]:
-            (k, v), = api_call.items()
-            f = vpp.get_function(k)
-            if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
-                v['sw_if_index'] = interface_list[v['sw_if_index']]
-            rv = f(**v)
-            if rv.retval != 0:
-                raise Exception(f'{k}({v}) failed with {rv}')
+    sections = ['nats', 'tenants', 'interfaces', 'tunnels']
+    for subsection in reversed(sections):
+        if subsection not in removed:
+            continue
+        api_calls(vpp, interface_list, removed[subsection])
+
+    for subsection in sections:
+        if subsection not in added:
+            continue
+        api_calls(vpp, interface_list, added[subsection])
 
     vpp.disconnect()
 

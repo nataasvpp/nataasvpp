@@ -25,18 +25,6 @@ from deepdiff import DeepDiff
 import IPython # pylint: disable=unused-import
 from vppapi import vppapirunner
 
-'''
-import atexit
-@atexit.register
-def goodbye():
-    print('You are now leaving the Python sector.')
-
-def excepthook(type, value, traceback):
-    print('EXCEPTHOOK', type, value, traceback)
-
-sys.excepthook = excepthook
-'''
-
 class Singleton: # pylint: disable=too-few-public-methods
     '''Meta class'''
     __instance = None
@@ -145,7 +133,7 @@ class Tenants(Singleton):
                 api = self.services(tenantid, k, obj[k])
                 apis.append(api)
         else:
-            raise NotImplementedError            
+            pass
 
         return apis
 VOM = {}
@@ -162,20 +150,23 @@ def diff(running, desired, verbose=None):
     dd = DeepDiff(running, desired, view='tree')
     if verbose:
         print('Changes:\n', dd.pretty())
-    api_calls = {}
 
     #
     # If path length is 1, then missing root key. Do we allow configuration at root level?
     # If path length is 3, then individual field element is changed. Remove and add object at level 2.
     #
+    added = {}
+    removed = {}
     for changes in dd:
         for a in dd[changes]:
             if changes == 'dictionary_item_added':
                 node = a.t2
                 add = True
+                api_calls = added
             elif changes == 'dictionary_item_removed':
                 node = a.t1
                 add = False
+                api_calls = removed
             else:
                 raise NotImplementedError(f'Not implemented: {changes} {a}')
             path = a.path(output_format='list')
@@ -185,7 +176,7 @@ def diff(running, desired, verbose=None):
                 api_calls[path[0]] += VOM[path[0]].get_api(path[1], node, add)
             else:
                 raise NotImplementedError('NOT YET IMPLEMENTED', path, changes  )
-    return api_calls
+    return added, removed
 
 
 def main():
@@ -235,14 +226,15 @@ def main():
     interface_list = running.pop('interface_list', None)
 
     # Delta API commands
-    api_calls = diff(running, desired, args.verbose)
+    added, removed = diff(running, desired, args.verbose)
     if args.verbose:
-        pp.pprint(api_calls)
+        pp.pprint(added)
+        pp.pprint(removed)
 
     # API Runner (separate module)
     if args.apply:
         try:
-            interface_list, boottime = vppapirunner(api_calls, interface_list, boottime)
+            interface_list, boottime = vppapirunner(added, removed, interface_list, boottime)
         except Exception as e:
             print('*** Programming VPP FAILED. VPP is left in indeterminate state.\n', repr(e), file=sys.stderr)
             sys.exit(-1)
