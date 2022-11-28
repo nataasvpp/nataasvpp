@@ -50,7 +50,7 @@ vl_api_vcdp_gateway_enable_disable_t_handler(vl_api_vcdp_gateway_enable_disable_
   gw_main_t *gw = &gateway_main;
   vl_api_vcdp_gateway_enable_disable_reply_t *rmp;
   int rv;
-  VALIDATE_SW_IF_INDEX (mp);
+  VALIDATE_SW_IF_INDEX_END(mp);
   rv = gw_interface_input_enable_disable(mp->sw_if_index, mp->tenant_id, mp->is_enable);
   BAD_SW_IF_INDEX_LABEL;
   REPLY_MACRO_END(VL_API_VCDP_GATEWAY_ENABLE_DISABLE_REPLY);
@@ -62,7 +62,7 @@ vl_api_vcdp_gateway_tunnel_enable_disable_t_handler(vl_api_vcdp_gateway_tunnel_e
   gw_main_t *gw = &gateway_main;
   vl_api_vcdp_gateway_tunnel_enable_disable_reply_t *rmp;
   int rv;
-  VALIDATE_SW_IF_INDEX (mp);
+  VALIDATE_SW_IF_INDEX_END (mp);
   rv = vcdp_tunnel_enable_disable_input(mp->sw_if_index, mp->is_enable);
   BAD_SW_IF_INDEX_LABEL;
   REPLY_MACRO_END(VL_API_VCDP_GATEWAY_TUNNEL_ENABLE_DISABLE_REPLY);

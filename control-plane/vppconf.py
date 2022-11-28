@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright(c) 2022 Cisco Systems, Inc.
 
 '''
 Process desired configuration against current running configuration (may be 0).
@@ -11,7 +12,8 @@ List of API commands to execute. Named tuple arguments.
 
 '''
 
-# pylint: disable=line-too-long
+ # pylint: disable=line-too-long
+ # pylint: disable=invalid-name
 
 import sys
 import pprint
@@ -21,6 +23,19 @@ import yaml
 from yaml.loader import SafeLoader
 from deepdiff import DeepDiff
 import IPython # pylint: disable=unused-import
+from vppapi import vppapirunner
+
+'''
+import atexit
+@atexit.register
+def goodbye():
+    print('You are now leaving the Python sector.')
+
+def excepthook(type, value, traceback):
+    print('EXCEPTHOOK', type, value, traceback)
+
+sys.excepthook = excepthook
+'''
 
 class Singleton: # pylint: disable=too-few-public-methods
     '''Meta class'''
@@ -36,24 +51,20 @@ def read_yamlfile(filename):
     '''Open the file and load the file'''
     with open(filename, 'r', encoding='utf-8') as yaml_file:
         data = yaml.load(yaml_file, Loader=SafeLoader)
-    # pp.pprint(data)
     return data
 
-
-# Generate API for interfaces
-# Object to API
-# TODO: Store interface table in running configuration.
-def interface_name2index(name):
-    '''Map interface name to VPP sw_if_index. Table downloaded from running VPP instance'''
-    return 0
+def write_yamlfile(data, filename):
+    '''Write Python datastructure to YAML file'''
+    with open(filename, 'w', encoding='utf-8') as yaml_file:
+        data = yaml.dump(data, yaml_file)
 
 class Interfaces(Singleton):
     '''Interfaces configuration object'''
     def get_api(self, interface, obj, add):
         '''Return VPP API commands'''
-        api_calls = []
+        # api_calls = []
         api = {}
-        sw_if_index = interface_name2index(interface)
+        # sw_if_index = interface_name2index(interface)
         is_tunnel = obj.get('tunnel-headend', False)
         if is_tunnel:
             f = 'vcdp_gateway_tunnel_enable_disable'
@@ -63,7 +74,7 @@ class Interfaces(Singleton):
             tenant = obj.get('tenant', 0)
             api[f] = {}
             api[f]['tenant_id'] = tenant
-        api[f]['sw_if_index'] = sw_if_index
+        api[f]['sw_if_index'] = interface
         api[f]['is_enable'] = add
         return [api]
 
@@ -97,6 +108,22 @@ class Nats(Singleton):
 
 class Tenants(Singleton):
     '''Tenant configuration objects'''
+
+    def services(self, tenantid, direction, obj):
+        '''Generete vcdp_set_services API call'''
+        api = {}
+        k = 'vcdp_set_services'
+        api[k] = {}
+        api[k]['tenant_id'] = tenantid
+        api[k]['dir'] = 0 if direction == 'forward-services' else 1
+        svc = {}
+        api[k]['services'] = []
+        for s in obj:
+            svc['data'] = s
+            api[k]['services'].append(svc)
+        api[k]['n_services'] = len(obj)
+        return api
+
     def get_api(self, tenantid, obj, add):
         '''Return VPP API commands'''
         api = {}
@@ -109,48 +136,31 @@ class Tenants(Singleton):
         apis.append(api)
 
         if add:
-            print('OJB', obj)
-            if 'forward-services' in obj:
-                api = {}
-                k = 'vcdp_set_services'
-                api[k] = {}
-                api[k]['tenant_id'] = tenantid
-                api[k]['dir'] = 0   # Forward
-                svc = {}
-                api[k]['services'] = []
-                for s in obj['forward-services']:
-                    svc['data'] = s
-                    api[k]['services'].append(svc)
-
-                    #                 api[k]['services'] = obj['forward-services']
-                    #                 api[k]['services'] = for s in obj['forward-services']
-                    # [x for x in fruits if "a" in x]
-                api[k]['n_services'] = len(obj['forward-services'])
+            k = 'forward-services'
+            if k in obj:
+                api = self.services(tenantid, k, obj[k])
                 apis.append(api)
-            # if 'reverse-services' in obj:
-            #     api = {}
-            #     k = 'vcdp_set_services'
-            #     api[k] = {}
-            #     api[k]['tenant_id'] = tenantid
-            #     api[k]['dir'] = 1   # Forward
-            #     api[k]['services'] = obj['reverse-services']
-            #     api[k]['n_services'] = len(obj['reverse-services'])
-            #     apis.append(api)
-            
+            k = 'reverse-services'
+            if k in obj:
+                api = self.services(tenantid, k, obj[k])
+                apis.append(api)
+        else:
+            raise NotImplementedError            
+
         return apis
-vom = {}
+VOM = {}
 def init():
     '''Init the object dispatcher'''
-    global vom
-    vom['interfaces'] = Interfaces()
-    vom['tunnels'] = Tunnels()
-    vom['nats'] = Nats()
-    vom['tenants'] = Tenants()
+    VOM['interfaces'] = Interfaces()
+    VOM['tunnels'] = Tunnels()
+    VOM['nats'] = Nats()
+    VOM['tenants'] = Tenants()
 
-def diff(running, desired):
+def diff(running, desired, verbose=None):
     '''Produce delta between desired and running state'''
     dd = DeepDiff(running, desired, view='tree')
-    print('Changes:\n', dd.pretty())
+    if verbose:
+        print('Changes:\n', dd.pretty())
     api_calls = []
 
     #
@@ -168,8 +178,8 @@ def diff(running, desired):
             else:
                 raise NotImplementedError(f'Not implemented: {changes} {a}')
             path = a.path(output_format='list')
-            if len(path) == 2 and path[0] in vom:
-                api_calls += vom[path[0]].get_api(path[1], node, add)
+            if len(path) == 2 and path[0] in VOM:
+                api_calls += VOM[path[0]].get_api(path[1], node, add)
             else:
                 raise NotImplementedError('NOT YET IMPLEMENTED', path, changes  )
     return api_calls
@@ -197,6 +207,9 @@ def main():
         "--test", action='store_true', help="Run unit tests",
     )
     parser.add_argument(
+        "--verbose", action='store_true', help="Verbose output",
+    )
+    parser.add_argument(
         "--apply", action='store_true', help="Apply changes to running VPP instance",
     )
     init()
@@ -212,17 +225,29 @@ def main():
     else:
         running = {'interfaces': {}, 'tenants': {}, 'nats': {}, 'tunnels': {}}
 
+    if args.apply and not args.new_running:
+        parser.error('Missing new running configuration option (--new-running-conf=<filename>)')
+
+    boottime = running.pop('boottime', None)
+    interface_list = running.pop('interface_list', None)
+
     # Delta API commands
-    api_calls = diff(running, desired)
-    # print('API CALLS', api_calls)
-    pp.pprint(api_calls)
+    api_calls = diff(running, desired, args.verbose)
+    if args.verbose:
+        pp.pprint(api_calls)
 
     # API Runner (separate module)
     if args.apply:
-        from vppapi import vppapirunner
-        rv = vppapirunner(api_calls)
+        try:
+            interface_list, boottime = vppapirunner(api_calls, interface_list, boottime)
+        except Exception as e:
+            print('*** Programming VPP FAILED. VPP is left in indeterminate state.\n', repr(e), file=sys.stderr)
+            sys.exit(-1)
 
-    # Dump new running configuration
+        # Dump new running configuration
+        desired['boottime'] = boottime
+        desired['interface_list'] = interface_list
+        write_yamlfile(desired, args.new_running)
 
 class TestVPPConf(unittest.TestCase):
     '''Unittests for VPPConf'''

@@ -1,9 +1,15 @@
-import time
-import sys
-sys.path.append('/home/otroan/src/vpp/src/vpp-api/python')
-#import vpp_papi
-from vpp_papi import VPPApiClient
+# Copyright(c) 2022 Cisco Systems, Inc.
 
+import sys
+from vpp_papi import VPPApiClient
+from vpp_papi.vpp_stats import VPPStats
+
+# pylint: disable=line-too-long
+# pylint: disable=invalid-name
+
+
+# TODO: Fix this to use auto-discovery or command line parameter
+# Build a python package with API JSONs included?
 apifiles=[
     './build/plugins/vcdp_services/nat/nat.api.json',
     './build/plugins/vcdp_services/tcp-check/tcp_check.api.json',
@@ -15,35 +21,54 @@ apifiles=[
     '../vpp/build-root/install-vpp_debug-native/vpp/share/vpp/api/core/interface.api.json',
 ]
 
+# Generate API for interfaces
+# Object to API
+# TODO: Store interface table in running configuration.
+
+def dump_interfaces(vpp):
+    '''
+    Get interface list for VPP. This is run only when first configuration the VPP instance. Later the
+    interface list is cached in the current running state configuration file.
+    '''
+    interface_list = {}
+    interfaces = vpp.api.sw_interface_dump()
+    for i in interfaces:
+        interface_list[i.interface_name] = i.sw_if_index
+    return interface_list
+
 def callback(msgname, msg):
+    '''In async mode this is called for every reply message from VPP'''
     print('NAME', msgname)
 
-def vppapirunner(api_calls):
+def vppapirunner(api_calls, interface_list, boottime):
+    '''
+    Given a list of API calls, connect to VPP and call those APIs in order.
+    If a call fails, abort. The state of VPP is then considered undefined.
+    '''
+
     vpp = VPPApiClient(use_socket=True, apifiles=apifiles)
     vpp.register_event_callback(callback)
 
     vpp.connect(name='nataasvpp', do_async=False)
-    # rv = vpp.api.show_version()
-    # print('RV', rv)
 
-    # services=[{'data': 'vcdp-nat-output'}, {'data': 'vcdp-nat-output'}]
-    # rv = vpp.api.vcdp_set_services(tenant_id=0, dir=0, services=services, n_services=2)
+    if not interface_list:
+        interface_list = dump_interfaces(vpp)
 
-    rv = vpp.api.vcdp_nat_add(nat_id='foobar', vrf=0, n_addr=1, addr=['1.1.1.1'])
-
-    # rv = vpp.api.cli_inband(cmd="show version")
-    # print('RV', rv)
-    # rv = vpp.api.log_dump()
-    # print('RV', rv)
+    # Check if current VPP instance is the same as we have running state for:
+    statistics = VPPStats()
+    current_boottime = statistics['/sys/boottime']
+    if boottime and boottime != current_boottime:
+        raise Exception('Connecting to different VPP instance than we have running state for')
 
     for api_call in api_calls:
-        print('Calling', api_call)
-        for k,v in api_call.items():
-            f = vpp.get_function(k)
-            print('Function', k, v, type(v))
-            rv = f(**v)
-            print('RV', rv)
-            break
-
+        (k, v), = api_call.items()
+        f = vpp.get_function(k)
+        if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+            v['sw_if_index'] = interface_list[v['sw_if_index']]
+        rv = f(**v)
+        if rv.retval != 0:
+            raise Exception(f'{k}({v}) failed with {rv}')
 
     vpp.disconnect()
+
+    return interface_list, current_boottime

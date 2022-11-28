@@ -26,7 +26,7 @@ vl_api_vcdp_nat_add_t_handler(vl_api_vcdp_nat_add_t *mp)
     ip4_address_decode(mp->addr[i], addrs + i);
   int rv = vcdp_nat_add((char *)mp->nat_id, addrs);
   vec_free(addrs);
-  REPLY_MACRO(VL_API_VCDP_NAT_ADD_REPLY);
+  REPLY_MACRO_END(VL_API_VCDP_NAT_ADD_REPLY);
 }
 
 static void
@@ -35,7 +35,7 @@ vl_api_vcdp_nat_remove_t_handler(vl_api_vcdp_nat_remove_t *mp)
   vl_api_vcdp_nat_remove_reply_t *rmp;
   nat_main_t *nat = &nat_main;
   int rv = vcdp_nat_remove((char *)mp->nat_id);
-  REPLY_MACRO(VL_API_VCDP_NAT_REMOVE_REPLY);
+  REPLY_MACRO_END(VL_API_VCDP_NAT_REMOVE_REPLY);
 }
 
 static void
@@ -44,7 +44,7 @@ vl_api_vcdp_nat_tenant_to_instance_set_unset_t_handler(vl_api_vcdp_nat_tenant_to
   nat_main_t *nat = &nat_main;
   vl_api_vcdp_nat_tenant_to_instance_set_unset_reply_t *rmp;
   int rv = vcdp_nat_tenant_to_instance_set_unset(mp->tenant_id, (char *)mp->nat_id, mp->is_set);
-  REPLY_MACRO(VL_API_VCDP_NAT_TENANT_TO_INSTANCE_SET_UNSET_REPLY);
+  REPLY_MACRO_END(VL_API_VCDP_NAT_TENANT_TO_INSTANCE_SET_UNSET_REPLY);
 }
 
 #include <vcdp_services/nat/nat.api.c>
