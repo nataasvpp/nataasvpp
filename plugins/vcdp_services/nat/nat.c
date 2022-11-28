@@ -61,7 +61,6 @@ vcdp_nat_tenant_to_instance_set_unset (u32 tenant_id, char *nat_id, bool is_set)
 {
   nat_main_t *nat = &nat_main;
   u16 tenant_idx, nat_idx;
-  vcdp_init_main_if_needed(&vcdp_main);
   
   if (!nat_id) return -1;
 

@@ -158,10 +158,11 @@ def init():
 
 def diff(running, desired, verbose=None):
     '''Produce delta between desired and running state'''
+    # Hard coded dependencies for now. Improve by following references. Might need a schema or use JSON pointers.
     dd = DeepDiff(running, desired, view='tree')
     if verbose:
         print('Changes:\n', dd.pretty())
-    api_calls = []
+    api_calls = {}
 
     #
     # If path length is 1, then missing root key. Do we allow configuration at root level?
@@ -179,7 +180,9 @@ def diff(running, desired, verbose=None):
                 raise NotImplementedError(f'Not implemented: {changes} {a}')
             path = a.path(output_format='list')
             if len(path) == 2 and path[0] in VOM:
-                api_calls += VOM[path[0]].get_api(path[1], node, add)
+                if path[0] not in api_calls:
+                    api_calls[path[0]] = []
+                api_calls[path[0]] += VOM[path[0]].get_api(path[1], node, add)
             else:
                 raise NotImplementedError('NOT YET IMPLEMENTED', path, changes  )
     return api_calls

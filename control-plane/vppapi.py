@@ -60,14 +60,18 @@ def vppapirunner(api_calls, interface_list, boottime):
     if boottime and boottime != current_boottime:
         raise Exception('Connecting to different VPP instance than we have running state for')
 
-    for api_call in api_calls:
-        (k, v), = api_call.items()
-        f = vpp.get_function(k)
-        if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
-            v['sw_if_index'] = interface_list[v['sw_if_index']]
-        rv = f(**v)
-        if rv.retval != 0:
-            raise Exception(f'{k}({v}) failed with {rv}')
+    # Hard code dependencies here. An improvement would be to follow dependencies and
+    # resolve them dynamically. Could be JSON pointers in the document or references
+    # from a JSON schema.
+    for subsection in ['nats', 'tenants', 'interfaces', 'tunnels']:
+        for api_call in api_calls[subsection]:
+            (k, v), = api_call.items()
+            f = vpp.get_function(k)
+            if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+                v['sw_if_index'] = interface_list[v['sw_if_index']]
+            rv = f(**v)
+            if rv.retval != 0:
+                raise Exception(f'{k}({v}) failed with {rv}')
 
     vpp.disconnect()
 

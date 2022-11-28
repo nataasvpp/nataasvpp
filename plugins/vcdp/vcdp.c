@@ -55,13 +55,15 @@ vcdp_init_tenant_counters(vcdp_main_t *vcdp)
 #undef _
 }
 
-void
-vcdp_init_main_if_needed(vcdp_main_t *vcdp)
+static clib_error_t *
+vcdp_init(vlib_main_t *vm)
 {
-  static u32 done = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  vlib_call_init_function(vm, vcdp_service_init);
+  vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
+  vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
+
   vlib_thread_main_t *tm = vlib_get_thread_main();
-  if (done)
-    return;
   time_t epoch = time(NULL);
   uword log_n_thread = max_log2(tm->n_vlib_mains);
   uword template_shift = VCDP_SESSION_ID_TOTAL_BITS - VCDP_SESSION_ID_EPOCH_N_BITS - log_n_thread;
@@ -81,17 +83,7 @@ vcdp_init_main_if_needed(vcdp_main_t *vcdp)
   clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
 
-  vcdp->frame_queue_index =
-    vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
-  done = 1;
-}
-
-static clib_error_t *
-vcdp_init(vlib_main_t *vm)
-{
-  vlib_call_init_function(vm, vcdp_service_init);
-  vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
-  vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
+  vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
 
   return 0;
 }
@@ -139,7 +131,6 @@ vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
 clib_error_t *
 vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_add)
 {
-  vcdp_init_main_if_needed(vcdp);
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   clib_error_t *err = 0;
   vcdp_tenant_t *tenant;
@@ -187,7 +178,6 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
 clib_error_t *
 vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
 {
-  vcdp_init_main_if_needed(vcdp);
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   vcdp_tenant_t *tenant;
   if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
@@ -201,7 +191,6 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
 clib_error_t *
 vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val)
 {
-  vcdp_init_main_if_needed(vcdp);
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   vcdp_tenant_t *tenant;
   if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
