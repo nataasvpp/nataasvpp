@@ -3,7 +3,7 @@ tunnels:
   # A tunnel can belong to a single tenant, or be multi-tenanted via a VNI field.
   foobar:
     # tep: 192.168.0.1:*,192.168.0.2:4789
-    tenant: 0
+    tenant: 0 # reference
     method: vxlan-dummy-l2
     src: 192.168.0.1
     dst: 192.168.0.2
@@ -18,7 +18,7 @@ tunnels:
 
 interfaces:
   tap0:
-    tenant: 1000
+    tenant: 1000 # reference
 
   tap10:
     tenant: 1000
@@ -38,18 +38,13 @@ tenants:
     context: 0
     forward-services: [vcdp-l4-lifecycle, vcdp-nat-output]
     reverse-services: [vcdp-l4-lifecycle, vcdp-tunnel-output]
-    nat-instance: '1'
+    nat-instance: '1' # reference
 
   1:
     context: 0
     forward-services: [vcdp-l4-lifecycle, vcdp-nat-output]
     reverse-services: [vcdp-l4-lifecycle, vcdp-tunnel-output]
     nat-instance: '1'
-  2:
-    context: 0
-    forward-services: [vcdp-l4-lifecycle, vcdp-nat-output]
-    reverse-services: [vcdp-l4-lifecycle, vcdp-tunnel-output]
-    nat-instance: '2'
 
   1000:  # Outside tenant
     context: 0

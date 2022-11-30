@@ -23,7 +23,7 @@ autoreply define vcdp_nat_remove
   string nat_id[36]; // UUID
 };
 
-autoreply autoendian define vcdp_nat_tenant_to_instance_set_unset
+autoreply autoendian define vcdp_nat_bind_set_unset
 {
   u32 client_index;
   u32 context;

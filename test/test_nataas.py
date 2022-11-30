@@ -6,7 +6,7 @@
 
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
-
+import uuid
 from framework import VppTestCase, VppTestRunner
 from scapy.layers.inet import ICMP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
@@ -47,18 +47,31 @@ class TestNATaaS(VppTestCase):
         dport2=4790
         # vrf=0
         pool = '222.1.1.1'
+        nat_id = 'nat-instance-1'
 
-        self.vapi.cli(f'set vcdp tenant {tenant} context 0')
-        self.vapi.cli(f'set vcdp tenant {outside_tenant} context 0 no-create')
+        self.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
+        self.vapi.vcdp_tenant_add_del(tenant_id=tenant, context=0, is_add=True)
+        self.vapi.vcdp_tenant_add_del(tenant_id=outside_tenant, context=0, flags=NO_CREATE, is_add=True)
+        self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
+        tunnel_id1 = uuid.uuid4()
+        self.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id1, tenant_id=tenant, method=VXLAN2, src=self.pg0.local_ip4,
+                                  dst=self.pg0.remote_ip4, dport=dport2)  # Add src_mac, dst_mac
+        tunnel_id2 = uuid.uuid4()
+        self.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id2, tenant_id=tenant, method=VXLAN2, src=self.pg0.local_ip4,
+                                  dst=self.pg0.remote_ip4, dport=dport)  # Add src_mac, dst_mac
+
+
+        # self.vapi.cli(f'set vcdp tenant {tenant} context 0')
+        # self.vapi.cli(f'set vcdp tenant {outside_tenant} context 0 no-create')
         self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {outside_tenant}")
         self.vapi.cli(f"set vcdp gateway tunnel {self.pg0.name}")
-        self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
-        self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
+        # self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
+        # self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
         self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
         self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
         self.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
-        self.vapi.cli(f"set vcdp nat id nat-instance-1 {pool}")
-        self.vapi.cli(f"set vcdp nat id nat-instance-1 tenant {tenant}")
+        # self.vapi.cli(f"set vcdp nat id nat-instance-1 {pool}")
+        # self.vapi.cli(f"set vcdp nat id nat-instance-1 tenant {tenant}")
 
         self.vxlan_pool = pool
         self.vxlan_dport = dport

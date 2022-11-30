@@ -89,7 +89,7 @@ vcdp_init(vlib_main_t *vm)
 }
 
 static void
-vcdp_enable_disable_timer_expire_node(u8 is_disable)
+vcdp_enable_disable_timer_expire_node(u8 is_enable)
 {
   vlib_main_t *vm;
   u32 n_vms = vlib_num_workers() + 1;
@@ -97,7 +97,7 @@ vcdp_enable_disable_timer_expire_node(u8 is_disable)
   for (int i = 0; i < n_vms; i++) {
     vm = vlib_get_main_by_index(i);
     vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) "vcdp-timer-expire");
-    vlib_node_set_state(vm, node->index, is_disable ? VLIB_NODE_STATE_DISABLED : VLIB_NODE_STATE_POLLING);
+    vlib_node_set_state(vm, node->index, is_enable ? VLIB_NODE_STATE_POLLING : VLIB_NODE_STATE_DISABLED);
   }
 }
 
@@ -150,6 +150,9 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
       kv.value = tenant_idx;
       clib_bihash_add_del_8_8(&vcdp->tenant_idx_by_id, &kv, 1);
       vcdp_tenant_clear_counters(vcdp, tenant_idx);
+      if (n_tenants == 0)
+        vcdp_enable_disable_timer_expire_node(is_add);
+
     } else {
       err = clib_error_return(0,
                               "Can't create tenant with id %d"
@@ -170,8 +173,11 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
        * maybe cb list? */
     }
   }
+#if 0
+  // Disable timer expiry if last tenant has gone?
   if (!err && ((n_tenants == 1 && !is_add) || (n_tenants == 0 && is_add)))
-    vcdp_enable_disable_timer_expire_node(!is_add);
+    vcdp_enable_disable_timer_expire_node(is_add);
+#endif
   return err;
 }
 

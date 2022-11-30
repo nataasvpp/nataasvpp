@@ -57,7 +57,7 @@ vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx)
  * Map tenant id to NAT instance
  */
 int
-vcdp_nat_tenant_to_instance_set_unset (u32 tenant_id, char *nat_id, bool is_set)
+vcdp_nat_bind_set_unset (u32 tenant_id, char *nat_id, bool is_set)
 {
   nat_main_t *nat = &nat_main;
   u16 tenant_idx, nat_idx;

@@ -36,7 +36,7 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
   }
 
   if (tenant_id != ~0) {
-    rv = vcdp_nat_tenant_to_instance_set_unset(tenant_id, (char *)nat_id, true);
+    rv = vcdp_nat_bind_set_unset(tenant_id, (char *)nat_id, true);
   } else {
     rv = vcdp_nat_add((char *)nat_id, addr);
   }
