@@ -25,7 +25,7 @@ typedef struct {
 } nat_tenant_t;
 
 typedef struct {
-  char nat_id[36];
+  char nat_id[36+1];
   ip4_address_t *addresses; // vec
 } nat_instance_t;
 

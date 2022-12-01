@@ -11,7 +11,7 @@ vcdp_nat_lookup_by_uuid(char *uuid, u16 *nat_idx)
 {
   nat_main_t *nat = &nat_main;
 
-  uword *p = hash_get(nat->uuid_hash, uuid);
+  uword *p = hash_get_mem(nat->uuid_hash, uuid);
   if (p == 0) {
     return 0;
   }
@@ -37,7 +37,7 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
   pool_get_zero(nat->instances, instance);
   strcpy_s(instance->nat_id, sizeof(instance->nat_id), nat_id);
   instance->addresses = vec_dup(addrs);
-  hash_set(nat->uuid_hash, nat_id, instance - nat->instances);
+  hash_set_mem(nat->uuid_hash, instance->nat_id, instance - nat->instances);
 
   return 0;
 }

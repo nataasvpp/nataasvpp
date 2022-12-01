@@ -76,7 +76,7 @@ vcdp_tunnel_lookup_by_uuid(char *uuid)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
 
-  uword *p = hash_get(uuid_hash, uuid);
+  uword *p = hash_get_mem(uuid_hash, uuid);
   if (p == 0) {
     return 0;
   }
@@ -191,7 +191,7 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   t->method = method;
   clib_memcpy(&t->src_mac, src_mac, sizeof(t->src_mac));
   clib_memcpy(&t->dst_mac, dst_mac, sizeof(t->dst_mac));
-  hash_set(uuid_hash, tunnel_id, t - tm->tunnels);
+  hash_set_mem(uuid_hash, t->tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
   rv = vcdp_tunnel_add_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);

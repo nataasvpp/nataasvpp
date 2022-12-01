@@ -89,7 +89,11 @@ typedef enum {
 
 typedef u16 session_version_t;
 
-enum { VCDP_FLOW_FORWARD = 0, VCDP_FLOW_REVERSE = 1, VCDP_FLOW_F_B_N = 2 };
+typedef enum {
+   VCDP_FLOW_FORWARD = 0,
+   VCDP_FLOW_REVERSE = 1,
+   VCDP_FLOW_F_B_N = 2
+} vcdp_session_direction_t;
 
 enum { VCDP_SESSION_KEY_PRIMARY, VCDP_SESSION_KEY_SECONDARY, VCDP_SESSION_N_KEY };
 /* Flags to determine key validity in the session */
@@ -262,7 +266,7 @@ vcdp_session_n_keys(vcdp_session_t *session)
 }
 
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del);
-clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction);
+clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);

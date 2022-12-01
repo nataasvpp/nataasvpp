@@ -20,6 +20,7 @@ vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp)
   u32 tenant_id = mp->tenant_id;
   u32 context_id = mp->context_id == ~0 ? tenant_id : mp->context_id;
   u8 is_add = mp->is_add;
+
   clib_error_t *err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, (vcdp_tenant_flags_t)mp->flags, is_add);
   vl_api_vcdp_tenant_add_del_reply_t *rmp;
   int rv = err ? -1 : 0;
@@ -30,10 +31,10 @@ static void
 vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
+  u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
   u8 idx = 0;
-  u8 dir = vcdp_api_direction(mp->dir);
+  vcdp_session_direction_t dir = vcdp_api_direction(mp->dir);
   int rv;
   for (uword i = 0; i < mp->n_services; i++) {
     char *cstring = (char *) mp->services[i].data;
@@ -51,7 +52,7 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
   vl_api_vcdp_set_services_reply_t *rmp;
   rv = err ? -1 : 0;
 fail:
-  REPLY_MACRO(VL_API_VCDP_SET_SERVICES_REPLY);
+  REPLY_MACRO_END(VL_API_VCDP_SET_SERVICES_REPLY);
 }
 
 static void

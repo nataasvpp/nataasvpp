@@ -2,6 +2,9 @@
 #
 # Copyright (c) 2022 Cisco and/or its affiliates.
 
+ # pylint: disable=line-too-long
+ # pylint: disable=invalid-name
+
 """NATaaS tests"""
 
 import unittest
@@ -13,6 +16,7 @@ from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
 from scapy.layers.vxlan import VXLAN
 from vpp_ip import DpoProto
 from vpp_ip_route import FibPathProto, VppIpRoute, VppRoutePath
+from vpp_papi import VppEnum
 
 """
 Tests for NATaaS.
@@ -20,10 +24,12 @@ Tests for NATaaS.
 
 DEBUG = False
 def log_packet(msg, pkt):
+    '''Show scapy packet'''
     if DEBUG:
         print(msg)
         pkt.show2()
 def log_error_packet(msg, pkt):
+    '''Show scapy packet'''
     print(msg)
     pkt.show2()
 
@@ -32,11 +38,12 @@ class TestNATaaS(VppTestCase):
 
     maxDiff = None
     @classmethod
-    def setUpClass(self):
-        super(TestNATaaS, self).setUpClass()
-        self.create_pg_interfaces(range(2))
-        self.interfaces = list(self.pg_interfaces)
-        for i in self.interfaces:
+    def setUpClass(cls):
+        '''Initialise tests'''
+        super(TestNATaaS, cls).setUpClass()
+        cls.create_pg_interfaces(range(2))
+        cls.interfaces = list(cls.pg_interfaces)
+        for i in cls.interfaces:
             i.admin_up()
             i.config_ip4()
             i.resolve_arp()
@@ -48,37 +55,56 @@ class TestNATaaS(VppTestCase):
         # vrf=0
         pool = '222.1.1.1'
         nat_id = 'nat-instance-1'
+        tenant_flags = VppEnum.vl_api_vcdp_tenant_flags_t
+        tunnel_flags = VppEnum.vl_api_vcdp_tunnel_method_t
+        services_flags = VppEnum.vl_api_vcdp_session_direction_t
 
-        self.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
-        self.vapi.vcdp_tenant_add_del(tenant_id=tenant, context=0, is_add=True)
-        self.vapi.vcdp_tenant_add_del(tenant_id=outside_tenant, context=0, flags=NO_CREATE, is_add=True)
-        self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
-        tunnel_id1 = uuid.uuid4()
-        self.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id1, tenant_id=tenant, method=VXLAN2, src=self.pg0.local_ip4,
-                                  dst=self.pg0.remote_ip4, dport=dport2)  # Add src_mac, dst_mac
-        tunnel_id2 = uuid.uuid4()
-        self.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id2, tenant_id=tenant, method=VXLAN2, src=self.pg0.local_ip4,
-                                  dst=self.pg0.remote_ip4, dport=dport)  # Add src_mac, dst_mac
+        tunnel_id1 = str(uuid.uuid4())
+        tunnel_id2 = str(uuid.uuid4())
 
+        # NATs
+        cls.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
 
-        # self.vapi.cli(f'set vcdp tenant {tenant} context 0')
-        # self.vapi.cli(f'set vcdp tenant {outside_tenant} context 0 no-create')
-        self.vapi.cli(f"set vcdp gateway interface {self.pg1.name} tenant {outside_tenant}")
-        self.vapi.cli(f"set vcdp gateway tunnel {self.pg0.name}")
-        # self.vapi.cli(f"set vcdp tunnel id foobar-uuid tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport2}")
-        # self.vapi.cli(f"set vcdp tunnel id foobar-uuid2 tenant {tenant} method vxlan-dummy-l2 src {self.pg0.local_ip4} dst {self.pg0.remote_ip4} dport {dport}")
-        self.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
-        self.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
-        self.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
-        # self.vapi.cli(f"set vcdp nat id nat-instance-1 {pool}")
-        # self.vapi.cli(f"set vcdp nat id nat-instance-1 tenant {tenant}")
+        # Tenants
+        cls.vapi.vcdp_tenant_add_del(tenant_id=tenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_tenant_add_del(tenant_id=outside_tenant, context_id=0, flags=tenant_flags.NO_CREATE, is_add=True)
 
-        self.vxlan_pool = pool
-        self.vxlan_dport = dport
-        self.vxlan_dport2 = dport2
+        # Bind tenant to nat
+        cls.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
+
+        # Tunnels
+        cls.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id1, tenant_id=tenant, method=tunnel_flags.VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2, src=cls.pg0.local_ip4,
+                                  dst=cls.pg0.remote_ip4, dport=dport2)  # Add src_mac, dst_mac
+        cls.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id2, tenant_id=tenant, method=tunnel_flags.VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2, src=cls.pg0.local_ip4,
+                                  dst=cls.pg0.remote_ip4, dport=dport)  # Add src_mac, dst_mac
+
+        # Configure services
+        # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
+        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data':'vcdp-nat-output'}]
+        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tunnel-output'}]
+        outside_services = [{'data': 'vcdp-bypass'}]
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
+                                    n_services=len(forward_services), services=forward_services)
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_REVERSE,
+                                    n_services=len(reverse_services), services=reverse_services)
+        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
+                                    n_services=len(outside_services), services=outside_services)
+
+        # Enable interfaces
+        cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
+        cls.vapi.vcdp_gateway_tunnel_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True)
+
+        # cls.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
+        # cls.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
+        # cls.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
+
+        cls.vxlan_pool = pool
+        cls.vxlan_dport = dport
+        cls.vxlan_dport2 = dport2
 
     @classmethod
     def tearDownClass(cls):
+        '''Clean up after tests'''
         super(TestNATaaS, cls).tearDownClass()
         # if not cls.vpp_dead:
         #     for i in cls.pg_interfaces:
@@ -86,6 +112,7 @@ class TestNATaaS(VppTestCase):
         #         i.admin_down()
 
     def encapsulate(self, dport, vni, pkt):
+        '''Wrap packet in Ether/IP/UDP/VXLAN'''
         return (
             Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)
             / IP(src=self.pg0.remote_ip4, dst=self.pg0.local_ip4)

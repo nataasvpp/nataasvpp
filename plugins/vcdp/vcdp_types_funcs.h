@@ -7,7 +7,8 @@
 #include <vcdp/vcdp_types.api_types.h>
 #include <vcdp/vcdp_types.api_enum.h>
 #include <vnet/ip/ip_types_api.h>
-static_always_inline u8
+
+static_always_inline vcdp_session_direction_t
 vcdp_api_direction(vl_api_vcdp_session_direction_t dir)
 {
   switch (dir) {

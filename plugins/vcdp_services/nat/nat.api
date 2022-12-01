@@ -10,7 +10,7 @@ autoreply autoendian define vcdp_nat_add
   u32 client_index;
   u32 context;
 
-  string nat_id[36]; // UUID
+  string nat_id[37]; // UUID
   u8 n_addr;
   vl_api_ip4_address_t addr[n_addr];
 };
@@ -20,7 +20,7 @@ autoreply define vcdp_nat_remove
   u32 client_index;
   u32 context;
 
-  string nat_id[36]; // UUID
+  string nat_id[37]; // UUID
 };
 
 autoreply autoendian define vcdp_nat_bind_set_unset

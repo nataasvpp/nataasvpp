@@ -18,7 +18,7 @@ autoreply autoendian define vcdp_tunnel_add
   u32 client_index;
   u32 context;
 
-  string tunnel_id[36]; // UUID
+  string tunnel_id[37];
   u16 tenant_id;
   vl_api_vcdp_tunnel_method_t method;
   vl_api_address_t src;
@@ -36,7 +36,7 @@ autoreply autoendian define vcdp_tunnel_remove
   u32 client_index;
   u32 context;
 
-  string tunnel_id[36]; // UUID
+  string tunnel_id[37]; // UUID
 };
 
 /*

@@ -182,7 +182,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
 }
 
 clib_error_t *
-vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, u8 direction)
+vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction)
 {
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   vcdp_tenant_t *tenant;

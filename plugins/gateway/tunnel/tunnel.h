@@ -19,7 +19,7 @@ typedef enum {
 //typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
 
 typedef struct {
-  char tunnel_id[36];
+  char tunnel_id[36+1];
   u32 tenant_id;
   vcdp_tunnel_method_t method;
   ip_address_t src;
