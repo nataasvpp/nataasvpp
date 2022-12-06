@@ -95,7 +95,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
 
     switch (t->method) {
 
-    case VCDP_TUNNEL_GENEVE_L3:
+    case VL_API_VCDP_TUNNEL_GENEVE_L3:
       bytes_to_inner_ip = ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(geneve_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {
         next[0] = VCDP_TUNNEL_INPUT_NEXT_DROP;
@@ -114,7 +114,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
       }
       break;
 
-    case VCDP_TUNNEL_VXLAN_DUMMY_L2:
+    case VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2:
       bytes_to_inner_ip =
         ip4_header_bytes(ip) + sizeof(udp_header_t) + sizeof(vxlan_header_t) + sizeof(ethernet_header_t);
       if (vlib_buffer_has_space(b[0], bytes_to_inner_ip + 28) == 0) {

@@ -94,10 +94,6 @@ class TestNATaaS(VppTestCase):
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
         cls.vapi.vcdp_gateway_tunnel_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True)
 
-        # cls.vapi.cli(f"set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-nat-output forward")
-        # cls.vapi.cli(f'set vcdp services tenant {tenant} vcdp-l4-lifecycle vcdp-tunnel-output reverse')
-        # cls.vapi.cli(f'set vcdp services tenant {outside_tenant} vcdp-bypass forward')
-
         cls.vxlan_pool = pool
         cls.vxlan_dport = dport
         cls.vxlan_dport2 = dport2
@@ -123,6 +119,7 @@ class TestNATaaS(VppTestCase):
 
 
     def gen_packets(self, pool, dst, dport, vni):
+        '''Array of tests. Returns encapsulated test packets'''
         # in2out packets
         # TODO:Separate test table for out2in packets.
         tests = [
@@ -197,15 +194,19 @@ class TestNATaaS(VppTestCase):
         return tests
 
     def validate(self, rx, expected, msg=None):
+        '''Validate received and expected packets'''
         self.assertEqual(rx, expected.__class__(expected), msg=msg)
 
     def validate_bytes(self, rx, expected):
+        '''Validate received and expected packets byte for byte'''
         self.assertEqual(rx, expected)
 
     def payload(self, len):
+        '''Create payload of the given length'''
         return "x" * len
 
     def make_reply(self, pkt):
+        '''Given a forward packet, generate the reply'''
         pkt = pkt.copy()
         pkt[Ether].src, pkt[Ether].dst = pkt[Ether].dst, pkt[Ether].src
         pkt[IP].src, pkt[IP].dst = pkt[IP].dst, pkt[IP].src
@@ -220,7 +221,7 @@ class TestNATaaS(VppTestCase):
         return pkt
 
     def validate_reply_packet(self, received, sent):
-        # A little rough validation that we received the packet on same tunnel as sent on
+        ''' A little rough validation that we received the packet on same tunnel as sent on'''
         try:
             self.assertEqual(sent[UDP].dport, received[UDP].dport)
             self.assertEqual(sent[IP].src, received[IP].dst)
@@ -245,7 +246,7 @@ class TestNATaaS(VppTestCase):
                     else:
                         try:
                             rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
-                        except:
+                        except Exception:
                             self.fail(f"No packet received for test {t['name']}")
                     print(self.vapi.cli("show vcdp session-table"))
                     for p in rx:

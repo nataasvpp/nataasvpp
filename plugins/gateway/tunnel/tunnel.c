@@ -9,7 +9,6 @@
 #include <vlib/stats/stats.h>
 
 vcdp_tunnel_main_t vcdp_tunnel_main;
-uword *uuid_hash;
 
 // Unidirectional session. Only accepting flows in forward direction
 // Adds session state to all threads.
@@ -76,11 +75,13 @@ vcdp_tunnel_lookup_by_uuid(char *uuid)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
 
-  uword *p = hash_get_mem(uuid_hash, uuid);
+  uword *p = hash_get_mem(tm->uuid_hash, uuid);
   if (p == 0) {
     return 0;
   }
-  return pool_elt_at_index(tm->tunnels, p[0]);
+  vcdp_tunnel_t *t = pool_elt_at_index(tm->tunnels, p[0]);
+  clib_warning("Found tunnel %d %s %s", p[0], uuid, t->tunnel_id);
+  return t;
 }
 
 vcdp_tunnel_t *
@@ -149,26 +150,27 @@ vcdp_tunnel_counter_unlock (void)
 
 int
 vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
-                   u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
+                u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
 
   if (t) {
+    clib_warning("Tunnel exists already");
     return -1;
   }
 
   // check input
   if (!tunnel_id) {
-    return -1;
+    return -2;
   }
 
   size_t uuid_len = strnlen_s(tunnel_id, sizeof(t->tunnel_id));
   if (uuid_len == 0 || uuid_len == sizeof(t->tunnel_id)) {
-    return -1;
+    return -3;
   }
   if (src == 0 || dst == 0 || dport == 0) {
-    return -1;
+    return -4;
   }
 
   // Check for duplicate in session table
@@ -176,10 +178,9 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   u64 value;
   rv = vcdp_tunnel_lookup(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), &value);
   if (rv == 0) {
-    return -1;
+    return -5;
   }
 
-  // Create pool entry
   pool_get_zero(tm->tunnels, t);
   strcpy_s(t->tunnel_id, sizeof(t->tunnel_id), tunnel_id);
   t->tenant_id = tenant_id;
@@ -191,21 +192,24 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   t->method = method;
   clib_memcpy(&t->src_mac, src_mac, sizeof(t->src_mac));
   clib_memcpy(&t->dst_mac, dst_mac, sizeof(t->dst_mac));
-  hash_set_mem(uuid_hash, t->tunnel_id, t - tm->tunnels);
+  // Note: Hashing to the t->tunnel_id only works for fixed pools.
+  hash_set_mem(tm->uuid_hash, t->tunnel_id, t - tm->tunnels);
+  // clib_warning("Adding to hash: %s %d", t->tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
   rv = vcdp_tunnel_add_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);
   if (rv != 0) {
     // error rollback
+    clib_warning("vcdp_tunnel_add_hash failed");
     pool_put(tm->tunnels, t);
-    hash_unset(uuid_hash, tunnel_id);
+    hash_unset_mem(tm->uuid_hash, tunnel_id);
   }
 
   switch (method) {
-  case VCDP_TUNNEL_VXLAN_DUMMY_L2:
+  case VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2:
     t->rewrite = vcdp_tunnel_vxlan_dummy_l2_build_rewrite(t, &t->encap_size);
     break;
-  case VCDP_TUNNEL_GENEVE_L3:
+  case VL_API_VCDP_TUNNEL_GENEVE_L3:
     t->rewrite = vcdp_tunnel_geneve_l3_build_rewrite(t, &t->encap_size);
     break;
   default:
@@ -239,7 +243,7 @@ vcdp_tunnel_remove(char *tunnel_id)
   vcdp_session_static_delete();
 
   // Remove from uuid hash
-  hash_unset(uuid_hash, t->tunnel_id);
+  hash_unset(tm->uuid_hash, t->tunnel_id);
 
   // Remove from pool
   pool_put(tm->tunnels, t);
@@ -260,7 +264,7 @@ vcdp_tunnel_init(vlib_main_t *vm)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   tm->log_default = vlib_log_register_class("vcdp", 0);
-  uuid_hash = hash_create_string(0, sizeof(uword));
+  tm->uuid_hash = hash_create_string(0, sizeof(uword));
   clib_bihash_init_16_8(&tm->tunnels_hash, "vcdp ipv4 static session table", VCDP_TUNNELS_NUM_BUCKETS, 0);
   tm->number_of_tunnels_gauge = vlib_stats_add_gauge ("/vcdp/tunnels/no");
 
@@ -268,6 +272,7 @@ vcdp_tunnel_init(vlib_main_t *vm)
 
   tm->combined_counters[VCDP_TUNNEL_COUNTER_RX].stat_segment_name = "/vcdp/tunnels/rx";
   tm->combined_counters[VCDP_TUNNEL_COUNTER_TX].stat_segment_name = "/vcdp/tunnels/tx";
+  pool_init_fixed(tm->tunnels, 65000);
 
   return 0;
 }

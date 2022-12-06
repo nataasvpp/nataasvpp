@@ -37,6 +37,7 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
   pool_get_zero(nat->instances, instance);
   strcpy_s(instance->nat_id, sizeof(instance->nat_id), nat_id);
   instance->addresses = vec_dup(addrs);
+  // NB: This approach only works for fixed pools
   hash_set_mem(nat->uuid_hash, instance->nat_id, instance - nat->instances);
 
   return 0;
@@ -83,6 +84,7 @@ nat_init(vlib_main_t *vm)
   nat_per_thread_data_t *ptd;
   uword n_threads = vlib_get_n_threads();
   nat->uuid_hash = hash_create_string(0, sizeof(uword));
+  pool_init_fixed(nat->instances, 1024);
   vec_validate(nat->ptd, n_threads);
   // TODO: Make configurable
   vec_foreach (ptd, nat->ptd)

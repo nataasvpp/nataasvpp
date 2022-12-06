@@ -10,16 +10,14 @@
 
 #include <vppinfra/bihash_16_8.h>
 
-#define VCDP_TUNNELS_NUM_BUCKETS 1024
+#define VCDP_TUNNELS_NUM_BUCKETS 1024 // TODO: dynamically adjustable
 
-typedef enum {
-    VCDP_TUNNEL_VXLAN_DUMMY_L2,
-    VCDP_TUNNEL_GENEVE_L3,
-} vcdp_tunnel_method_t;
-//typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
+#include <gateway/gateway.api_types.h>
+
+typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
 
 typedef struct {
-  char tunnel_id[36+1];
+  char *tunnel_id[36+1];
   u32 tenant_id;
   vcdp_tunnel_method_t method;
   ip_address_t src;
@@ -43,6 +41,7 @@ typedef struct {
   vcdp_tunnel_t *tunnels; // pool of tunnels
   vlib_log_class_t log_default;
   clib_bihash_16_8_t tunnels_hash;
+  uword *uuid_hash;
 
   // vlib_simple_counter_main_t *simple_counters;
   vlib_combined_counter_main_t combined_counters[VCDP_TUNNEL_N_COUNTERS];

@@ -18,12 +18,31 @@ List of API commands to execute. Named tuple arguments.
 import sys
 import pprint
 import argparse
+import logging
 import unittest
+import time
+from functools import wraps
+import json
+import traceback  # pylint: disable=unused-import
 import yaml
 from yaml.loader import SafeLoader
 from deepdiff import DeepDiff
 import IPython # pylint: disable=unused-import
 from vppapi import vppapirunner
+
+performance = []
+def timeit(func):
+    '''Timeit decorator'''
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        performance.append({'func': func.__name__, 'time': total_time})
+        return result
+    return timeit_wrapper
+
 
 class Singleton: # pylint: disable=too-few-public-methods
     '''Meta class'''
@@ -35,16 +54,29 @@ class Singleton: # pylint: disable=too-few-public-methods
 
 pp = pprint.PrettyPrinter(indent=4)
 
+@timeit
 def read_yamlfile(filename):
     '''Open the file and load the file'''
     with open(filename, 'r', encoding='utf-8') as yaml_file:
         data = yaml.load(yaml_file, Loader=SafeLoader)
     return data
 
+@timeit
+def read_jsonfile(filename):
+    '''Open the file and load the file'''
+    with open(filename, 'r', encoding='utf-8') as json_file:
+        data = json.load(json_file)
+    return data
+
 def write_yamlfile(data, filename):
     '''Write Python datastructure to YAML file'''
     with open(filename, 'w', encoding='utf-8') as yaml_file:
         data = yaml.dump(data, yaml_file)
+
+def write_jsonfile(data, filename):
+    '''Write Python datastructure to YAML file'''
+    with open(filename, 'w', encoding='utf-8') as json_file:
+        json.dump(data, json_file, indent=4)
 
 class Interfaces(Singleton):
     '''Interfaces configuration object'''
@@ -71,14 +103,19 @@ class Tunnels(Singleton):
     def get_api(self, tunnelid, obj, add):
         '''Return VPP API commands'''
         api = {}
-        k = 'vcdp_tunnel_add' if add else 'vcdp_tunnel_remove'
-        api[k] = obj.copy()
-        api[k]['tunnel_id'] = tunnelid
-        api[k]['tenant_id'] = api[k].pop('tenant')
-        if obj['method'] == 'vxlan-dummy-l2':
-            api[k]['method'] = 0
+        if add:
+            k = 'vcdp_tunnel_add'
+            api[k] = obj.copy()
+            api[k]['tunnel_id'] = tunnelid
+            api[k]['tenant_id'] = api[k].pop('tenant')
+            if obj['method'] == 'vxlan-dummy-l2':
+                api[k]['method'] = 0
+            else:
+                api[k]['method'] = 1
         else:
-            api[k]['method'] = 1
+            k = 'vcdp_tunnel_remove'
+            api[k] = {}
+            api[k]['tunnel_id'] = tunnelid
         return [api]
 
 
@@ -114,12 +151,13 @@ class Tenants(Singleton):
 
     def get_api(self, tenantid, obj, add):
         '''Return VPP API commands'''
+        tenantid = int(tenantid)
         api = {}
         apis = []
         k = 'vcdp_tenant_add_del'
         api[k] = {}
         api[k]['tenant_id'] = tenantid
-        api[k]['context_id'] = obj['context']
+        api[k]['context_id'] = obj.get('context', 0)
         api[k]['is_add'] = add
         apis.append(api)
 
@@ -136,7 +174,9 @@ class Tenants(Singleton):
             pass
 
         return apis
+
 VOM = {}
+
 def init():
     '''Init the object dispatcher'''
     VOM['interfaces'] = Interfaces()
@@ -144,8 +184,12 @@ def init():
     VOM['nats'] = Nats()
     VOM['tenants'] = Tenants()
 
+@timeit
 def diff(running, desired, verbose=None):
     '''Produce delta between desired and running state'''
+    # if running == desired:
+    #     print('They are equal!!')
+
     # Hard coded dependencies for now. Improve by following references. Might need a schema or use JSON pointers.
     dd = DeepDiff(running, desired, view='tree')
     if verbose:
@@ -178,44 +222,47 @@ def diff(running, desired, verbose=None):
                 raise NotImplementedError('NOT YET IMPLEMENTED', path, changes  )
     return added, removed
 
+@timeit
+def call_vpp(apidir, added, removed, interface_list, boottime, cfg):
+    '''Wrapper to call or generate vpp apis'''
+    return vppapirunner(apidir, added, removed, interface_list, boottime, cfg)
 
 def main():
     '''Main function'''
     parser = argparse.ArgumentParser(description="VPP Configuration.")
-    parser.add_argument(
-        "--desired-conf",
-        dest="desired",
-        help="Desired configuration",
-    )
-    parser.add_argument(
-        "--running-conf",
-        dest="running",
-        help="Current Running configuration",
-    )
-    parser.add_argument(
-        "--new-running-conf",
-        dest="new_running",
-        help="New Running configuration",
-    )
-    parser.add_argument(
-        "--test", action='store_true', help="Run unit tests",
-    )
-    parser.add_argument(
-        "--verbose", action='store_true', help="Verbose output",
-    )
-    parser.add_argument(
-        "--apply", action='store_true', help="Apply changes to running VPP instance",
-    )
+    parser.add_argument("--desired-conf", dest="desired", help="Desired configuration", required=True)
+    parser.add_argument("--running-conf", dest="running", help="Current Running configuration",)
+    parser.add_argument("--new-running-conf", dest="new_running", help="New Running configuration",)
+    parser.add_argument("--test", action='store_true', help="Run unit tests",)
+    parser.add_argument("--verbose", action='store_true', help="Verbose output",)
+    parser.add_argument("--apply", action='store_true', help="Apply changes to running VPP instance",)
+    parser.add_argument("--apidir", nargs="+", default=[])
+    parser.add_argument("--log", help="Specify log level")
+    parser.add_argument("--packed-file", help="Apply changes via binary bulk API")
+
     init()
 
     args, unknownargs = parser.parse_known_args()
+
+    if args.log:
+        loglevel = getattr(logging, args.log.upper(), None)
+        if not isinstance(loglevel, int):
+            raise ValueError(f'Invalid log level: {loglevel}')
+        logging.basicConfig(level=loglevel)
+
     if args.test:
         a = [sys.argv[0]] + unknownargs
         unittest.main(verbosity=2, argv=a)
         sys.exit(0)
-    desired = read_yamlfile(args.desired)
+    try:
+        desired = read_jsonfile(args.desired)
+    except json.decoder.JSONDecodeError:
+        sys.exit(f'Reading "{args.desired}" failed')
     if args.running:
-        running = read_yamlfile(args.running)
+        try:
+            running = read_jsonfile(args.running)
+        except json.decoder.JSONDecodeError:
+            sys.exit(f'Reading "{args.running}" failed')
     else:
         running = {'interfaces': {}, 'tenants': {}, 'nats': {}, 'tunnels': {}}
 
@@ -231,18 +278,31 @@ def main():
         pp.pprint(added)
         pp.pprint(removed)
 
-    # API Runner (separate module)
     if args.apply:
         try:
-            interface_list, boottime = vppapirunner(added, removed, interface_list, boottime)
+            interface_list, boottime, summary = call_vpp(args.apidir, added, removed, interface_list, boottime, args.packed_file)
         except Exception as e:
-            print('*** Programming VPP FAILED. VPP is left in indeterminate state.\n', repr(e), file=sys.stderr)
+            print('*** Programming VPP FAILED. VPP is left in an indeterminate state.\n',
+                  repr(e), file=sys.stderr)
+            logging.debug(traceback.print_exc())
             sys.exit(-1)
+
+        logging.info(summary)
+        logging.info(performance)
+
+        if summary['replies_failed'] > 0:
+            print('*** Programming VPP failed.', file=sys.stderr)
+            sys.exit(-2)
 
         # Dump new running configuration
         desired['boottime'] = boottime
         desired['interface_list'] = interface_list
-        write_yamlfile(desired, args.new_running)
+        try:
+            write_jsonfile(desired, args.new_running)
+        except Exception as e:
+            print(f'Writing "{args.new_running}" failed. {repr(e)}', file=sys.stderr)
+            sys.exit(-3)
+    sys.exit(0)
 
 class TestVPPConf(unittest.TestCase):
     '''Unittests for VPPConf'''

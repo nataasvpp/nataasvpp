@@ -1,29 +1,17 @@
 # Copyright(c) 2022 Cisco Systems, Inc.
 
-import sys
+'''
+API runner: Takes a list of API calls and applies them to VPP.
+'''
+
+import struct
+import threading
+import logging
 from vpp_papi import VPPApiClient
 from vpp_papi.vpp_stats import VPPStats
 
 # pylint: disable=line-too-long
 # pylint: disable=invalid-name
-
-
-# TODO: Fix this to use auto-discovery or command line parameter
-# Build a python package with API JSONs included?
-apifiles=[
-    './build/plugins/vcdp_services/nat/nat.api.json',
-    './build/plugins/vcdp_services/tcp-check/tcp_check.api.json',
-    './build/plugins/vcdp/vcdp_types.api.json',
-    './build/plugins/vcdp/vcdp.api.json',
-    './build/plugins/gateway/gateway.api.json',
-    '../vpp/build-root/install-vpp_debug-native/vpp/share/vpp/api/core/memclnt.api.json',
-    '../vpp/build-root/install-vpp_debug-native/vpp/share/vpp/api/core/vpe.api.json',
-    '../vpp/build-root/install-vpp_debug-native/vpp/share/vpp/api/core/interface.api.json',
-]
-
-# Generate API for interfaces
-# Object to API
-# TODO: Store interface table in running configuration.
 
 def dump_interfaces(vpp):
     '''
@@ -36,12 +24,26 @@ def dump_interfaces(vpp):
         interface_list[i.interface_name] = i.sw_if_index
     return interface_list
 
-def callback(msgname, msg):
-    '''In async mode this is called for every reply message from VPP'''
-    print('NAME', msgname)
+replies_received = 0
+calls_made = 0
+replies_failed = 0
+evt = threading.Event()
 
-def api_calls(vpp, interface_list, api_calls):
-    for api_call in api_calls:
+def callback(msgname, msg):
+    '''Called for each response message from VPP (in async mode)'''
+    global replies_received
+    global replies_failed
+    retval = msg.retval
+    if retval != 0:
+        replies_failed += 1
+        logging.error(msg)
+    replies_received += 1
+    if calls_made == replies_received:
+        evt.set()
+
+def api_calls(vpp, interface_list, calls, binary_file):
+    '''Execute blocking API calls against VPP'''
+    for api_call in calls:
         (k, v), = api_call.items()
         f = vpp.get_function(k)
         if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
@@ -50,25 +52,62 @@ def api_calls(vpp, interface_list, api_calls):
         if rv.retval != 0:
             raise Exception(f'{k}({v}) failed with {rv}')
 
-def vppapirunner(added, removed, interface_list, boottime):
-    '''
-    Given a list of API calls, connect to VPP and call those APIs in order.
-    If a call fails, abort. The state of VPP is then considered undefined.
-    '''
+def api_calls_async(vpp, interface_list, calls, binary_file):
+    '''Execute async API calls against VPP'''
+    global calls_made
+    for api_call in calls:
+        (k, v), = api_call.items()
+        f = vpp.get_function(k)
+        if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+            v['sw_if_index'] = interface_list[v['sw_if_index']]
+        calls_made += 1
+        f(**v)
 
-    vpp = VPPApiClient(use_socket=True, apifiles=apifiles)
-    vpp.register_event_callback(callback)
+def api_calls_pack(vpp, interface_list, calls, binary_file):
+    '''Get binary representation of API calls for VPP'''
+    for api_call in calls:
+        (k, v), = api_call.items()
+        f = vpp.get_function(k+'_pack')
+        if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+            v['sw_if_index'] = interface_list[v['sw_if_index']]
+        b = f(**v)
+        l = struct.pack('>I', len(b))
+        binary_file.write(l+b)
 
+def get_init_vpp_state(vpp, interface_list):
+    '''Get interface list and boottime from VPP'''
     vpp.connect(name='nataasvpp', do_async=False)
-
     if not interface_list:
         interface_list = dump_interfaces(vpp)
 
     # Check if current VPP instance is the same as we have running state for:
     statistics = VPPStats()
     current_boottime = statistics['/sys/boottime']
+    vpp.disconnect()
+    return interface_list, current_boottime
+
+def vppapirunner(apidir, added, removed, interface_list, boottime, packed_file):
+    '''
+    Given a list of API calls, connect to VPP and call those APIs in order.
+    If a call fails, abort. The state of VPP is then considered undefined.
+    '''
+
+    f = api_calls_async
+    do_async = True
+    fp = None
+    if packed_file:
+        f = api_calls_pack
+        fp = open(packed_file, "wb")
+
+    VPPApiClient.apidir = apidir
+    vpp = VPPApiClient(use_socket=True)
+    vpp.register_event_callback(callback)
+
+    interface_list, current_boottime = get_init_vpp_state(vpp, interface_list)
     if boottime and boottime != current_boottime:
         raise Exception('Connecting to different VPP instance than we have running state for')
+
+    vpp.connect(name='nataasvpp', do_async=do_async)
 
     # Hard code dependencies here. An improvement would be to follow dependencies and
     # resolve them dynamically. Could be JSON pointers in the document or references
@@ -77,13 +116,22 @@ def vppapirunner(added, removed, interface_list, boottime):
     for subsection in reversed(sections):
         if subsection not in removed:
             continue
-        api_calls(vpp, interface_list, removed[subsection])
+        f(vpp, interface_list, removed[subsection], fp)
 
     for subsection in sections:
         if subsection not in added:
             continue
-        api_calls(vpp, interface_list, added[subsection])
+        f(vpp, interface_list, added[subsection], fp)
+
+    # time.sleep(1) ## Wait for responses
+    if do_async:
+        evt.wait(timeout=10)
 
     vpp.disconnect()
 
-    return interface_list, current_boottime
+    if fp:
+        fp.close()
+
+    summary = {'calls_made': calls_made, 'replies_received': replies_received, 'replies_failed': replies_failed}
+
+    return interface_list, current_boottime, summary
