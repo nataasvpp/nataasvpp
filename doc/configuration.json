@@ -1,0 +1,63 @@
+{
+    "tunnels": {
+        "foobar2": {
+            "tenant": 1,
+            "method": "vxlan-dummy-l2",
+            "src": "192.168.0.1",
+            "dst": "192.168.0.2",
+            "dport": 4790
+        }
+    },
+    "interfaces": {
+        "tap0": {
+            "tenant": 1000
+        },
+        "tap10": {
+            "tenant": 1000
+        },
+        "tap1": {
+            "tunnel-headend": true
+        }
+    },
+    "nats": {
+        "1": {
+            "pool-address": [
+                "123.123.123.123",
+                "1.1.1.1"
+            ]
+        }
+    },
+    "tenants": {
+        "0": {
+            "context": 0,
+            "forward-services": [
+                "vcdp-l4-lifecycle",
+                "vcdp-nat-output"
+            ],
+            "reverse-services": [
+                "vcdp-l4-lifecycle",
+                "vcdp-tunnel-output"
+            ],
+            "nat-instance": "1"
+        },
+        "1": {
+            "context": 0,
+            "forward-services": [
+                "vcdp-l4-lifecycle",
+                "vcdp-nat-output"
+            ],
+            "reverse-services": [
+                "vcdp-l4-lifecycle",
+                "vcdp-tunnel-output"
+            ],
+            "nat-instance": "1"
+        },
+        "1000": {
+            "context": 0,
+            "flags": "no-create",
+            "forward-services": [
+                "vcdp-bypass"
+            ]
+        }
+    }
+}
