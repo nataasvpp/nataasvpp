@@ -83,19 +83,20 @@ class Interfaces(Singleton):
     def get_api(self, interface, obj, add):
         '''Return VPP API commands'''
         # api_calls = []
-        api = {}
         apis = []
         # sw_if_index = interface_name2index(interface)
         is_tunnel = obj.get('tunnel-headend', False)
         if is_tunnel:
+            api = {}
             f = 'vcdp_gateway_tunnel_enable_disable'
             api[f] = {}
             api[f]['sw_if_index'] = interface
             api[f]['is_enable'] = add
             apis.append(api)
-        if obj.get('tenant', False):
+        tenant = obj.get('tenant', None)
+        if tenant is not None:
+            api = {}
             f = 'vcdp_gateway_enable_disable'
-            tenant = obj.get('tenant', 0)
             api[f] = {}
             api[f]['tenant_id'] = tenant
             api[f]['sw_if_index'] = interface
@@ -140,7 +141,7 @@ class Tenants(Singleton):
     '''Tenant configuration objects'''
 
     def services(self, tenantid, direction, obj):
-        '''Generete vcdp_set_services API call'''
+        '''Generate vcdp_set_services API call'''
         api = {}
         k = 'vcdp_set_services'
         api[k] = {}

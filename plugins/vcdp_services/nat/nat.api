@@ -29,7 +29,7 @@ autoreply autoendian define vcdp_nat_bind_set_unset
   u32 context;
 
   u32 tenant_id;
-  string nat_id[36];
+  string nat_id[37];
 
   bool is_set;
 };

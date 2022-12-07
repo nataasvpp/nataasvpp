@@ -59,6 +59,8 @@ def api_calls_async(vpp, interface_list, calls, binary_file):
         (k, v), = api_call.items()
         f = vpp.get_function(k)
         if 'sw_if_index' in v and isinstance(v['sw_if_index'], str):  ## Change to check for vl_api_interface_id_t
+            if v['sw_if_index'] not in interface_list:
+                raise Exception(f'Interface: {v["sw_if_index"]} not configured in VPP')
             v['sw_if_index'] = interface_list[v['sw_if_index']]
         calls_made += 1
         f(**v)
