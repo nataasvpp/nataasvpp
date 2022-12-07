@@ -126,7 +126,7 @@ def vppapirunner(apidir, added, removed, interface_list, boottime, packed_file):
         f(vpp, interface_list, added[subsection], fp)
 
     # time.sleep(1) ## Wait for responses
-    if do_async:
+    if do_async and calls_made > 0:
         evt.wait(timeout=10)
 
     vpp.disconnect()

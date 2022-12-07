@@ -27,7 +27,7 @@ make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 prot
 // Create a new session.
 // The fields must be in big-endian.
 static int
-vcdp_tunnel_add_hash(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u32 value)
+vcdp_tunnel_add_del_hash(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 proto, u16 sport, u16 dport, u32 value, bool is_add)
 {
   vcdp_tunnel_key_t key = {0};
   clib_bihash_kv_16_8_t kv = {};
@@ -38,8 +38,8 @@ vcdp_tunnel_add_hash(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 pr
   kv.value = value;
 
   // proto = ((vcdp_session_ip4_key_t *) k)->ip4_key.proto;
-  if (clib_bihash_add_del_16_8(&vcdp_tunnel_main.tunnels_hash, &kv, 2)) {
-    vcdp_log_err("failed add to bihash %U", format_bihash_kvp_16_8, &kv);
+  if (clib_bihash_add_del_16_8(&vcdp_tunnel_main.tunnels_hash, &kv, is_add)) {
+    vcdp_log_err("failed add/del to bihash %U", format_bihash_kvp_16_8, &kv);
     return -1;
   }
 
@@ -63,13 +63,6 @@ vcdp_tunnel_lookup(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 prot
   return -1;
 }
 
-int
-vcdp_session_static_delete()
-{
-  // NOT YET IMPLEMENTED
-  return 0;
-}
-
 vcdp_tunnel_t *
 vcdp_tunnel_lookup_by_uuid(char *uuid)
 {
@@ -80,7 +73,6 @@ vcdp_tunnel_lookup_by_uuid(char *uuid)
     return 0;
   }
   vcdp_tunnel_t *t = pool_elt_at_index(tm->tunnels, p[0]);
-  clib_warning("Found tunnel %d %s %s", p[0], uuid, t->tunnel_id);
   return t;
 }
 
@@ -197,7 +189,7 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   // clib_warning("Adding to hash: %s %d", t->tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
-  rv = vcdp_tunnel_add_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels);
+  rv = vcdp_tunnel_add_del_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels, true);
   if (rv != 0) {
     // error rollback
     clib_warning("vcdp_tunnel_add_hash failed");
@@ -235,12 +227,17 @@ vcdp_tunnel_remove(char *tunnel_id)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid(tunnel_id);
+  int rv = 0;
   if (t == 0) {
     return -1;
   }
 
   // Remove from session table
-  vcdp_session_static_delete();
+  rv = vcdp_tunnel_add_del_hash(0, t->src.ip.ip4, t->dst.ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(t->sport), clib_host_to_net_u16(t->dport), 0, false);
+  if (rv != 0) {
+    clib_warning("Failed to delete tunnel %s", t->tunnel_id);
+
+  }
 
   // Remove from uuid hash
   hash_unset(tm->uuid_hash, t->tunnel_id);
@@ -249,7 +246,7 @@ vcdp_tunnel_remove(char *tunnel_id)
   pool_put(tm->tunnels, t);
   vlib_stats_set_gauge (tm->number_of_tunnels_gauge, pool_elts(tm->tunnels));
 
-  return 0;
+  return rv;
 }
 
 // enable on interface

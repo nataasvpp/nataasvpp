@@ -190,6 +190,19 @@ def init():
     VOM['nats'] = Nats()
     VOM['tenants'] = Tenants()
 
+
+@timeit
+def toapicalls(desired):
+    '''Generate API calls'''
+    api_calls = {}
+    for section,instances in desired.items():
+        for k,v in instances.items():
+            if section not in api_calls:
+                api_calls[section] = []
+            api_calls[section] += VOM[section].get_api(k, v, True)
+    return api_calls
+
+
 @timeit
 def diff(running, desired, verbose=None):
     '''Produce delta between desired and running state'''
@@ -278,8 +291,13 @@ def main():
     boottime = running.pop('boottime', None)
     interface_list = running.pop('interface_list', None)
 
-    # Delta API commands
-    added, removed = diff(running, desired, args.verbose)
+
+    if not args.running:
+        added = toapicalls(desired)
+        removed = {}
+    else:
+        # Delta API commands
+        added, removed = diff(running, desired, args.verbose)
     if args.verbose:
         pp.pprint(added)
         pp.pprint(removed)
