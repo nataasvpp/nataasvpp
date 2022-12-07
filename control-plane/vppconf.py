@@ -84,19 +84,24 @@ class Interfaces(Singleton):
         '''Return VPP API commands'''
         # api_calls = []
         api = {}
+        apis = []
         # sw_if_index = interface_name2index(interface)
         is_tunnel = obj.get('tunnel-headend', False)
         if is_tunnel:
             f = 'vcdp_gateway_tunnel_enable_disable'
             api[f] = {}
-        else:
+            api[f]['sw_if_index'] = interface
+            api[f]['is_enable'] = add
+            apis.append(api)
+        if obj.get('tenant', False):
             f = 'vcdp_gateway_enable_disable'
             tenant = obj.get('tenant', 0)
             api[f] = {}
             api[f]['tenant_id'] = tenant
-        api[f]['sw_if_index'] = interface
-        api[f]['is_enable'] = add
-        return [api]
+            api[f]['sw_if_index'] = interface
+            api[f]['is_enable'] = add
+            apis.append(api)
+        return apis
 
 class Tunnels(Singleton):
     '''Tunnel configuration objects'''
@@ -230,7 +235,7 @@ def call_vpp(apidir, added, removed, interface_list, boottime, cfg):
 def main():
     '''Main function'''
     parser = argparse.ArgumentParser(description="VPP Configuration.")
-    parser.add_argument("--desired-conf", dest="desired", help="Desired configuration", required=True)
+    parser.add_argument("--desired-conf", dest="desired", help="Desired configuration")
     parser.add_argument("--running-conf", dest="running", help="Current Running configuration",)
     parser.add_argument("--new-running-conf", dest="new_running", help="New Running configuration",)
     parser.add_argument("--test", action='store_true', help="Run unit tests",)
@@ -308,26 +313,34 @@ class TestVPPConf(unittest.TestCase):
     '''Unittests for VPPConf'''
     def test_basic_add(self):
         '''Basic add objects'''
+        empty_running = {'interfaces': {} }
         desired = {'interfaces': { 'tap0': {'tenant': 1000} } }
-        api_calls = diff(desired, desired)
-        self.assertEqual(len(api_calls), 0)
-
-        api_calls = diff({'interfaces': {}}, desired)
-        self.assertEqual(len(api_calls), 1)
+        added, removed = diff(empty_running, desired, verbose=True)
+        self.assertEqual(len(added), 1)
 
         desired['interfaces']['tap1'] = {'tunnel-headend': True }
-        api_calls = diff({'interfaces': {}}, desired)
-        pp.pprint(api_calls)
+        added, removed = diff(empty_running, desired)
+        self.assertEqual(len(added['interfaces']), 2)
 
-        desired = {'nats': {1: {'pool-addresses': ['1.1.1.1', '2.2.2.2']},
-                            2: {'pool-addresses': ['1.1.1.1', '2.2.2.2']}},}
+        pp.pprint((added, removed))
 
-        api_calls = diff({'nats': {}}, desired)
-        pp.pprint(api_calls)
+        # Both tunnel and tenant on same interface
+        desired = {'interfaces': { 'tap0': {'tenant': 1000, 'tunnel-headend': True} } }
+        added, removed = diff(empty_running, desired)
+        self.assertEqual(len(added['interfaces']), 2)
+        pp.pprint((added, removed))
 
-        running = {'nats': {2: {'pool-addresses': ['1.1.1.1', '2.2.2.2']}},}
-        api_calls = diff(running, desired)
-        self.assertEqual(len(api_calls), 1)
+        desired = {'nats': {1: {'pool-address': ['1.1.1.1', '2.2.2.2']},
+                            2: {'pool-address': ['1.1.1.1', '2.2.2.2']}},}
+
+        added, removed = diff({'nats': {}}, desired)
+        pp.pprint((added, removed))
+
+        running = {'nats': {2: {'pool-address': ['1.1.1.1', '2.2.2.2']}},}
+        added, removed = diff(running, desired)
+
+        pp.pprint((added, removed))
+        # self.assertEqual(len(api_calls), 1)
 
     def test_basic_remove(self):
         '''Basic remove'''
