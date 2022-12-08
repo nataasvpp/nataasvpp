@@ -254,10 +254,15 @@ int
 main(int argc, char **argv)
 {
   clib_mem_init(0, 3ULL << 30);
-  vlib_main_init();
+  vlib_main_init(); 
   vlib_main_t *vm = vlib_get_first_main();
   assert(vlib_node_main_init(vm) == 0);
-  vlib_stats_init(vm);
+  vlib_thread_main_t *tm = &vlib_thread_main;
+  tm->n_vlib_mains = 1;
+  clib_error_t *err = vlib_stats_init(vm);
+  if (err) {
+    exit(-1);
+  }
   vcdp_tunnel_init(0);
 
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid("foobar");
@@ -279,8 +284,7 @@ main(int argc, char **argv)
   assert(rv == 0 && "Lookup by session parameters");
 
   rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
-
-  assert(rv == -1 && "creating duplicate tunnel");
+  assert(rv == -5 && "creating duplicate tunnel");
 
   rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4279, 0, 0, 0);
 
