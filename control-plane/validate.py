@@ -2,8 +2,9 @@
 
 import sys
 import json
-from jsonschema import validate
+from jsonschema import validate, FormatChecker
 
+formatchecker = FormatChecker(['ipv4'])
 schemaname  = 'nataasvpp-schema.json'
 instancename = sys.argv[1]
 
@@ -15,8 +16,8 @@ def read_jsonfile(filename):
 
 schema = read_jsonfile(schemaname)
 instance = read_jsonfile(instancename)
-
-validate(instance, schema)
+validate(instance, schema, format_checker=FormatChecker())
+formatchecker.check(instance, "ipv4")
 
 tunnel_keys = instance['tunnels'].keys()
 tenant_keys = {int(k): k for k in instance['tenants'].keys()}

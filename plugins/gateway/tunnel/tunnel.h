@@ -12,9 +12,13 @@
 
 #define VCDP_TUNNELS_NUM_BUCKETS 1024 // TODO: dynamically adjustable
 
-#include <gateway/gateway.api_types.h>
 
-typedef vl_api_vcdp_tunnel_method_t vcdp_tunnel_method_t; // From .api file
+// TODO: remove when we have figured out dependencies to .apis
+//#include <gateway/gateway.api_types.h>
+typedef enum {
+    VCDP_TUNNEL_VXLAN_DUMMY_L2 = 0,
+    VCDP_TUNNEL_GENEVE_L3 = 1,
+} vcdp_tunnel_method_t;
 
 typedef struct {
   char tunnel_id[36+1];

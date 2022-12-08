@@ -197,10 +197,10 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   }
 
   switch (method) {
-  case VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2:
+  case VCDP_TUNNEL_VXLAN_DUMMY_L2:
     t->rewrite = vcdp_tunnel_vxlan_dummy_l2_build_rewrite(t, &t->encap_size);
     break;
-  case VL_API_VCDP_TUNNEL_GENEVE_L3:
+  case VCDP_TUNNEL_GENEVE_L3:
     t->rewrite = vcdp_tunnel_geneve_l3_build_rewrite(t, &t->encap_size);
     break;
   default:
