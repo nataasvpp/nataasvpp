@@ -1,0 +1,111 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.office.opendns.com/otroan/nataasvpp/tree/main/control-plane/nataasvpp-schema.json",
+    "title": "NATaaS VPP",
+    "description": "NATaaS VPP control plane schema",
+    "type": "object",
+    "properties": {
+        "interfaces": {
+            "description": "A hash of interfaces gatewaying traffic into the session data plane",
+            "type": "object",
+            "properties": {
+                "tenant": {
+                    "type": "number"
+                },
+                "tunnel-headend": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "nats": {
+            "description": "A hash of NAT definitions",
+            "type": "object",
+            "propertyNames": {
+                "format": "uuid"
+            },
+            "properties": {
+                "pool-address": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "ipv4"
+                    }
+                }
+            }
+        },
+        "tunnels": {
+            "description": "A hash of tunnel definitions",
+            "type": "object",
+            "propertyNames": {
+                "format": "uuid"
+            },
+            "properties": {
+                "tenant": {
+                    "type": "number"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "src": {
+                    "type": "string",
+                    "format": "ipv4"
+                },
+                "dst": {
+                    "type": "string",
+                    "format": "ipv4"
+                },
+                "sport": {
+                    "type": "number"
+                },
+                "dport": {
+                    "type": "number"
+                },
+                "src-mac": {
+                    "type": "string"
+                },
+                "dst-mac": {
+                    "type": "string"
+                }
+            }
+        },
+        "tenants": {
+            "description": "A hash of tenant definitions",
+            "type": "object",
+            "propertyNames": {
+                "pattern": "[0-9]+"
+            },
+            "properties": {
+                "context": {
+                    "type": "number"
+                },
+                "flags": {
+                    "type": "string",
+                    "enum": ["no-create"]
+                },
+                "forward-services": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "reverse-services": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "nat-instance": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        }
+    },
+    "required": [
+        "interfaces",
+        "tunnels",
+        "nats",
+        "tenants"
+    ],
+    "additionalProperties": false
+}

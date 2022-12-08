@@ -186,7 +186,6 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   clib_memcpy(&t->dst_mac, dst_mac, sizeof(t->dst_mac));
   // Note: Hashing to the t->tunnel_id only works for fixed pools.
   hash_set_mem(tm->uuid_hash, t->tunnel_id, t - tm->tunnels);
-  // clib_warning("Adding to hash: %s %d", t->tunnel_id, t - tm->tunnels);
 
   // Add tunnel to session table
   rv = vcdp_tunnel_add_del_hash(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), t - tm->tunnels, true);
