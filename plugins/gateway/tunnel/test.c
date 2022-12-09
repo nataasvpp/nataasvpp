@@ -31,7 +31,7 @@ vnet_feature_main_t feature_main;
 vcdp_service_main_t vcdp_service_main;
 vcdp_main_t vcdp_main;
 
-static int
+int
 session_walk(clib_bihash_kv_16_8_t *kvp, void *arg)
 {
   printf("Walking sessions table %lx\n", kvp->value);
@@ -263,6 +263,8 @@ main(int argc, char **argv)
   if (err) {
     exit(-1);
   }
+
+  vcdp_cfg_main.no_tunnels = 1000;
   vcdp_tunnel_init(0);
 
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid("foobar");
@@ -301,6 +303,6 @@ main(int argc, char **argv)
   // test_tunnel_input(vm);
 
   test_packets();
+  _Exit(0);
 
-  return 0;
 }
