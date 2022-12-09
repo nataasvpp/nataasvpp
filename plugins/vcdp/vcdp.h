@@ -20,15 +20,8 @@
 #include <vcdp/timer/timer.h>
 
 // TODO: Make this configurable on startup
-#define VCDP_LOG2_SESSIONS_PER_THREAD 19
-#define VCDP_LOG2_TENANTS             15
 #define VCDP_SESSION_ID_TOTAL_BITS    64
 #define VCDP_SESSION_ID_EPOCH_N_BITS  16
-#define BIHASH_IP4_NUM_BUCKETS        (1 << (VCDP_LOG2_SESSIONS_PER_THREAD - 2))
-#define BIHASH_IP4_MEM_SIZE           (2ULL << 30)
-
-#define BIHASH_TENANT_NUM_BUCKETS (1 << (VCDP_LOG2_TENANTS - 2))
-#define BIHASH_TENANT_MEM_SIZE    (1 << 15)
 
 /* Convention session_index is 31 bit
  * Flow_index (embedded in vlib_buffer_t as "flow_id")
@@ -179,7 +172,15 @@ typedef struct {
   u16 msg_id_base;
 } vcdp_main_t;
 
+typedef struct {
+  u32 no_tenants;
+  u32 no_sessions_per_thread;
+  u32 no_nat_instances;
+  u32 no_tunnels;
+} vcdp_cfg_main_t;
+
 extern vcdp_main_t vcdp_main;
+extern vcdp_cfg_main_t vcdp_cfg_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
 

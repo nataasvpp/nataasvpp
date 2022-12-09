@@ -10,9 +10,6 @@
 
 #include <vppinfra/bihash_16_8.h>
 
-#define VCDP_TUNNELS_NUM_BUCKETS 1024 // TODO: dynamically adjustable
-
-
 // TODO: remove when we have figured out dependencies to .apis
 //#include <gateway/gateway.api_types.h>
 typedef enum {

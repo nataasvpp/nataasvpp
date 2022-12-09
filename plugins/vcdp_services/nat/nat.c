@@ -84,11 +84,10 @@ nat_init(vlib_main_t *vm)
   nat_per_thread_data_t *ptd;
   uword n_threads = vlib_get_n_threads();
   nat->uuid_hash = hash_create_string(0, sizeof(uword));
-  pool_init_fixed(nat->instances, 1024);
+  pool_init_fixed(nat->instances, vcdp_cfg_main.no_nat_instances);
   vec_validate(nat->ptd, n_threads);
-  // TODO: Make configurable
   vec_foreach (ptd, nat->ptd)
-    pool_init_fixed(ptd->flows, 2ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
+    pool_init_fixed(ptd->flows, vcdp_cfg_main.no_sessions_per_thread);
 
   return 0;
 }

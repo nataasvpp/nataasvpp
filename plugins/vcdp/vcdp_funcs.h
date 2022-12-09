@@ -75,4 +75,24 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
   return rv;
 }
 
+static_always_inline u32
+vcdp_calc_bihash_buckets (u32 n_elts)
+{
+  n_elts = n_elts / 2.5;
+  u64 lower_pow2 = 1;
+  while (lower_pow2 * 2 < n_elts)
+    {
+      lower_pow2 = 2 * lower_pow2;
+    }
+  u64 upper_pow2 = 2 * lower_pow2;
+  if ((upper_pow2 - n_elts) < (n_elts - lower_pow2))
+    {
+      if (upper_pow2 <= UINT32_MAX)
+        {
+          return upper_pow2;
+        }
+    }
+  return lower_pow2;
+}
+
 #endif

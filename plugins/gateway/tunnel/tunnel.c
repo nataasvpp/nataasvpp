@@ -7,6 +7,7 @@
 #include <vnet/vxlan/vxlan_packet.h>
 #include <vpp_plugins/geneve/geneve_packet.h>
 #include <vlib/stats/stats.h>
+#include <vcdp/vcdp_funcs.h>
 
 vcdp_tunnel_main_t vcdp_tunnel_main;
 
@@ -261,14 +262,15 @@ vcdp_tunnel_init(vlib_main_t *vm)
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   tm->log_default = vlib_log_register_class("vcdp", 0);
   tm->uuid_hash = hash_create_string(0, sizeof(uword));
-  clib_bihash_init_16_8(&tm->tunnels_hash, "vcdp ipv4 static session table", VCDP_TUNNELS_NUM_BUCKETS, 0);
+  u32 tunnel_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tunnels);
+  clib_bihash_init_16_8(&tm->tunnels_hash, "vcdp ipv4 static session table", tunnel_buckets, 0);
   tm->number_of_tunnels_gauge = vlib_stats_add_gauge ("/vcdp/tunnels/no");
 
   clib_spinlock_init(&tm->counter_lock);
 
   tm->combined_counters[VCDP_TUNNEL_COUNTER_RX].stat_segment_name = "/vcdp/tunnels/rx";
   tm->combined_counters[VCDP_TUNNEL_COUNTER_TX].stat_segment_name = "/vcdp/tunnels/tx";
-  pool_init_fixed(tm->tunnels, 65000);
+  pool_init_fixed(tm->tunnels, vcdp_cfg_main.no_tunnels);
 
   return 0;
 }

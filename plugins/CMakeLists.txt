@@ -4,6 +4,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
+#
+# Core VCDP library. None of these files can depend on APIs
+#
 add_vpp_library(vcdpcore
   SOURCES
   vcdp/lookup/node.c

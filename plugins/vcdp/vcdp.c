@@ -15,12 +15,14 @@
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
 #include <vcdp/service.h>
+#include <vcdp/vcdp_funcs.h>
 
 #define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK(drop)
 
 VCDP_SERVICE_DECLARE(drop)
 
 vcdp_main_t vcdp_main;
+vcdp_cfg_main_t vcdp_cfg_main;
 
 static void
 vcdp_timer_expired(u32 *expired)
@@ -36,29 +38,31 @@ vcdp_timer_expired(u32 *expired)
 }
 
 static void
-vcdp_init_tenant_counters(vcdp_main_t *vcdp)
+vcdp_init_tenant_counters(vcdp_main_t *vcdp, u32 no_tenants)
 {
 #define _(x, y, z)                                                                                                     \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;                                                  \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;        \
-  vlib_validate_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x],                             \
-                               1ULL << (1 + VCDP_LOG2_TENANTS));
+  vlib_validate_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], no_tenants);                           \
 
   foreach_vcdp_tenant_session_counter
 #undef _
 #define _(x, y, z)                                                                                                     \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;                                                        \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;              \
-  vlib_validate_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], 1ULL << (1 + VCDP_LOG2_TENANTS));
+  vlib_validate_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], no_tenants);
 
     foreach_vcdp_tenant_data_counter
 #undef _
 }
 
+vcdp_cfg_main_t vcdp_cfg_main;
+
 static clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
   vcdp_main_t *vcdp = &vcdp_main;
+
   vlib_call_init_function(vm, vcdp_service_init);
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
   vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
@@ -72,16 +76,20 @@ vcdp_init(vlib_main_t *vm)
   vec_validate(vcdp->per_thread_data, tm->n_vlib_mains - 1);
   for (int i = 0; i < tm->n_vlib_mains; i++) {
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, i);
-    pool_init_fixed(ptd->sessions, 1ULL << VCDP_LOG2_SESSIONS_PER_THREAD);
+    pool_init_fixed(ptd->sessions, vcdp_cfg_main.no_sessions_per_thread);
     vcdp_tw_init(&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
     ptd->session_id_template = (u64) epoch << (template_shift + log_n_thread);
     ptd->session_id_template |= (u64) i << template_shift;
   }
-  pool_init_fixed(vcdp->tenants, 1ULL << VCDP_LOG2_TENANTS);
-  vcdp_init_tenant_counters(vcdp);
-  clib_bihash_init_16_8(&vcdp->table4, "vcdp ipv4 session table", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
-  clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", BIHASH_TENANT_NUM_BUCKETS, BIHASH_TENANT_MEM_SIZE);
-  clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", BIHASH_IP4_NUM_BUCKETS, BIHASH_IP4_MEM_SIZE);
+  pool_init_fixed(vcdp->tenants, vcdp_cfg_main.no_tenants);
+  vcdp_init_tenant_counters(vcdp, vcdp_cfg_main.no_tenants);
+
+  u32 session_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_sessions_per_thread);
+  u32 tenant_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tenants);
+
+  clib_bihash_init_16_8(&vcdp->table4, "vcdp ipv4 session table", session_buckets, 0);
+  clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", tenant_buckets, 0);
+  clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 
   vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
 
@@ -248,3 +256,33 @@ VLIB_PLUGIN_REGISTER() = {
   .version = VCDP_CORE_PLUGIN_BUILD_VER,
   .description = "vCDP Core Plugin",
 };
+
+static clib_error_t *
+vcdp_config(vlib_main_t *vm, unformat_input_t *input)
+{
+  u32 tenants = 0;
+  u32 tunnels = 0;
+  u32 nat_instances = 0;
+  u32 sessions = 0;
+
+  /* Set defaults */
+  vcdp_cfg_main.no_nat_instances = 1 << 10; // 1024
+  vcdp_cfg_main.no_sessions_per_thread = 1 << 20; // 1M
+  vcdp_cfg_main.no_tenants = 1 << 10; // 1024
+  vcdp_cfg_main.no_tunnels = 1 << 20; // 1M;
+
+  while (unformat_check_input(input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(input, "tenants %d", &tenants))
+      vcdp_cfg_main.no_tenants = tenants;
+    else if (unformat(input, "tunnels %d", &tunnels))
+      vcdp_cfg_main.no_tunnels = tunnels;
+    else if (unformat(input, "nat-instances %d", &nat_instances))
+      vcdp_cfg_main.no_nat_instances = nat_instances;
+    else if (unformat(input, "sessions-per-thread %d", &sessions))
+      vcdp_cfg_main.no_sessions_per_thread = sessions;
+    else
+      return clib_error_return(0, "unknown input '%U'", format_unformat_error, input);
+  }
+  return 0;
+}
+VLIB_EARLY_CONFIG_FUNCTION(vcdp_config, "vcdp");
