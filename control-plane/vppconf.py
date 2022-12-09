@@ -147,10 +147,9 @@ class Tenants(Singleton):
         api[k] = {}
         api[k]['tenant_id'] = tenantid
         api[k]['dir'] = 0 if direction == 'forward-services' else 1
-        svc = {}
         api[k]['services'] = []
         for s in obj:
-            svc['data'] = s
+            svc = dict(data=s)
             api[k]['services'].append(svc)
         api[k]['n_services'] = len(obj)
         return api
