@@ -12,10 +12,12 @@ from vpp_papi.vpp_stats import VPPStats
 
 # pylint: disable=line-too-long
 # pylint: disable=invalid-name
+import logging
+logger = logging.getLogger(__name__)
 
 def dump_interfaces(vpp):
     '''
-    Get interface list for VPP. This is run only when first configuration the VPP instance. Later the
+    Get interface list for VPP. This is run only when first confugiring the VPP instance. Later the
     interface list is cached in the current running state configuration file.
     '''
     interface_list = {}
@@ -36,7 +38,7 @@ def callback(msgname, msg):
     retval = msg.retval
     if retval != 0:
         replies_failed += 1
-        logging.error(msg)
+        logger.error(msg)
     replies_received += 1
     if calls_made == replies_received:
         evt.set()
@@ -125,9 +127,10 @@ def vppapirunner(apidir, added, removed, interface_list, boottime, packed_file):
             continue
         f(vpp, interface_list, added[subsection], fp)
 
-    # time.sleep(1) ## Wait for responses
+    # Wait for responses
     if do_async and calls_made > 0:
-        evt.wait(timeout=10)
+        timeout = max(calls_made / 1000, 5)
+        evt.wait(timeout=timeout)
 
     vpp.disconnect()
 

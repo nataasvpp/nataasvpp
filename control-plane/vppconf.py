@@ -30,6 +30,15 @@ from deepdiff import DeepDiff
 import IPython # pylint: disable=unused-import
 from vppapi import vppapirunner
 
+import logging
+
+# Create a logger
+logger = logging.getLogger()
+console_handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
 performance = []
 def timeit(func):
     '''Timeit decorator'''
@@ -204,15 +213,14 @@ def toapicalls(desired):
 
 
 @timeit
-def diff(running, desired, verbose=None):
+def diff(running, desired):
     '''Produce delta between desired and running state'''
     # if running == desired:
     #     print('They are equal!!')
 
     # Hard coded dependencies for now. Improve by following references. Might need a schema or use JSON pointers.
     dd = DeepDiff(running, desired, view='tree')
-    if verbose:
-        print('Changes:\n', dd.pretty())
+    logger.debug('Changes: %s\n', dd.pretty())
 
     #
     # If path length is 1, then missing root key. Do we allow configuration at root level?
@@ -253,7 +261,6 @@ def main():
     parser.add_argument("--running-conf", dest="running", help="Current Running configuration",)
     parser.add_argument("--new-running-conf", dest="new_running", help="New Running configuration",)
     parser.add_argument("--test", action='store_true', help="Run unit tests",)
-    parser.add_argument("--verbose", action='store_true', help="Verbose output",)
     parser.add_argument("--apply", action='store_true', help="Apply changes to running VPP instance",)
     parser.add_argument("--apidir", nargs="+", default=[])
     parser.add_argument("--log", help="Specify log level")
@@ -262,12 +269,11 @@ def main():
     init()
 
     args, unknownargs = parser.parse_known_args()
-
     if args.log:
         loglevel = getattr(logging, args.log.upper(), None)
         if not isinstance(loglevel, int):
             raise ValueError(f'Invalid log level: {loglevel}')
-        logging.basicConfig(level=loglevel)
+        logger.setLevel(loglevel)
 
     if args.test:
         a = [sys.argv[0]] + unknownargs
@@ -291,32 +297,31 @@ def main():
     boottime = running.pop('boottime', None)
     interface_list = running.pop('interface_list', None)
 
-
     if not args.running:
         added = toapicalls(desired)
         removed = {}
     else:
         # Delta API commands
-        added, removed = diff(running, desired, args.verbose)
-    if args.verbose:
-        pp.pprint(added)
-        pp.pprint(removed)
+        added, removed = diff(running, desired)
+    logger.debug('Added: %s', pp.pformat(added))
+    logger.debug('Removed: %s', pp.pformat(removed))
 
     if args.apply:
         try:
             interface_list, boottime, summary = call_vpp(args.apidir, added, removed, interface_list, boottime, args.packed_file)
         except Exception as e:
-            print('*** Programming VPP FAILED. VPP is left in an indeterminate state.\n',
-                  repr(e), file=sys.stderr)
-            logging.debug(traceback.print_exc())
-            sys.exit(-1)
+            logger.error('*** Programming VPP FAILED. VPP is left in an indeterminate state. %s\n', repr(e))
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(traceback.print_exc())
+            sys.exit(1)
 
-        logging.info(summary)
-        logging.info(performance)
+        logger.info("API calls: %d/%d (%d failed)", summary['replies_received'], summary['calls_made'], summary['replies_failed'])
+        for p in performance:
+            logger.info("%s: %.4fs", p['func'], p['time'])
 
         if summary['replies_failed'] > 0:
-            print('*** Programming VPP failed.', file=sys.stderr)
-            sys.exit(-2)
+            logger.error('*** Programming VPP failed.')
+            sys.exit(1)
 
         # Dump new running configuration
         desired['boottime'] = boottime
@@ -324,8 +329,8 @@ def main():
         try:
             write_jsonfile(desired, args.new_running)
         except Exception as e:
-            print(f'Writing "{args.new_running}" failed. {repr(e)}', file=sys.stderr)
-            sys.exit(-3)
+            logger.error('Writing %s failed. %s', args.new_running, repr(e))
+            sys.exit(1)
     sys.exit(0)
 
 class TestVPPConf(unittest.TestCase):
@@ -334,7 +339,7 @@ class TestVPPConf(unittest.TestCase):
         '''Basic add objects'''
         empty_running = {'interfaces': {} }
         desired = {'interfaces': { 'tap0': {'tenant': 1000} } }
-        added, removed = diff(empty_running, desired, verbose=True)
+        added, removed = diff(empty_running, desired)
         self.assertEqual(len(added), 1)
 
         desired['interfaces']['tap1'] = {'tunnel-headend': True }
