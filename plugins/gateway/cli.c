@@ -195,7 +195,7 @@ vcdp_tunnel_show_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   return err;
 }
 
-VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
+VLIB_CLI_COMMAND(show_vcdp_tunnels_command, static) = {
   .path = "show vcdp tunnels",
   .short_help = "show vcdp tunnels",
   .function = vcdp_tunnel_show_command_fn,

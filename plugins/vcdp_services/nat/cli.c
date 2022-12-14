@@ -55,3 +55,27 @@ VLIB_CLI_COMMAND(vcdp_nat_add_command, static) = {
   .short_help = "[un]set vcdp nat id <id> {<ip-addr>+ | tenant <tenand-id>}",
   .function = vcdp_nat_add_command_fn,
 };
+
+static clib_error_t *
+vcdp_nat_show_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  clib_error_t *err = 0;
+  nat_main_t *nat = &nat_main;
+  nat_instance_t *instance;
+  u8 *s = 0;
+  pool_foreach (instance, nat->instances) {
+    vlib_cli_output(vm, "%s:", instance->nat_id);
+    for (int i = 0; i < vec_len(instance->addresses); i++) {
+      s = format(s, "%U ", format_ip4_address, &instance->addresses[i]);
+    }
+    vlib_cli_output(vm, "\t%s", s);
+    vec_free(s);
+  }
+  return err;
+}
+
+VLIB_CLI_COMMAND(show_vcdp_nats_command, static) = {
+  .path = "show vcdp nats",
+  .short_help = "show vcdp nats",
+  .function = vcdp_nat_show_command_fn,
+};
