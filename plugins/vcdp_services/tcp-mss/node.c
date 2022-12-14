@@ -2,10 +2,7 @@
 
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
-#include <vnet/pg/pg.h>
-#include <vppinfra/error.h>
 #include "tcp_mss.h"
-#include <vcdp_services/tcp-mss/tcp_mss.api_enum.h>
 #include <vnet/ip/ip4.h>
 #include <vnet/tcp/tcp_packet.h>
 #include <vcdp/vcdp.h>
@@ -96,6 +93,8 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
   u32 n_left, *from;
   u32 pkts_clamped = 0;
   u16 org_mss4 = 0;
+  u32 session_idx;
+  vcdp_session_t *session;
 
   u32 thread_index = vlib_get_thread_index();
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
@@ -131,8 +130,8 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     }
   done:
     // If session is established remove ourselves from service chain
-    u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    vcdp_session_t *session = vcdp_session_at_index(ptd, session_idx);
+    session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    session = vcdp_session_at_index(ptd, session_idx);
     if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
       session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
       session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
