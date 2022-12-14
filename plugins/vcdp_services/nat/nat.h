@@ -42,6 +42,7 @@ typedef enum {
   foreach_nat_rewrite_op
 #undef _
 } nat_rewrite_op_t;
+
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
   struct {

@@ -97,6 +97,15 @@
                 "nat-instance": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "tcp-mss": {
+                    "type": "array",
+                    "description": "Forward and Reverse direction TCP MSS clamping.",
+                    "items": {
+                        "type": "number",
+                        "minItems": 1,
+                        "maxItems": 2
+                    }
                 }
             }
         }

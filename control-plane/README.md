@@ -36,13 +36,15 @@ A tenant provides the glue between tunnels and nats and the forward and reverse 
                 "vcdp-tunnel-output"
             ],
             "nat-instance": "dd981ca2-9c35-4fab-836e-b9f8d8abbee2",
-            flags: "no-create"
+            flags: "no-create",
+            tcp-mss: [ 1280, 1280 ]
         },
     }
 ```
 
 An outside tenant has the 'no-create' flag set, which means if a packet arrives that does not match an existing session, it will be dropped.
 The vcdp-bypass service can be used to forward packets through the normal forwarding path, bypassing VCDP for packets not matching existing sessions.
+tcp-mss sets the TCP MSS clamping forward and reverse parameters if the service "vcdp-tcp-mss" is in the chain.
 
 ### Tunnels
 A dictionary that is key'ed on the tunnel UUID. Specifies the source and destination IP addresses. If the tunnel method requires an inner Ethernet header, the src-mac and dst-mac fields can be specified. These are not used by VPP.
@@ -64,6 +66,10 @@ If the tunnel method includes a VNI, then that is used as the tenant idenfier, u
 ```
 
 Currently supported tunnel methods are "geneve-l3" and "vxlan-dummy-l2".
+
+## Ordering constraints
+
+The initial plan was to require that all objects existed before they are referenced when compiled to VPP API calls. It might be more convenient to support "dangling" references. E.g. to configure a tenant there are at least 4 different API calls. Set forward and reverse services, bind to NAT instance, configure MSS parameters and create the tenant itself.
 
 ### Interfaces
 Interface configuration is how packets are injected into the session dataplane (VCDP). Packets can either come in on the native interface, where they are intercepted via the ip4-input feature arc. Or they are injected into VCDP from tunnel-decap. Tunnel decapsulation must also be enabled on the ingress interface.

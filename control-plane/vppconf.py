@@ -148,45 +148,56 @@ class Nats(Singleton):
 
 class Tenants(Singleton):
     '''Tenant configuration objects'''
+    def __init__(self):
+        self.dispatch = {'tcp-mss': self.tcp_mss,
+                         'forward-services': self.services,
+                         'reverse-services': self.services}
 
-    def services(self, tenantid, direction, obj):
+    def tcp_mss(self, key, tenantid, mss, is_add):
+        '''TCP MSS clamping configuration'''
+        return [{'vcdp_tcp_mss_enable_disable': {'tenant_id': tenantid,
+                                                 'dir': 0,
+                                                 'ip4_mss': mss,
+                                                 'is_enable': is_add}}]
+
+    def services(self, key, tenantid, obj, is_add):
         '''Generate vcdp_set_services API call'''
+        if not is_add:
+            return []
+
         api = {}
         k = 'vcdp_set_services'
         api[k] = {}
         api[k]['tenant_id'] = tenantid
-        api[k]['dir'] = 0 if direction == 'forward-services' else 1
+        api[k]['dir'] = 0 if key == 'forward-services' else 1
         api[k]['services'] = []
         for s in obj:
             svc = dict(data=s)
             api[k]['services'].append(svc)
         api[k]['n_services'] = len(obj)
-        return api
+        return
 
     def get_api(self, tenantid, obj, add):
         '''Return VPP API commands'''
-        tenantid = int(tenantid)
-        api = {}
         apis = []
+        tenantid = int(tenantid)
+        for k,v in obj.items():
+            if k in self.dispatch:
+                l = self.dispatch[k](k, tenantid, v, add)
+                if l:
+                    apis += l
+        api = {}
         k = 'vcdp_tenant_add_del'
         api[k] = {}
         api[k]['tenant_id'] = tenantid
         api[k]['context_id'] = obj.get('context', 0)
         api[k]['is_add'] = add
-        apis.append(api)
 
+        # Ensure the tenant itself is created first and deleted last
         if add:
-            k = 'forward-services'
-            if k in obj:
-                api = self.services(tenantid, k, obj[k])
-                apis.append(api)
-            k = 'reverse-services'
-            if k in obj:
-                api = self.services(tenantid, k, obj[k])
-                apis.append(api)
+            apis.insert(0, api)
         else:
-            pass
-
+            apis.append(api)
         return apis
 
 VOM = {}
@@ -384,6 +395,23 @@ class TestVPPConf(unittest.TestCase):
         api_calls = diff(running, desired)
         self.assertEqual(len(api_calls), 1)
         pp.pprint(api_calls)
+
+    def test_tenant_add(self):
+        '''Add tenant'''
+
+        desired = {'tenants': {
+            '0': {'tcp-mss': [123, 456], 'context': 0, 'flags': 'no-create',
+            "forward-services": ["vcdp-l4-lifecycle", "vcdp-tcp-mss", "vcdp-nat-output"],
+            "reverse-services": ["vcdp-l4-lifecycle", "vcdp-tunnel-output"],
+            "nat-instance": "6529f996-2854-4d78-8337-059053a2c61f",}}}
+
+        # Add
+        api_calls = diff({'tenants': {}}, desired)
+        print('Added API CALLS', api_calls)
+
+        # Remove
+        api_calls = diff(desired, {'tenants': {}})
+        print('Removed API CALLS', api_calls)
 
 
     @unittest.skip

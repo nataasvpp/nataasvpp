@@ -7,7 +7,9 @@
         "tunnel.h": "c",
         "ip_types_api.h": "c",
         "*.def": "c",
-        "bihash_16_8.h": "c"
+        "bihash_16_8.h": "c",
+        "plugin.h": "c",
+        "common.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

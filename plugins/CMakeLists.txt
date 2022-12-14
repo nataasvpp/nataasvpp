@@ -33,6 +33,10 @@ add_vpp_library(vcdpcore
   gateway/tunnel/tunnel.c
   gateway/tunnel/node.c
 
+  vcdp_services/tcp-mss/tcp_mss.c
+  vcdp_services/tcp-mss/node.c
+
+
   INSTALL_HEADERS
   vcdp/vcdp.h
   vcdp/service.h
@@ -53,6 +57,7 @@ add_vpp_plugin(vcdp
   vcdp_services/nat/api.c
   gateway/cli.c
   gateway/api.c
+  vcdp_services/tcp-mss/api.c
 
   API_FILES
   vcdp/vcdp_types.api
@@ -60,6 +65,7 @@ add_vpp_plugin(vcdp
   vcdp_services/nat/nat.api
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
+  vcdp_services/tcp-mss/tcp_mss.api
 
   # DEPENDS
   # vcdp_api_headers

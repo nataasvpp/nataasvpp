@@ -62,6 +62,8 @@ class TestNATaaS(VppTestCase):
         tunnel_id1 = str(uuid.uuid4())
         tunnel_id2 = str(uuid.uuid4())
 
+        mss = 1280
+
         # NATs
         cls.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
 
@@ -80,7 +82,7 @@ class TestNATaaS(VppTestCase):
 
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
-        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data':'vcdp-nat-output'}]
+        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-nat-output'}]
         reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tunnel-output'}]
         outside_services = [{'data': 'vcdp-bypass'}]
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
@@ -90,6 +92,9 @@ class TestNATaaS(VppTestCase):
         cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
                                     n_services=len(outside_services), services=outside_services)
 
+        # MSS clamping
+        cls.vapi.vcdp_tcp_mss_enable_disable(tenant_id=tenant, ip4_mss=[mss, 0xFFFF], is_enable=True)
+
         # Enable interfaces
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
         cls.vapi.vcdp_gateway_tunnel_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True)
@@ -97,6 +102,7 @@ class TestNATaaS(VppTestCase):
         cls.vxlan_pool = pool
         cls.vxlan_dport = dport
         cls.vxlan_dport2 = dport2
+        cls.mss = mss
 
     @classmethod
     def tearDownClass(cls):
@@ -173,6 +179,13 @@ class TestNATaaS(VppTestCase):
                 'name': 'Send non TCP/UDP/ICMP packet',
                 'send': IP(src='210.10.10.10', dst=dst)/IP(),
                 'expect': IP(src=pool, dst=dst)/IP(),
+                'npackets': 1,
+            },
+
+            {
+                'name': 'Check TCP MSS clamp',
+                'send': IP(src='210.10.10.10', dst=dst)/TCP(sport=888, flags="S", options=[("MSS", 9000), ("EOL", None)]),
+                'expect': IP(src=pool, dst=dst)/TCP(sport=888, flags="S", options=[("MSS", self.mss), ("EOL", None)]),
                 'npackets': 1,
             },
 
@@ -286,10 +299,8 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-        # self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests([tests[8]], self.vxlan_pool, self.vxlan_dport, 1)
         self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
-#        self.test_runner(self.nataas_tests, self.vxlan_pool, self.vxlan_dport2, 1)
-        # self.send_packet_through_nat(pool, dport2)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 

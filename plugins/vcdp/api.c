@@ -33,7 +33,7 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
-  u8 idx = 0;
+  u32 idx = 0;
   vcdp_session_direction_t dir = vcdp_api_direction(mp->dir);
   int rv;
   for (uword i = 0; i < mp->n_services; i++) {

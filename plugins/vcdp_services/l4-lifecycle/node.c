@@ -36,6 +36,7 @@ format_vcdp_l4_lifecycle_trace(u8 *s, va_list *args)
 }
 
 VCDP_SERVICE_DECLARE(tcp_check)
+VCDP_SERVICE_DECLARE(vcdp_tcp_mss)
 VCDP_SERVICE_DECLARE(l4_lifecycle)
 VLIB_NODE_FN(vcdp_l4_lifecycle_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
@@ -67,6 +68,11 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
       session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(tcp_check);
       session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(tcp_check);
     } else {
+      /* Disable all TCP services for non-TCP traffic */
+      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+      vcdp_buffer(b[0])->service_bitmap &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+
       if (session->state == VCDP_SESSION_STATE_FSOL && direction == VCDP_FLOW_REVERSE)
         /*Establish the session*/
         session->state = VCDP_SESSION_STATE_ESTABLISHED;
