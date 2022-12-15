@@ -103,6 +103,9 @@ class TestNATaaS(VppTestCase):
         cls.vxlan_dport = dport
         cls.vxlan_dport2 = dport2
         cls.mss = mss
+        cls.nat_id = nat_id
+        cls.tenant = tenant
+        cls.tunnel_id1 = tunnel_id1
 
     @classmethod
     def tearDownClass(cls):
@@ -315,3 +318,18 @@ class TestNATaaS(VppTestCase):
         self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)
 
         print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])
+
+        # Delete tenant prematurely
+        # self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)
+        # self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)
+
+
+        # Delete a NAT
+        self.vapi.vcdp_nat_bind_set_unset(tenant_id=self.tenant, nat_id=self.nat_id, is_set=False)
+        self.vapi.vcdp_nat_remove(nat_id=self.nat_id)
+
+        # Delete a tunnel
+        self.vapi.vcdp_tunnel_remove(tunnel_id=self.tunnel_id1)
+
+        # Delete tenant
+        self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)

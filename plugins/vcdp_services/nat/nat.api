@@ -15,7 +15,7 @@ autoreply autoendian define vcdp_nat_add
   vl_api_ip4_address_t addr[n_addr];
 };
 
-autoreply define vcdp_nat_remove
+autoreply autoendian define vcdp_nat_remove
 {
   u32 client_index;
   u32 context;

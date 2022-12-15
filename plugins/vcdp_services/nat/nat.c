@@ -45,6 +45,26 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
   return 0;
 }
 
+int
+vcdp_nat_remove(char *nat_id)
+{
+  nat_main_t *nat = &nat_main;
+  nat_instance_t *instance;
+  u16 nat_idx;
+
+  size_t uuid_len = strnlen_s(nat_id, sizeof(instance->nat_id));
+  if (uuid_len == 0 || uuid_len == sizeof(instance->nat_id)) return -1;
+  instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
+  if (!instance) return -1; // no instance to remove
+
+  // Remove from uuid hash
+  hash_unset_mem(nat->uuid_hash, instance->nat_id);
+
+  // Remove from pool
+  pool_put(nat->instances, instance);
+
+  return 0;
+}
 
 nat_instance_t *
 vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx)
@@ -70,12 +90,15 @@ vcdp_nat_bind_set_unset (u32 tenant_id, char *nat_id, bool is_set)
   vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
   if (!tenant) return -1;
 
-  nat_instance_t *instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
-  if (!instance) return -1;
-
-  vec_validate_init_empty(nat->instance_by_tenant_idx, tenant_idx, 0xFFFF);
-  nat->instance_by_tenant_idx[tenant_idx] = nat_idx;
-
+  if (is_set) {
+    nat_instance_t *instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
+    if (!instance)
+      return -1;
+    vec_validate_init_empty(nat->instance_by_tenant_idx, tenant_idx, 0xFFFF);
+    nat->instance_by_tenant_idx[tenant_idx] = nat_idx;
+  } else {
+    nat->instance_by_tenant_idx[tenant_idx] = 0xFFFF;
+  }
   return 0;
 }
 

@@ -242,7 +242,7 @@ vcdp_tunnel_remove(char *tunnel_id)
   }
 
   // Remove from uuid hash
-  hash_unset(tm->uuid_hash, t->tunnel_id);
+  hash_unset_mem(tm->uuid_hash, t->tunnel_id);
 
   // Remove from pool
   pool_put(tm->tunnels, t);
