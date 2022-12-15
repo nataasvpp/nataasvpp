@@ -286,7 +286,7 @@ main(int argc, char **argv)
   assert(rv == 0 && "Lookup by session parameters");
 
   rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4278, 0, 0, 0);
-  assert(rv == -5 && "creating duplicate tunnel");
+  assert(rv == -6 && "creating duplicate tunnel");
 
   rv = vcdp_tunnel_add("tunnel2", 1, VCDP_TUNNEL_VXLAN_DUMMY_L2, &src, &dst, 0, 4279, 0, 0, 0);
 
