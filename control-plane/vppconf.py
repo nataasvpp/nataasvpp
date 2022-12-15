@@ -175,7 +175,7 @@ class Tenants(Singleton):
             svc = dict(data=s)
             api[k]['services'].append(svc)
         api[k]['n_services'] = len(obj)
-        return
+        return [api, ]
 
     def get_api(self, tenantid, obj, add):
         '''Return VPP API commands'''
