@@ -74,6 +74,11 @@ vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
   u32 session_idx;
   u32 pseudo_flow_idx;
   u64 session_id;
+
+  // Session table is full
+  if (pool_elts(ptd->sessions) == vcdp_cfg_main.no_sessions_per_thread)
+    return 2;
+
   pool_get(ptd->sessions, session);
   session_idx = session - ptd->sessions;
   pseudo_flow_idx = (session_idx << 1);

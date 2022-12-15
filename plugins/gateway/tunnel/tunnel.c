@@ -152,18 +152,20 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
     clib_warning("Tunnel exists already");
     return -1;
   }
+  if (pool_elts(tm->tunnels) == vcdp_cfg_main.no_tunnels)
+    return -2;
 
   // check input
   if (!tunnel_id) {
-    return -2;
+    return -3;
   }
 
   size_t uuid_len = strnlen_s(tunnel_id, sizeof(t->tunnel_id));
   if (uuid_len == 0 || uuid_len == sizeof(t->tunnel_id)) {
-    return -3;
+    return -4;
   }
   if (src == 0 || dst == 0 || dport == 0) {
-    return -4;
+    return -5;
   }
 
   // Check for duplicate in session table
@@ -171,7 +173,7 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   u64 value;
   rv = vcdp_tunnel_lookup(0, src->ip.ip4, dst->ip.ip4, IP_PROTOCOL_UDP, clib_host_to_net_u16(sport), clib_host_to_net_u16(dport), &value);
   if (rv == 0) {
-    return -5;
+    return -6;
   }
 
   pool_get_zero(tm->tunnels, t);

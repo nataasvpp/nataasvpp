@@ -145,6 +145,10 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
   u32 tenant_idx;
   u32 n_tenants = pool_elts(vcdp->tenants);
   if (is_add) {
+    if (pool_elts(vcdp->tenants) == vcdp_cfg_main.no_tenants)
+      return clib_error_return(0, "Can't create tenant with id %d. Maximum limit reached %d", tenant_id,
+                               vcdp_cfg_main.no_tenants);
+
     if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
       pool_get(vcdp->tenants, tenant);
       tenant_idx = tenant - vcdp->tenants;

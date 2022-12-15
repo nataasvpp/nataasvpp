@@ -32,6 +32,8 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
 
   instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
   if (instance) return -1; // exists already
+  if (pool_elts(nat->instances) == vcdp_cfg_main.no_nat_instances)
+    return -1;
 
   // Create pool entry
   pool_get_zero(nat->instances, instance);
