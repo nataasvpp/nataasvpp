@@ -103,7 +103,8 @@ def vppapirunner(apidir, added, removed, interface_list, boottime, packed_file):
         f = api_calls_pack
         fp = open(packed_file, "wb")
 
-    VPPApiClient.apidir = apidir
+    if apidir:
+        VPPApiClient.apidir = apidir
     vpp = VPPApiClient(use_socket=True)
     vpp.register_event_callback(callback)
 
