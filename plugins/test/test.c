@@ -1,7 +1,7 @@
 /* Copyright(c) 2022 Cisco Systems, Inc. */
 
 #include <stdio.h>
-#include "tunnel.h"
+#include "gateway/tunnel/tunnel.h"
 #include <assert.h>
 #include <vcdp/service.h>
 #include <arpa/inet.h>
@@ -143,7 +143,7 @@ void *test_vlib_add_trace(vlib_main_t *vm, vlib_node_runtime_t *r,
 }
 
 /* Must be included here to allow the above functions to override */
-#include "node.h"
+#include "gateway/tunnel/node.h"
 
 
 void
@@ -247,9 +247,11 @@ test_packets(void)
 #endif
 }
 
-clib_error_t *
-vlib_stats_init(vlib_main_t *vm);
+clib_error_t *vlib_stats_init(vlib_main_t *vm);
+clib_error_t *vcdp_init(vlib_main_t *vm);
 
+
+int test_tcp_state(void);
 int
 main(int argc, char **argv)
 {
@@ -263,8 +265,13 @@ main(int argc, char **argv)
   if (err) {
     exit(-1);
   }
-
+  vcdp_cfg_main.no_nat_instances = 1 << 10; // 1024
+  vcdp_cfg_main.no_sessions_per_thread = 1 << 20; // 1M
+  vcdp_cfg_main.no_tenants = 1 << 10; // 1024
+  vcdp_cfg_main.no_tunnels = 1 << 20; // 1M;
   vcdp_cfg_main.no_tunnels = 1000;
+  vcdp_init(vm);
+
   vcdp_tunnel_init(0);
 
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid("foobar");
@@ -303,6 +310,10 @@ main(int argc, char **argv)
   // test_tunnel_input(vm);
 
   test_packets();
+
+
+  test_tcp_state();
+
   _Exit(0);
 
 }

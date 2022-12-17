@@ -61,7 +61,7 @@ typedef struct {
   u32 flow_id;
 } vcdp_handoff_trace_t;
 
-static_always_inline int
+int
 vcdp_create_session_v4 (vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd,
 			vcdp_tenant_t *tenant, u16 tenant_idx,
 			u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val)

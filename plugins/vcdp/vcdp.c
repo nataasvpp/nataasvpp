@@ -58,7 +58,7 @@ vcdp_init_tenant_counters(vcdp_main_t *vcdp, u32 no_tenants)
 
 vcdp_cfg_main_t vcdp_cfg_main;
 
-static clib_error_t *
+clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
   vcdp_main_t *vcdp = &vcdp_main;

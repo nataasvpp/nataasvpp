@@ -11,7 +11,8 @@
         "plugin.h": "c",
         "common.h": "c",
         "tcp_mss.api_enum.h": "c",
-        "error.h": "c"
+        "error.h": "c",
+        "test_stubs.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

@@ -21,6 +21,9 @@ add_vpp_library(vcdpcore
   vcdp_services/tcp-check/tcp_check.c
   vcdp_services/tcp-check/format.c
 
+  vcdp_services/tcp-check-lite/node.c
+  vcdp_services/tcp-check-lite/tcp_check_lite.c
+
   vcdp_services/l4-lifecycle/node.c
 
   vcdp_services/nat/nat.c
@@ -98,7 +101,8 @@ add_compile_options(-Werror -Wall)
 # set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address ${CMAKE_EXE_LINKER_FLAGS}")
 # set(CMAKE_SHARED_LINKER_FLAGS "-fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS}")
 #set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*,-readability-identifier-length)
-add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
+# add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
+add_executable(test_tunnel test/test.c test/test_tcp_state.c)
 target_link_libraries(test_tunnel vcdpcore ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
 add_test(NAME test_tunnel
          COMMAND test_tunnel)
