@@ -1,0 +1,31 @@
+digraph TCP_Lite_State_Diagram {
+    // rankdir=LR;
+    node [shape=circle];
+
+    // States
+    CLOSED [label="CLOSED"];
+    CLIENT_INIT [label="CLIENT\nINIT"];
+    SERVER_WAIT [label="SERVER\nWAIT"];
+    ESTABLISHED [label="ESTABLISHED"];
+    FIN_WAIT_1 [label="FIN\nWAIT\n1"];
+    FIN_WAIT_2 [label="FIN\nWAIT\n2"];
+    CLOSE_WAIT [label="CLOSE\nWAIT"];
+    CLOSING [label="CLOSING"];
+    LAST_ACK [label="LAST\nACK"];
+    TIME_WAIT [label="TIME\nWAIT"];
+
+    // Transitions
+    CLOSED -> CLIENT_INIT [label="client data pkt"];
+    CLIENT_INIT -> CLOSED [label="timeout"];
+    CLIENT_INIT -> SERVER_WAIT;
+    SERVER_WAIT -> ESTABLISHED [label="server data pkt"];
+    ESTABLISHED -> FIN_WAIT_1 [label="passive close"];
+    FIN_WAIT_1 -> FIN_WAIT_2 [label="FIN"];
+    FIN_WAIT_1 -> CLOSING [label="ACK of FIN"];
+    FIN_WAIT_2 -> TIME_WAIT [label="ACK of FIN"];
+    CLOSING -> TIME_WAIT [label="ACK of FIN"];
+    CLOSE_WAIT -> LAST_ACK [label="close"];
+    LAST_ACK -> CLOSED [label="ACK of FIN"];
+    TIME_WAIT -> CLOSED [label="timeout"];
+    ESTABLISHED -> CLOSE_WAIT [label="active close"];
+}

@@ -105,7 +105,7 @@ typedef union {
     u32 src, dst;
     u16 sport, dport;
     u32 context_id : 24;
-    u8 proto;
+    u8 proto : 8;
   };
   u64 as_u64[2];
 } __clib_packed vcdp_session_ip4_key_t;
@@ -266,7 +266,7 @@ vcdp_session_n_keys(vcdp_session_t *session)
     return 1;
 }
 
-clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_del);
+clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 

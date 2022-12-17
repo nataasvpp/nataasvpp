@@ -191,6 +191,21 @@ class TestNATaaS(VppTestCase):
                 'expect': IP(src=pool, dst=dst)/TCP(sport=888, flags="S", options=[("MSS", self.mss), ("EOL", None)]),
                 'npackets': 1,
             },
+            {
+                'name': 'TCP state machine 3-way open #1',
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': IP(src=pool, dst=dst)/TCP(sport=1234, dport=1234),
+                'npackets': 1,
+                'reply': True,
+            },
+            {
+                'name': 'TCP state machine 3-way open #2',
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="A", sport=1234, dport=1234),
+                'expect': IP(src=pool, dst=dst)/TCP(flags="A", sport=1234, dport=1234),
+                'npackets': 1,
+                'reply': False,
+            },
+
 
             # {
             #     'name': 'Verify mid-stream TCP creates session',
@@ -302,8 +317,8 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-        # self.run_tests([tests[8]], self.vxlan_pool, self.vxlan_dport, 1)
-        self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests(tests[9:10+1], self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
@@ -312,7 +327,7 @@ class TestNATaaS(VppTestCase):
         # self.send_and_assert_no_replies(self.pg1, pkt_to_send)
 
         print(self.vapi.cli("show vcdp session-table"))
-        print(self.vapi.cli('show vcdp tcp session-table'))
+        # print(self.vapi.cli('show vcdp tcp session-table'))
         print(self.vapi.cli('show vcdp tenant'))
 
         self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)

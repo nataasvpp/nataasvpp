@@ -64,7 +64,12 @@ vnet_main_t *vnet_get_main (void) { return 0;}
 #include <vppinfra/bihash_template.c>
 
 u8 *format_vnet_sw_if_index_name (u8 * s, va_list * args) { return 0; }
-u8 *format_ip_protocol (u8 * s, va_list * args) { return 0; }
+u8 *
+format_ip_protocol(u8 *s, va_list *args)
+{
+  ip_protocol_t protocol = va_arg(*args, int); // int promo of ip_protocol_t);
+  return format(s, "unknown %d", protocol);
+}
 
 u8 *format_tcp_header(u8 *s, va_list *args) {
     tcp_header_t *tcp = va_arg(*args, tcp_header_t *);

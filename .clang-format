@@ -8,7 +8,7 @@ AlignConsecutiveMacros: true
 BreakBeforeTernaryOperators: false
 BreakBeforeBinaryOperators: None
 ContinuationIndentWidth: 2
-AlwaysBreakAfterReturnType: All
+AlwaysBreakAfterReturnType: AllDefinitions
 BreakBeforeBraces: Linux
 ColumnLimit: 120
 

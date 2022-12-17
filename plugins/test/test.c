@@ -78,8 +78,14 @@ struct buffers {
 struct buffers buffers[256];
 struct buffers expected[256];
 u32 *buffers_vector = 0;
+
+/*
+ * Register nodes
+ */
 vlib_node_runtime_t *node;
 extern vlib_node_registration_t vcdp_tunnel_input_node;
+extern vlib_node_registration_t vcdp_handoff_node;
+extern vlib_node_registration_t vcdp_timer_expire_node;
 
 int
 vcdp_tunnel_input_node_fn(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame);
@@ -92,38 +98,7 @@ buffer_init(u32 *vector, int count)
   }
   return vector;
 }
-
-/*
- * Always return the frame of generated packets
- */
-#define vlib_frame_vector_args test_vlib_frame_vector_args
-void *test_vlib_frame_vector_args(vlib_frame_t *f) { return buffers_vector; }
-
-
-/* Gather output packets */
-#define vlib_buffer_enqueue_to_next test_vlib_buffer_enqueue_to_next
-void
-test_vlib_buffer_enqueue_to_next(vlib_main_t *vm, vlib_node_runtime_t *node, u32 *buffers, u16 *nexts, uword count)
-{
-  vec_add(results_next, nexts, count);
-  vec_add(results_bi, buffers, count);
-}
-
-#define vlib_get_buffers test_vlib_get_buffers
-void
-test_vlib_get_buffers(vlib_main_t *vm, u32 *bi, vlib_buffer_t **b, int count)
-{
-  int i;
-  for (i = 0; i < count; i++) {
-    b[i] = (vlib_buffer_t *) &buffers[bi[i]];
-  }
-}
-
-vlib_buffer_t *
-test_vlib_get_buffer(u32 bi)
-{
-  return (vlib_buffer_t *) &buffers[bi];
-}
+#include "test_node_macros.h"
 
 typedef struct {
   char *name;
@@ -251,9 +226,10 @@ clib_error_t *vlib_stats_init(vlib_main_t *vm);
 clib_error_t *vcdp_init(vlib_main_t *vm);
 
 
-int test_tcp_state(void);
-int
-main(int argc, char **argv)
+/*
+ * Init VPP infrastructure
+ */
+static void init(void)
 {
   clib_mem_init(0, 3ULL << 30);
   vlib_main_init(); 
@@ -265,6 +241,17 @@ main(int argc, char **argv)
   if (err) {
     exit(-1);
   }
+
+  /* Initialise hand-off node */
+  u32 node_index = vlib_register_node(vm, &vcdp_handoff_node, "%s", vcdp_handoff_node.name);
+  node = vlib_node_get_runtime(vm, node_index);
+  assert(node);
+
+  node_index = vlib_register_node(vm, &vcdp_timer_expire_node, "%s", vcdp_timer_expire_node.name);
+  node = vlib_node_get_runtime(vm, node_index);
+  assert(node);
+
+  /* Set VCDP default data structure sizes */
   vcdp_cfg_main.no_nat_instances = 1 << 10; // 1024
   vcdp_cfg_main.no_sessions_per_thread = 1 << 20; // 1M
   vcdp_cfg_main.no_tenants = 1 << 10; // 1024
@@ -273,6 +260,14 @@ main(int argc, char **argv)
   vcdp_init(vm);
 
   vcdp_tunnel_init(0);
+
+}
+
+int test_tcp_state(void);
+int
+main(int argc, char **argv)
+{
+  init();
 
   vcdp_tunnel_t *t = vcdp_tunnel_lookup_by_uuid("foobar");
   assert(t == 0 && "lookup on empty table");
