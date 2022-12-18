@@ -150,6 +150,7 @@ class Tenants(Singleton):
     '''Tenant configuration objects'''
     def __init__(self):
         self.dispatch = {'tcp-mss': self.tcp_mss,
+                         'nat-instance': self.nat_instance,
                          'forward-services': self.services,
                          'reverse-services': self.services}
 
@@ -159,6 +160,11 @@ class Tenants(Singleton):
                                                  'dir': 0,
                                                  'ip4_mss': mss,
                                                  'is_enable': is_add}}]
+
+    def nat_instance(self, key, tenantid, natid, is_add):
+        return [{'vcdp_nat_bind_set_unset': {'tenant_id': tenantid,
+                                             'nat_id':  natid,
+                                             'is_set': is_add}}]
 
     def services(self, key, tenantid, obj, is_add):
         '''Generate vcdp_set_services API call'''
