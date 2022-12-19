@@ -142,8 +142,9 @@ class Nats(Singleton):
         k = 'vcdp_nat_add' if add else 'vcdp_nat_remove'
         api[k] = {}
         api[k]['nat_id'] = natid
-        api[k]['addr'] = obj['pool-address']
-        api[k]['n_addr'] = len(obj['pool-address'])
+        if add:
+            api[k]['addr'] = obj['pool-address']
+            api[k]['n_addr'] = len(obj['pool-address'])
         return [api]
 
 class Tenants(Singleton):
