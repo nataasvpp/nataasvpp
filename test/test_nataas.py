@@ -22,7 +22,7 @@ from vpp_papi import VppEnum
 Tests for NATaaS.
 """
 
-DEBUG = False
+DEBUG = True
 def log_packet(msg, pkt):
     '''Show scapy packet'''
     if DEBUG:
@@ -117,7 +117,7 @@ class TestNATaaS(VppTestCase):
         #         i.admin_down()
 
     def encapsulate(self, dport, vni, pkt):
-        '''Wrap packet in Ether/IP/UDP/VXLAN'''
+        '''Wrap packet in Ether/IP/UDP/VXLAN. Specific to interface pg0'''
         return (
             Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)
             / IP(src=self.pg0.remote_ip4, dst=self.pg0.local_ip4)
@@ -191,6 +191,7 @@ class TestNATaaS(VppTestCase):
                 'expect': IP(src=pool, dst=dst)/TCP(sport=888, flags="S", options=[("MSS", self.mss), ("EOL", None)]),
                 'npackets': 1,
             },
+            # Tests for TCP state machine
             {
                 'name': 'TCP state machine 3-way open #1',
                 'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
@@ -206,6 +207,30 @@ class TestNATaaS(VppTestCase):
                 'reply': False,
             },
 
+            # ICMP error
+            {
+                'name': 'ICMP error for established session',
+                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': None,
+                'npackets': 1,
+                'reply': False,
+                'interface': self.pg1  # out2in
+            },
+            {
+                'name': 'ICMP error - truncated',
+                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
+                'expect': None,
+                'npackets': 1,
+                'reply': False,
+                'interface': self.pg1  # out2in
+            },
+            {
+                'name': 'ICMP error for established session in2out',
+                'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst=pool)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': None,
+                'npackets': 1,
+                'reply': False,
+            },
 
             # {
             #     'name': 'Verify mid-stream TCP creates session',
@@ -217,7 +242,13 @@ class TestNATaaS(VppTestCase):
         ]
 
         for t in tests:
-            t['send'] = self.encapsulate(dport, vni, t['send'])
+            if t.get('interface', self.pg0) == self.pg0:
+                t['send'] = self.encapsulate(dport, vni, t['send'])
+                t['interface'] = self.pg0
+            else:
+                interface = t['interface']
+                t['send'] =  Ether(src=interface.remote_mac, dst=interface.local_mac) / t['send']
+                
             if t['expect']: # If a reply is expected
                 t['expect'][IP].ttl -= 1
 
@@ -271,8 +302,8 @@ class TestNATaaS(VppTestCase):
             with self.subTest(msg=f"*******************Test: {t['name']}", t=t):
                 for f in range(nframes):
                     log_packet('Sent packet', t['send'])
-                    if t['expect'] == None:
-                        self.send_and_assert_no_replies(self.pg0, t['send'] * t['npackets'])
+                    if t['expect'] is None:
+                        self.send_and_assert_no_replies(t['interface'], t['send'] * t['npackets'])
                         continue
                     else:
                         try:
@@ -317,8 +348,8 @@ class TestNATaaS(VppTestCase):
 
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
-        self.run_tests(tests[9:10+1], self.vxlan_pool, self.vxlan_dport, 1)
-        # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests(tests[9:14], self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests([tests[13]], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 

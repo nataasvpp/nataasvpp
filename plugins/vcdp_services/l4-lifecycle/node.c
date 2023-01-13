@@ -61,28 +61,16 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
     u8 direction = vcdp_direction_from_flow_index(b[0]->flow_id);
     /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
      */
-    if (session->proto == IP_PROTOCOL_TCP) {
-      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(l4_lifecycle);
-      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(l4_lifecycle);
-      vcdp_buffer(b[0])->service_bitmap |= VCDP_SERVICE_MASK(tcp_check_lite);
-      session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(tcp_check_lite);
-      session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(tcp_check_lite);
-    } else {
-      /* Disable all TCP services for non-TCP traffic */
-      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-      vcdp_buffer(b[0])->service_bitmap &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    if (session->state == VCDP_SESSION_STATE_FSOL && direction == VCDP_FLOW_REVERSE)
+      /*Establish the session*/
+      session->state = VCDP_SESSION_STATE_ESTABLISHED;
 
-      if (session->state == VCDP_SESSION_STATE_FSOL && direction == VCDP_FLOW_REVERSE)
-        /*Establish the session*/
-        session->state = VCDP_SESSION_STATE_ESTABLISHED;
-
-      if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
-        /* TODO: must be configurable per tenant */
-        vcdp_session_timer_update(&ptd->wheel, &session->timer, ptd->current_time,
-                                  tenant->timeouts[VCDP_TIMEOUT_ESTABLISHED]);
-      }
+    if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
+      /* TODO: must be configurable per tenant */
+      vcdp_session_timer_update(&ptd->wheel, &session->timer, ptd->current_time,
+                                tenant->timeouts[VCDP_TIMEOUT_ESTABLISHED]);
     }
+
     vcdp_next(b[0], to_next);
 
     b++;
