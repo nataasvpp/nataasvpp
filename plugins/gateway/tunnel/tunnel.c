@@ -4,7 +4,7 @@
 
 #include "tunnel.h"
 #include <vnet/adj/adj_nbr.h>
-#include <vnet/vxlan/vxlan_packet.h>
+#include "vxlan_packet.h"
 #include <vpp_plugins/geneve/geneve_packet.h>
 #include <vlib/stats/stats.h>
 #include <vcdp/vcdp_funcs.h>
