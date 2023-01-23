@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include "gateway/tunnel/tunnel.h"
+#include "vcdp/lookup/lookup_inlines.h"
 #include <assert.h>
 #include <vcdp/service.h>
 #include <arpa/inet.h>
@@ -45,9 +46,9 @@ buffer_init(u32 *vector, int count)
 #include "test_node_macros.h"
 #include <vcdp_services/tcp-check-lite/node.h>
 
-int
-vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
-                       u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val);
+int vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
+                           u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val,
+                           vcdp_service_chain_selector_t sc);
 
 extern vlib_node_registration_t vcdp_tcp_check_lite_node;
 
@@ -85,7 +86,7 @@ test_tcp_state(void)
   
   /* Create session(s) */
   vcdp_session_ip4_key_t k = {.src = 0x01020304, .dst = 0x04030201, .proto = 6, .dport = 80, .sport = 12345};
-  int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, &k, rx_id, &lookup_val);
+  int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, &k, rx_id, &lookup_val, VCDP_SERVICE_CHAIN_TCP);
   assert(rv == 0);
   clib_warning("Created session %U", format_vcdp_session_key, &k);
   clib_warning("Created session %U", format_vcdp_session_detail, ptd, 0, now);

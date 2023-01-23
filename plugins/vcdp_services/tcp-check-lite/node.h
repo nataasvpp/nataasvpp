@@ -150,9 +150,8 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 state[VLIB_FRAME_SIZE], *sf = state;
   u32 new_state[VLIB_FRAME_SIZE], *nsf = new_state;
-  // f64 current_time = ptd->current_time;
-  f64 current_time = vlib_time_now(vm);
-  ASSERT(current_time != 0);
+  f64 current_time = ptd->current_time;
+
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
