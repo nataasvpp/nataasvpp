@@ -70,7 +70,7 @@ nat_instance_t *
 vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx)
 {
   nat_main_t *nat = &nat_main;
-  if (vec_len(nat->instance_by_tenant_idx) < tenant_idx) return 0;
+  if (vec_len(nat->instance_by_tenant_idx) <= tenant_idx) return 0;
   nat_idx = vec_elt_at_index (nat->instance_by_tenant_idx, tenant_idx);
   if (*nat_idx == 0xFFFF) return 0;
   return pool_elt_at_index(nat->instances, *nat_idx);

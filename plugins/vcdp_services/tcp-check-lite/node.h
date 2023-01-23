@@ -39,6 +39,19 @@ format_vcdp_tcp_check_lite_trace(u8 *s, va_list *args)
   return s;
 }
 
+u8 *format_tcp_flags (u8 * s, va_list * args);
+u8 *
+format_tcp_flags (u8 * s, va_list * args)
+{
+  int flags = va_arg (*args, int);
+
+  s = format (s, "0x%02x", flags);
+#define _(f) if (flags & TCP_FLAG_##f) s = format (s, " %s", #f);
+  foreach_tcp_flag
+#undef _
+    return s;
+}
+
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_session_state_t *tcp_session,
@@ -53,11 +66,12 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   /* Ignore non first fragments */
   if (ip4_get_fragment_offset(ip4) > 0) {
     vcdp_next(b[0], to_next);
+    clib_warning("Fragment ignored");
     return;
   }
   /* Note: We don't care about SYNs */
   u8 flags = tcp->flags & (TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
-  u32 next_timeout = 0;
+  u32 next_timeout = tenant->timeouts[tcp_session->state];
 
   if (PREDICT_FALSE(tcp_session->version != session->session_version)) {
     tcp_session->version = session->session_version;
@@ -69,11 +83,12 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   u8 old_flags = tcp_session->flags[dir];
   tcp_session->flags[dir] |= flags;
 
+  u8 old_state = tcp_session->state;
+
   /* No change */
   if (old_flags == tcp_session->flags[dir])
     goto out;
 
-  u8 old_state = tcp_session->state;
   switch (old_state) {
   case VCDP_TCP_CHECK_LITE_STATE_CLOSED:
     // ESTABLISHED when ACKs are seen from both sides
@@ -89,8 +104,9 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
       tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSING;
       tcp_session->flags[VCDP_FLOW_FORWARD] = 0;
       tcp_session->flags[VCDP_FLOW_REVERSE] = 0;
-      next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];
+      next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_TRANSITORY];
       session->state = VCDP_SESSION_STATE_TIME_WAIT;
+
     }
     break;
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
@@ -103,9 +119,12 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
     }
     break;
+    default:
+      clib_warning("Unknown state %d", old_state);
   }
 
 out:
+
   nsf[0] = tcp_session->state;
   vcdp_session_timer_update_maybe_past(tw, &session->timer, current_time, next_timeout);
   vcdp_next(b[0], to_next);
@@ -131,8 +150,9 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 state[VLIB_FRAME_SIZE], *sf = state;
   u32 new_state[VLIB_FRAME_SIZE], *nsf = new_state;
-  f64 current_time = ptd->current_time;
-
+  // f64 current_time = ptd->current_time;
+  f64 current_time = vlib_time_now(vm);
+  ASSERT(current_time != 0);
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);

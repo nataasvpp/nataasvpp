@@ -35,9 +35,6 @@ format_vcdp_l4_lifecycle_trace(u8 *s, va_list *args)
   return s;
 }
 
-VCDP_SERVICE_DECLARE(tcp_check_lite)
-VCDP_SERVICE_DECLARE(vcdp_tcp_mss)
-VCDP_SERVICE_DECLARE(l4_lifecycle)
 VLIB_NODE_FN(vcdp_l4_lifecycle_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {

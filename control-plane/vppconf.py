@@ -30,8 +30,6 @@ from deepdiff import DeepDiff
 import IPython # pylint: disable=unused-import
 from vppapi import vppapirunner
 
-import logging
-
 # Create a logger
 logger = logging.getLogger()
 console_handler = logging.StreamHandler()

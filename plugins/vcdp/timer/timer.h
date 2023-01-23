@@ -12,11 +12,13 @@ typedef struct {
   u32 handle;
 } vcdp_session_timer_t;
 
+/* Default NAT state protocol timeouts */
 #define foreach_vcdp_timeout                                                                                           \
   _(EMBRYONIC, 5, "embryonic")                                                                                         \
-  _(ESTABLISHED, 120, "established")                                                                                   \
-  _(TCP_ESTABLISHED, 3600, "tcp-established")                                                                          \
-  _(SECURITY, 30, "security")
+  _(ESTABLISHED, 240, "established")                                                                                   \
+  _(TCP_TRANSITORY, 240, "tcp-transitory")                                                                          \
+  _(TCP_ESTABLISHED, 7440, "tcp-established")                                                                          \
+  _(SECURITY, 30, "security") // TODO: Needed?
 
 typedef enum {
 #define _(name, val, str) VCDP_TIMEOUT_##name,

@@ -69,7 +69,6 @@ VCDP_SERVICE_DECLARE(l4_lifecycle)
 static void
 vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, u32 *bitmaps)
 {
-  clib_warning("SC: %d", sc);
   clib_memcpy_fast(bitmaps, tenant->bitmaps, sizeof(tenant->bitmaps));
 
   switch (sc) {
@@ -256,8 +255,10 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
+        clib_warning("Creating session failed key: %d %U", rv, format_vcdp_session_key, k4);
         goto next;
       }
+
       /* if there is collision, we just reiterate */
       if (rv == 1) {
         vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
@@ -275,6 +276,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u32 flow_index = lv[0] & (~(u32) 0);
       to_local[n_local] = bi[0];
       session_index = flow_index >> 1;
+
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
