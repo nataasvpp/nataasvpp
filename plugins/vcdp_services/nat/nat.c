@@ -1,5 +1,10 @@
 // Copyright(c) 2022 Cisco Systems, Inc.
 
+/*
+ * A NAT instance is mostly a pool of addresses. The address is either statically configured or learnt from an interface
+ * address. The NAT code is interface agnostic, neither does it care if the pool addresses are reachable or not.
+ * Think of it as a blind rewrite engine. With a few instance counters.
+ */
 #include <vcdp/vcdp.h>
 #include <vcdp_services/nat/nat.h>
 #include <vppinfra/pool.h>
@@ -122,20 +127,21 @@ vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_i
                                        u32 address_length, u32 if_address_index, u32 is_delete)
 {
   // Is this an interface we are interested in?
-  nat_if_instance_t *instance = vcdp_nat_interface_by_sw_if_index(sw_if_index);
-  if (!instance) return; // Not a NAT interface
+  nat_if_instance_t *if_instance = vcdp_nat_interface_by_sw_if_index(sw_if_index);
+  if (!if_instance) return; // Not a NAT interface
 
   // If address is deleted and address is used as a NAT pool, delete NAT instance
-  if (is_delete) {
-    clib_warning("Removing NAT instance %s with address %U", instance->nat_id, format_ip4_address, address);
-    vcdp_nat_remove(instance->nat_id);
-  } else {
+  // TODO: Handle the cases where a secondary address is added (or a secondary address is deleted)
+  if (!is_delete) {
     // If address is added and address is used as a NAT pool, create NAT instance
-    clib_warning("Creating NAT instance %s with address %U", instance->nat_id, format_ip4_address, address);
+    clib_warning("Creating NAT instance %s with address %U", if_instance->nat_id, format_ip4_address, address);
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(instance->nat_id, v);
+    vcdp_nat_add(if_instance->nat_id, v);
     vec_free(v);
+  } else {
+    clib_warning("Removing NAT instance %s with address %U", if_instance->nat_id, format_ip4_address, address);
+    vcdp_nat_remove(if_instance->nat_id);
   }
 }
 
@@ -176,23 +182,28 @@ int
 vcdp_nat_if_add(char *nat_id, u32 sw_if_index)
 {
   nat_main_t *nat = &nat_main;
-  nat_if_instance_t *instance;
+  nat_if_instance_t *if_instance;
+  nat_instance_t *instance;
+  u16 nat_idx;
 
   size_t uuid_len = strnlen_s(nat_id, sizeof(instance->nat_id));
   if (uuid_len == 0 || uuid_len == sizeof(instance->nat_id)) return -1;
 
-  pool_get_zero(nat->if_instances, instance);
-  instance->sw_if_index = sw_if_index;
+  instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
+  if (instance) return -1; // exists already
+
+  pool_get_zero(nat->if_instances, if_instance);
+  if_instance->sw_if_index = sw_if_index;
   vec_validate_init_empty(nat->interface_by_sw_if_index, sw_if_index, ~0);
-  nat->interface_by_sw_if_index[sw_if_index] = instance - nat->if_instances;
-  strcpy_s(instance->nat_id, sizeof(instance->nat_id), nat_id);
+  nat->interface_by_sw_if_index[sw_if_index] = if_instance - nat->if_instances;
+  strcpy_s(if_instance->nat_id, sizeof(instance->nat_id), nat_id);
 
   // Pick up existing addresses on this interface
   ip4_address_t *address = vcdp_ip4_interface_first_address(&ip4_main, sw_if_index, 0);
   if (address) {
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(instance->nat_id, v);
+    vcdp_nat_add(if_instance->nat_id, v);
     vec_free(v);
   }
 
