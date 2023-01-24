@@ -49,6 +49,7 @@ typedef enum {
     VCDP_SESSION_N_STATE
 } vcdp_session_state_t;
 
+#if REMOVE
 #define foreach_vcdp_flow_counter _(LOOKUP, "lookup")
 
 typedef enum {
@@ -57,6 +58,8 @@ typedef enum {
 #undef _
     VCDP_FLOW_N_COUNTER
 } vcdp_flow_counter_index_t;
+#endif
+
 
 #define foreach_vcdp_tenant_session_counter                                                                            \
   _(CREATED, "created", "created sessions")                                                                            \

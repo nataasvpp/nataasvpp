@@ -102,6 +102,105 @@ vcdp_nat_bind_set_unset (u32 tenant_id, char *nat_id, bool is_set)
   return 0;
 }
 
+void *
+vcdp_nat_interface_by_sw_if_index(u32 sw_if_index)
+{
+  nat_main_t *nat = &nat_main;
+
+  if (!nat->interface_by_sw_if_index || sw_if_index > (vec_len(nat->interface_by_sw_if_index) - 1))
+    return 0;
+  u32 index = nat->interface_by_sw_if_index[sw_if_index];
+  if (index == ~0)
+    return 0;
+  if (pool_is_free_index(nat->if_instances, index))
+    return 0;
+  return pool_elt_at_index(nat->if_instances, index);
+}
+
+void
+vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_index, ip4_address_t *address,
+                                       u32 address_length, u32 if_address_index, u32 is_delete)
+{
+  // Is this an interface we are interested in?
+  nat_if_instance_t *instance = vcdp_nat_interface_by_sw_if_index(sw_if_index);
+  if (!instance) return; // Not a NAT interface
+
+  // If address is deleted and address is used as a NAT pool, delete NAT instance
+  if (is_delete) {
+    clib_warning("Removing NAT instance %s with address %U", instance->nat_id, format_ip4_address, address);
+    vcdp_nat_remove(instance->nat_id);
+  } else {
+    // If address is added and address is used as a NAT pool, create NAT instance
+    clib_warning("Creating NAT instance %s with address %U", instance->nat_id, format_ip4_address, address);
+    ip4_address_t *v = 0;
+    vec_add1(v, *address);
+    vcdp_nat_add(instance->nat_id, v);
+    vec_free(v);
+  }
+}
+
+/*
+ * This helper function should be in the IP component
+ */
+static void
+vcdp_nat_register_address_changes(u32 sw_if_index, ip4_add_del_interface_address_function_t func)
+{
+  ip4_main_t *im4 = &ip4_main;
+  ip4_add_del_interface_address_callback_t cb;
+
+  cb.function = func;
+  cb.function_opaque = 0;
+  vec_add1 (im4->add_del_interface_address_callbacks, cb);
+}
+
+// Copy from ip4_forward.c to avoid dependency
+static ip4_address_t *
+vcdp_ip4_interface_first_address (ip4_main_t * im, u32 sw_if_index,
+                             ip_interface_address_t ** result_ia)
+{
+  ip_lookup_main_t *lm = &im->lookup_main;
+  ip_interface_address_t *ia = 0;
+  ip4_address_t *result = 0;
+
+  foreach_ip_interface_address(lm, ia, sw_if_index, 1 /* honor unnumbered */, ({
+                                 ip4_address_t *a = ip_interface_address_get_address(lm, ia);
+                                 result = a;
+                                 break;
+                               }));
+  if (result_ia)
+    *result_ia = result ? ia : 0;
+  return result;
+}
+
+int
+vcdp_nat_if_add(char *nat_id, u32 sw_if_index)
+{
+  nat_main_t *nat = &nat_main;
+  nat_if_instance_t *instance;
+
+  size_t uuid_len = strnlen_s(nat_id, sizeof(instance->nat_id));
+  if (uuid_len == 0 || uuid_len == sizeof(instance->nat_id)) return -1;
+
+  pool_get_zero(nat->if_instances, instance);
+  instance->sw_if_index = sw_if_index;
+  vec_validate_init_empty(nat->interface_by_sw_if_index, sw_if_index, ~0);
+  nat->interface_by_sw_if_index[sw_if_index] = instance - nat->if_instances;
+  strcpy_s(instance->nat_id, sizeof(instance->nat_id), nat_id);
+
+  // Pick up existing addresses on this interface
+  ip4_address_t *address = vcdp_ip4_interface_first_address(&ip4_main, sw_if_index, 0);
+  if (address) {
+    ip4_address_t *v = 0;
+    vec_add1(v, *address);
+    vcdp_nat_add(instance->nat_id, v);
+    vec_free(v);
+  }
+
+  // Register for address changes on this interface
+  vcdp_nat_register_address_changes(sw_if_index, vcdp_nat_ip4_add_del_interface_address);
+  return 0;
+}
+
 static clib_error_t *
 nat_init(vlib_main_t *vm)
 {

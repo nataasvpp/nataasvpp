@@ -42,14 +42,14 @@ vcdp_init_tenant_counters(vcdp_main_t *vcdp, u32 no_tenants)
 {
 #define _(x, y, z)                                                                                                     \
   vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;                                                  \
-  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;        \
-  vlib_validate_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], no_tenants);                           \
+  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].stat_segment_name = "/vcdp/tenant_session/" y;             \
+  vlib_validate_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], no_tenants);
 
   foreach_vcdp_tenant_session_counter
 #undef _
 #define _(x, y, z)                                                                                                     \
   vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;                                                        \
-  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;              \
+  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name = "/vcdp/tenant_data/" y;                      \
   vlib_validate_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], no_tenants);
 
     foreach_vcdp_tenant_data_counter

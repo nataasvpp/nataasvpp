@@ -30,6 +30,18 @@ vl_api_vcdp_nat_add_t_handler(vl_api_vcdp_nat_add_t *mp)
 }
 
 static void
+vl_api_vcdp_nat_if_add_t_handler(vl_api_vcdp_nat_if_add_t *mp)
+{
+  vl_api_vcdp_nat_if_add_reply_t *rmp;
+  nat_main_t *nat = &nat_main;
+  int rv = 0;
+  VALIDATE_SW_IF_INDEX_END(mp);
+  rv = vcdp_nat_if_add((char *)mp->nat_id, mp->sw_if_index);
+  bad_sw_if_index:
+  REPLY_MACRO_END(VL_API_VCDP_NAT_IF_ADD_REPLY);
+}
+
+static void
 vl_api_vcdp_nat_remove_t_handler(vl_api_vcdp_nat_remove_t *mp)
 {
   vl_api_vcdp_nat_remove_reply_t *rmp;

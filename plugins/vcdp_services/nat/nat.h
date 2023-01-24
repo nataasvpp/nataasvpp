@@ -29,6 +29,11 @@ typedef struct {
   ip4_address_t *addresses; // vec
 } nat_instance_t;
 
+typedef struct {
+  char nat_id[36+1];
+  u32 sw_if_index;
+} nat_if_instance_t;
+
 #define foreach_nat_rewrite_op                                                                                         \
   _(SADDR, 0x1, "src-addr")                                                                                            \
   _(SPORT, 0x2, "src-port")                                                                                            \
@@ -70,6 +75,11 @@ typedef struct {
   u16 *instance_by_tenant_idx;
   nat_per_thread_data_t *ptd;   /* vec */
   u16 msg_id_base;
+
+
+  /* Interface pool */
+  nat_if_instance_t *if_instances;
+  u32 *interface_by_sw_if_index;
 } nat_main_t;
 
 extern nat_main_t nat_main;
@@ -77,6 +87,7 @@ extern nat_main_t nat_main;
 format_function_t format_vcdp_nat_rewrite;
 
 int vcdp_nat_add(char *natid, ip4_address_t *addr);
+int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);
 int vcdp_nat_remove(char *nat_id);
 int vcdp_nat_bind_set_unset(u32 tenant_id, char *nat_id, bool is_set);
 nat_instance_t *vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx);
