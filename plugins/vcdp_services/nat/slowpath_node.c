@@ -5,17 +5,21 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 
-#define foreach_vcdp_nat_slowpath_error _(DROP, "drop")
+#define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 5 /* retries to allocate a port */
 
-typedef enum {
-#define _(sym, str) VCDP_NAT_SLOWPATH_ERROR_##sym,
+#define foreach_vcdp_nat_slowpath_error                                             \
+  _ (NO_INSTANCE, no_instance, ERROR, "no instance")
+
+typedef enum
+{
+#define _(f, n, s, d) VCDP_NAT_SLOWPATH_##f,
   foreach_vcdp_nat_slowpath_error
 #undef _
     VCDP_NAT_SLOWPATH_N_ERROR,
 } vcdp_nat_slowpath_error_t;
 
-static char *vcdp_nat_slowpath_error_strings[] = {
-#define _(sym, string) string,
+static vlib_error_desc_t vcdp_nat_slowpath_error_counters[] = {
+#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
   foreach_vcdp_nat_slowpath_error
 #undef _
 };
@@ -51,7 +55,7 @@ VCDP_SERVICE_DECLARE(nat_output)
 
 static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
-                          u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u32 session_index,
+                          u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
   uword l3_sum_delta_forward = 0;
@@ -115,8 +119,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   ip4_new_port = ip4_old_port;
   // TODO TODO TODO: Swap keys somehow somewhere???
   // TODO: The secondary key should be added by create session and modified by the NAT node?????
-  while ((++n_retries) < 5 && vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index,
-                                                                 &new_key, &h)) {
+  while ((++n_retries) < VCDP_NAT_MAX_PORT_ALLOC_RETRIES &&
+         vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
     /* Use h to try a different port */
     u32 h2 = h;
     u64 reduced = h2;
@@ -128,10 +132,10 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
       *ip4_key_dst_port = ip4_new_port;
   }
 
-  if (n_retries == 5) {
+  if (n_retries == VCDP_NAT_MAX_PORT_ALLOC_RETRIES) {
     /* Port allocation failure */
-    /* TODO: do the sensible thing, drop the packet + increase counters */
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+    vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     goto end_of_packet;
   }
 
@@ -182,6 +186,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_late_rewrite);
   session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_early_rewrite);
 
+  nat_session[0].nat_idx = nat_session[1].nat_idx = nat_idx;
+
 end_of_packet:
   vcdp_next(b[0], to_next);
   return;
@@ -216,10 +222,11 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
     if (instance) {
-      nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, session_idx,
+      nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
                                 nat_rewrites, session, to_next, b);
     } else {
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[VCDP_NAT_SLOWPATH_NO_INSTANCE];
       vcdp_next(b[0], to_next);
     }
     n_left -= 1;
@@ -249,8 +256,8 @@ VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {.name = "vcdp-nat-output",
                                               .format_trace = format_vcdp_nat_slowpath_trace,
                                               .type = VLIB_NODE_TYPE_INTERNAL,
 
-                                              .n_errors = ARRAY_LEN(vcdp_nat_slowpath_error_strings),
-                                              .error_strings = vcdp_nat_slowpath_error_strings,
+                                              .n_errors = ARRAY_LEN(vcdp_nat_slowpath_error_counters),
+                                              .error_counters = vcdp_nat_slowpath_error_counters,
                                               .sibling_of = "vcdp-lookup-ip4"
 
 };

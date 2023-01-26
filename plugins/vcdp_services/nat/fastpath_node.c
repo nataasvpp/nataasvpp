@@ -137,6 +137,7 @@ nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *sessio
 
 end_of_packet:
   vcdp_next(b[0], to_next);
+
   return;
 }
 
@@ -164,11 +165,16 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
     nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id); // broken
 
     nat_fastpath_process_one(nat_rewrite, session, to_next, b, is_terminal);
+    int dir = vcdp_direction_from_flow_index(b[0]->flow_id);
+    vlib_increment_combined_counter(nat->combined_counters + dir, thread_index,
+                                    nat_rewrite->nat_idx, 1, vlib_buffer_length_in_chain(vm, b[0]));
+
     n_left -= 1;
     b += 1;
     to_next += 1;
   }
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
+
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
     b = bufs;

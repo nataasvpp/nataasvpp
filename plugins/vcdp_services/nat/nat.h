@@ -19,6 +19,20 @@ enum {
     NAT_TENANT_N_FLAGS
 };
 
+
+typedef enum {
+  /* Simple counters. */
+  VCDP_NAT_COUNTER_SESSION_CREATED = 0,
+  VCDP_NAT_COUNTER_SESSION_EXPIRED,
+  VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES,
+  VCDP_NAT_COUNTER_N_SIMPLE,
+
+  /* Combined counters. */
+  VCDP_NAT_COUNTER_FORWARD = 0,
+  VCDP_NAT_COUNTER_REVERSE,
+  VCDP_NAT_COUNTER_N_COMBINED,
+} vcdp_nat_counter_type_t;
+
 typedef struct {
   u16 flags;
   uword out_alloc_pool_idx;
@@ -62,6 +76,7 @@ typedef struct {
   uword l3_csum_delta; // TODO: csum_t?
   uword l4_csum_delta;
   session_version_t version;
+  u16 nat_idx; // index into nat_main.instances
 } nat_rewrite_data_t;
 STATIC_ASSERT_SIZEOF(nat_rewrite_data_t, CLIB_CACHE_LINE_BYTES);
 
@@ -76,6 +91,10 @@ typedef struct {
   nat_per_thread_data_t *ptd;   /* vec */
   u16 msg_id_base;
 
+  /* Per instance counters */
+  clib_spinlock_t counter_lock;
+  vlib_simple_counter_main_t simple_counters[VCDP_NAT_COUNTER_N_SIMPLE];
+  vlib_combined_counter_main_t combined_counters[VCDP_NAT_COUNTER_N_COMBINED];
 
   /* Interface pool */
   nat_if_instance_t *if_instances;
