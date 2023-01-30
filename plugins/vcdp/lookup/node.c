@@ -94,6 +94,68 @@ vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, 
   }
 }
 
+/*
+ * Create a new VCDP session on the main thread
+ */
+VCDP_SERVICE_DECLARE(bypass)
+
+int
+vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol, ip4_address_t dst, u16 dport)
+{
+  // Create a new VCDP session
+  clib_bihash_kv_16_8_t kv = {};
+  clib_bihash_kv_8_8_t kv2;
+
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 thread_index = vlib_get_thread_index();
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+
+  ASSERT(thread_index == 0); // ??
+
+  vcdp_session_ip4_key_t k = {
+    .src = src.as_u32,
+    .dst = dst.as_u32,
+    .sport = sport,
+    .dport = dport,
+    .proto = protocol,
+  };
+
+  vcdp_session_t *session;
+  pool_get(ptd->sessions, session);
+  u32 session_idx = session - ptd->sessions;
+  u32 pseudo_flow_idx = (session_idx << 1);
+  u64 value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
+  kv.key[0] = k.as_u64[0];
+  kv.key[1] = k.as_u64[1];
+  kv.value = value;
+
+  if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
+    /* already exists */
+    pool_put(ptd->sessions, session);
+    return 1;
+  }
+  session->type = VCDP_SESSION_TYPE_IP4;
+  session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
+
+  session->session_version += 1;
+  u64 session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
+  ptd->session_id_ctr += 2; /* two at a time, because last bit is reserved for direction */
+  session->session_id = session_id;
+  session->tenant_idx = 0; // Special magic tenant???
+  session->state = VCDP_SESSION_STATE_STATIC;
+  session->rx_id = ~0;
+  kv2.key = session_id;
+  kv2.value = value;
+  clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
+
+  /* Assign service chain */
+  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(bypass);
+  clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], &k, sizeof(session->keys[0]));
+  session->proto = protocol;
+
+  return 0;
+}
+
 int
 vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
                        u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val, vcdp_service_chain_selector_t sc)
@@ -215,7 +277,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     clib_bihash_kv_16_8_t kv;
     kv.key[0] = k4->as_u64[0];
     kv.key[1] = k4->as_u64[1];
-
+    // clib_warning("Looking up: %U", format_vcdp_session_key, k4);
     if (sc[0] == VCDP_SERVICE_CHAIN_DROP_NO_KEY) {
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_KEY];
@@ -253,7 +315,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
         if (rv == -1) {
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
-        } else {
+          vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        } else { // no-create (bypass)
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
         }
         vcdp_next(b[0], current_next);

@@ -40,7 +40,8 @@ typedef enum {
 #define foreach_vcdp_session_state                                                                                     \
   _(FSOL, "embryonic")                                                                                                 \
   _(ESTABLISHED, "established")                                                                                        \
-  _(TIME_WAIT, "time-wait")
+  _(TIME_WAIT, "time-wait")                                                                                            \
+  _(STATIC, "static")
 
 typedef enum {
 #define _(val, str) VCDP_SESSION_STATE_##val,

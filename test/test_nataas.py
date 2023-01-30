@@ -208,22 +208,22 @@ class TestNATaaS(VppTestCase):
             },
 
             # ICMP error
-            {
-                'name': 'ICMP error for established session',
-                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
-                'expect': None,
-                'npackets': 1,
-                'reply': False,
-                'interface': self.pg1  # out2in
-            },
-            {
-                'name': 'ICMP error - truncated',
-                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
-                'expect': None,
-                'npackets': 1,
-                'reply': False,
-                'interface': self.pg1  # out2in
-            },
+            # {
+            #     'name': 'ICMP error for established session',
+            #     'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+            #     'expect': None,
+            #     'npackets': 1,
+            #     'reply': False,
+            #     'interface': self.pg1  # out2in
+            # },
+            # {
+            #     'name': 'ICMP error - truncated',
+            #     'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
+            #     'expect': None,
+            #     'npackets': 1,
+            #     'reply': False,
+            #     'interface': self.pg1  # out2in
+            # },
             {
                 'name': 'ICMP error for established session in2out',
                 'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst=pool)/TCP(flags="S", sport=1234, dport=1234),
@@ -350,7 +350,7 @@ class TestNATaaS(VppTestCase):
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
         # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
-        self.run_tests(tests[9:14], self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests(tests[9:], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 

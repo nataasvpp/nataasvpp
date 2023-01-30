@@ -71,6 +71,22 @@ vcdp_enable_disable_timer_expire_node(bool is_enable)
   }
 }
 
+int vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol, ip4_address_t dst, u16 dport);
+
+static void
+vcdp_static_sessions (void)
+{
+
+  int rv;
+
+  /* DHCP */
+  ip4_address_t src = {.as_u32 = 0x00000000};
+  ip4_address_t dst = {.as_u32 = 0xffffffff};
+  rv =
+    vcdp_create_session_v4_2(0, src, clib_host_to_net_u16(68), IP_PROTOCOL_UDP, dst, clib_host_to_net_u16(67));
+  ASSERT(rv == 0);
+}
+
 clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
@@ -108,6 +124,7 @@ vcdp_init(vlib_main_t *vm)
 
   vcdp_enable_disable_timer_expire_node(true);
 
+  vcdp_static_sessions();
   return 0;
 }
 

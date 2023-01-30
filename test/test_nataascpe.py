@@ -12,6 +12,7 @@ from socket import AF_INET, AF_INET6, inet_pton
 import uuid
 from framework import VppTestCase, VppTestRunner
 from scapy.layers.inet import ICMP
+from scapy.layers.dhcp import BOOTP, DHCP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
 from vpp_ip import DpoProto
 from vpp_ip_route import FibPathProto, VppIpRoute, VppRoutePath
@@ -110,6 +111,14 @@ class TestNATaaSCPE(VppTestCase):
         # in2out packets
         # TODO:Separate test table for out2in packets.
         tests = [
+            {
+                'name': 'DHCP Discover',
+                # 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
+                'send': IP(src='0.0.0.0', dst='255.255.255.255')/UDP(sport=68, dport=67)/BOOTP(chaddr='00:00:00:00:00:00', ciaddr='0.0.0.0', xid=0x01020304, flags=1)/DHCP(options=[("message-type", "discover"), "end"]),
+                'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
+                'npackets': 1,
+                'reply': True,
+            },
             {
                 'name': 'Basic UDP',
                 # 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
@@ -290,7 +299,7 @@ class TestNATaaSCPE(VppTestCase):
                         log_packet('Received packet', p)
                         self.validate(p[1], t['expect'], msg=t)
 
-                        # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
+                        # if reply is set, send reply and validate packet
                         # Send reply back through the opened sessions
                         if t.get('reply', False):
                             reply = self.make_reply(p)
