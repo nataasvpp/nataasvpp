@@ -17,6 +17,7 @@
   _(COLLISION, collision, ERROR, "hash add collision")                                                                 \
   _(CON_DROP, con_drop, INFO, "handoff drop")                                                                          \
   _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")                                       \
+  _(FULL_TABLE, full_table, ERROR, "session table is full")                                                            \
   _(NO_KEY, no_key, ERROR, "not able to create 6-tuple key")
 
 typedef enum
@@ -110,7 +111,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   if (pool_elts(ptd->sessions) == vcdp_cfg_main.no_sessions_per_thread)
     return -1;
   if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE)
-    return -1;
+    return -2;
 
   pool_get(ptd->sessions, session);
   session_idx = session - ptd->sessions;
@@ -250,12 +251,16 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
       if (rv < 0) {
         vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
-        b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
+        if (rv == -1) {
+          b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
+        } else {
+          b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
+        }
         vcdp_next(b[0], current_next);
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
-        clib_warning("Creating session failed key: %d %U", rv, format_vcdp_session_key, k4);
+        // clib_warning("Creating session failed key: %d %U", rv, format_vcdp_session_key, k4);
         goto next;
       }
 
