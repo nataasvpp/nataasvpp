@@ -8,6 +8,7 @@
 #include <vnet/feature/feature.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/common.h>
+#include <vcdp/service.h>
 #include <vnet/ip/reass/ip4_sv_reass.h>
 #include "gateway.h"
 
@@ -104,3 +105,39 @@ VNET_FEATURE_INIT(vcdp_input_feat, static) = {
   .arc_name = "ip4-unicast",
   .node_name = "vcdp-input",
 };
+
+VLIB_NODE_FN(vcdp_output_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
+  u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
+
+  u32 *from = vlib_frame_vector_args(frame);
+  u32 n_left = frame->n_vectors;
+
+  vlib_get_buffers(vm, from, bufs, n_left);
+
+  while (n_left) {
+    vnet_feature_next_u16(to_next, b[0]);
+
+    b += 1;
+    to_next += 1;
+    n_left -= 1;
+  }
+  vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
+  return frame->n_vectors;
+}
+
+VLIB_REGISTER_NODE (vcdp_output_node) = {
+  .name = "vcdp-output",
+  .vector_size = sizeof (u32),
+  // .format_trace = format_vcdp_output_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .sibling_of = "vcdp-input"
+};
+
+VCDP_SERVICE_DEFINE(output) = {
+  .node_name = "vcdp-output",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check", "vcdp-nat-early-rewrite"),
+  .is_terminal = 1};
