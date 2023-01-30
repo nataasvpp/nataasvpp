@@ -197,8 +197,19 @@ vcdp_nat_bind_set_unset (u32 tenant_id, char *nat_id, bool is_set)
 
   if (is_set) {
     nat_instance_t *instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
-    if (!instance)
-      return -1;
+    if (!instance) {
+      // Check if we have a pending tenant for the interface NAT instance
+      nat_if_instance_t *if_instance;
+      int rv = -1;
+      pool_foreach(if_instance, nat->if_instances) {
+        if (strncmp(if_instance->nat_id, nat_id, sizeof(if_instance->nat_id)) == 0) {
+          vec_add1(if_instance->pending_tenant_ids, tenant_id);
+          rv = 0;
+          break;
+        }
+      };
+      return rv;
+    }
     vec_validate_init_empty(nat->instance_by_tenant_idx, tenant_idx, 0xFFFF);
     nat->instance_by_tenant_idx[tenant_idx] = nat_idx;
   } else {
@@ -239,6 +250,13 @@ vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_i
     vec_add1(v, *address);
     vcdp_nat_add(if_instance->nat_id, v);
     vec_free(v);
+
+    // Check if we have any pending tenant bindings
+    u16 *tenant_id = 0;
+    vec_foreach(tenant_id, if_instance->pending_tenant_ids) {
+      clib_warning("Binding pending tenant: %d to NAT: %s", *tenant_id, if_instance->nat_id);
+      vcdp_nat_bind_set_unset(*tenant_id, if_instance->nat_id, true);
+    }
   } else {
     clib_warning("Removing NAT instance %s with address %U", if_instance->nat_id, format_ip4_address, address);
     vcdp_nat_remove(if_instance->nat_id);

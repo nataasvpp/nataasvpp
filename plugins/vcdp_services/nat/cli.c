@@ -74,7 +74,7 @@ vcdp_nat_show_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
     for (int i = 0; i < vec_len(instance->addresses); i++) {
       s = format(s, "%U ", format_ip4_address, &instance->addresses[i]);
     }
-    vlib_cli_output(vm, "\t%s", s);
+    vlib_cli_output(vm, "\t%v", s);
     vec_reset_length(s);
   }
   vec_free(s);

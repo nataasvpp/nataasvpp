@@ -46,6 +46,7 @@ typedef struct {
 typedef struct {
   char nat_id[36+1];
   u32 sw_if_index;
+  u16 *pending_tenant_ids; // awaiting creation of main NAT instance vec
 } nat_if_instance_t;
 
 #define foreach_nat_rewrite_op                                                                                         \
