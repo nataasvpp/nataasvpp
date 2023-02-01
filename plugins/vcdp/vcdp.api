@@ -30,6 +30,19 @@ autoreply autoendian define vcdp_set_services
   vl_api_vcdp_service_name_t services[n_services];
 };
 
+autoreply autoendian define vcdp_session_add
+{
+  u32 client_index;
+  u32 context;
+
+  u32 tenant_id;
+  vl_api_address_t src;
+  vl_api_address_t dst;
+  u8 protocol;
+  u16 sport;
+  u16 dport;
+};
+
 define vcdp_session_dump
 {
   u32 client_index;

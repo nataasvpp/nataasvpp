@@ -258,8 +258,7 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
   return pool_elt_at_index(vcdpm->tenants, idx);
 }
 
-vcdp_tenant_t *
-vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
+vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 static_always_inline u8
 vcdp_session_n_keys(vcdp_session_t *session)
@@ -278,6 +277,7 @@ u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
+int vcdp_create_session_v4_2(u32 context, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
 
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 

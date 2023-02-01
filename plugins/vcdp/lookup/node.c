@@ -100,7 +100,7 @@ vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, 
 VCDP_SERVICE_DECLARE(bypass)
 
 int
-vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol, ip4_address_t dst, u16 dport)
+vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
 {
   // Create a new VCDP session
   clib_bihash_kv_16_8_t kv = {};
@@ -111,10 +111,15 @@ vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol,
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   ASSERT(thread_index == 0); // ??
+  u16 tenant_idx;
+  vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
+  if (!tenant) return -1;
+  u32 context_id = tenant->context_id;
 
   vcdp_session_ip4_key_t k = {
-    .src = src.as_u32,
-    .dst = dst.as_u32,
+    .context_id = context_id,
+    .src = src->ip.ip4.as_u32,
+    .dst = dst->ip.ip4.as_u32,
     .sport = sport,
     .dport = dport,
     .proto = protocol,
@@ -141,7 +146,7 @@ vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol,
   u64 session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
   ptd->session_id_ctr += 2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
-  session->tenant_idx = 0; // Special magic tenant???
+  session->tenant_idx = tenant_idx;
   session->state = VCDP_SESSION_STATE_STATIC;
   session->rx_id = ~0;
   kv2.key = session_id;
@@ -149,7 +154,8 @@ vcdp_create_session_v4_2(u32 context, ip4_address_t src, u16 sport, u8 protocol,
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
 
   /* Assign service chain */
-  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(bypass);
+  vcdp_set_service_chain(tenant, VCDP_SERVICE_CHAIN_DEFAULT, session->bitmaps);
+
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], &k, sizeof(session->keys[0]));
   session->proto = protocol;
 
@@ -171,9 +177,9 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 
   // Session table is full
   if (pool_elts(ptd->sessions) == vcdp_cfg_main.no_sessions_per_thread)
-    return -1;
+    return 1;
   if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE)
-    return -2;
+    return 2;
 
   pool_get(ptd->sessions, session);
   session_idx = session - ptd->sessions;
@@ -187,7 +193,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
     /* collision - previous packet created same entry */
     pool_put(ptd->sessions, session);
-    return 1;
+    return 3;
   }
   lookup_val[0] = kv.value;
   session->type = VCDP_SESSION_TYPE_IP4;
@@ -311,32 +317,31 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
       int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
-      if (rv < 0) {
-        vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
-        if (rv == -1) {
+      switch (rv) {
+        case 1: // full
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
           vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-        } else { // no-create (bypass)
+          break;
+        case 2: // no-create (bypass)
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
-        }
+          vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
+          break;
+        case 3: // collision
+          vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
+          continue;
+      }
+      if (rv > 0) {
         vcdp_next(b[0], current_next);
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
-        // clib_warning("Creating session failed key: %d %U", rv, format_vcdp_session_key, k4);
         goto next;
       }
-
-      /* if there is collision, we just reiterate */
-      if (rv == 1) {
-        vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
-        continue;
-      }
     } else {
+      // Hit
       lv[0] = kv.value;
       hit_count++;
     }
-
     // Figure out if this is local or remote thread
     u32 flow_thread_index = vcdp_thread_index_from_lookup(lv[0]);
     if (flow_thread_index == thread_index) {

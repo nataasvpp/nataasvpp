@@ -86,6 +86,13 @@ class TestNATaaSCPE(VppTestCase):
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=tenant)
 
+        # Set static sessions
+        static_tenant = 123
+        cls.vapi.vcdp_tenant_add_del(tenant_id=static_tenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_set_services(tenant_id=static_tenant, dir=services_flags.VCDP_API_FORWARD,
+                                    n_services=len(outside_services), services=outside_services)
+        cls.vapi.vcdp_session_add(tenant_id=static_tenant, src='0.0.0.0', dst='255.255.255.255', sport=68, dport=67, protocol=17)
+
         cls.pool = pool
         cls.mss = mss
         cls.nat_id = nat_id
