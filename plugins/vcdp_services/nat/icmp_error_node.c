@@ -96,6 +96,13 @@ nat_icmp_error_process_one(nat_rewrite_data_t *nat_rewrites, vcdp_session_t *ses
     return;
   }
 
+  // Recalculate ICMP checksum
+  vlib_main_t *vm = vlib_get_main();
+  ip_csum_t sum;
+  icmp->checksum = 0;
+  sum = ip_incremental_checksum(0, icmp, vlib_buffer_length_in_chain(vm, b[0]) - ip4_header_bytes(ip));
+  icmp->checksum = ~ip_csum_fold (sum);
+
 end_of_packet:
   vcdp_next(b[0], to_next);
 
