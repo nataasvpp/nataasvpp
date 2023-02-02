@@ -4,6 +4,7 @@
 #include <vcdp_services/nat/nat.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
+#include "rewrite.h"
 
 #define foreach_vcdp_nat_fastpath_error _(DROP, "drop")
 
@@ -57,77 +58,14 @@ static_always_inline void
 nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b,
                          u8 is_terminal)
 {
-  u8 *data = vlib_buffer_get_current(b[0]);
-  u8 proto = nat_session->rewrite.proto;
-  u32 ops;
-  ip4_header_t *ip4 = (void *) data;
-  ip_csum_t ip_sum = 0, tcp_sum = 0, udp_sum = 0, icmp_sum = 0;
-  tcp_header_t *tcp;
-  udp_header_t *udp;
-  icmp46_header_t *icmp;
-  u16 *icmp_id;
-
   if (session->session_version != nat_session->version) {
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
 
-  ops = nat_session->ops;
+  nat_rewrite(vlib_buffer_get_current(b[0]), nat_session);
 
-  ip_sum = ip4->checksum;
-  ip_sum = ip_csum_sub_even(ip_sum, nat_session->l3_csum_delta);
-  ip_sum = ip_csum_fold(ip_sum);
-  ip4->checksum = ip_sum;
-
-  if (ops & NAT_REWRITE_OP_SADDR)
-    ip4->src_address = nat_session->rewrite.saddr;
-
-  if (ops & NAT_REWRITE_OP_DADDR)
-    ip4->dst_address = nat_session->rewrite.daddr;
-
-  if (proto == IP_PROTOCOL_TCP) {
-    tcp = ip4_next_header(ip4);
-    tcp_sum = tcp->checksum;
-    tcp_sum = ip_csum_sub_even(tcp_sum, nat_session->l3_csum_delta);
-    tcp_sum = ip_csum_sub_even(tcp_sum, nat_session->l4_csum_delta);
-    tcp_sum = ip_csum_fold(tcp_sum);
-    tcp->checksum = tcp_sum;
-
-    if (ops & NAT_REWRITE_OP_SPORT)
-      tcp->src_port = nat_session->rewrite.sport;
-
-    if (ops & NAT_REWRITE_OP_DPORT)
-      tcp->dst_port = nat_session->rewrite.dport;
-  } else if (proto == IP_PROTOCOL_UDP) {
-    udp = ip4_next_header(ip4);
-    udp_sum = udp->checksum;
-    udp_sum = ip_csum_sub_even(udp_sum, nat_session->l3_csum_delta);
-    udp_sum = ip_csum_sub_even(udp_sum, nat_session->l4_csum_delta);
-    udp_sum = ip_csum_fold(udp_sum);
-    udp->checksum = udp_sum;
-
-    if (ops & NAT_REWRITE_OP_SPORT)
-      udp->src_port = nat_session->rewrite.sport;
-
-    if (ops & NAT_REWRITE_OP_DPORT)
-      udp->dst_port = nat_session->rewrite.dport;
-  } else if (proto == IP_PROTOCOL_ICMP) {
-    icmp = ip4_next_header(ip4);
-    icmp_sum = icmp->checksum;
-    icmp_id = (u16 *) (icmp + 1);
-    icmp_sum = ip_csum_sub_even(icmp_sum, nat_session->l4_csum_delta);
-    icmp_sum = ip_csum_fold(icmp_sum);
-    icmp->checksum = icmp_sum;
-    if (ops & NAT_REWRITE_OP_ICMP_ID)
-      *icmp_id = nat_session->rewrite.icmp_id;
-  } else {
-    /*FIXME:, must be done at the beginning!*/
-    // vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-    // b[0]->error = node->errors[UNSUPPORTED_PROTOCOL]
-    // goto end_of_packet;
-  }
-
-  if (ops & NAT_REWRITE_OP_TXFIB)
+  if (nat_session->ops & NAT_REWRITE_OP_TXFIB)
     vnet_buffer(b[0])->sw_if_index[VLIB_TX] = nat_session->rewrite.fib_index;
 
   if (is_terminal) {
@@ -165,6 +103,7 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
     nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id); // broken
 
     nat_fastpath_process_one(nat_rewrite, session, to_next, b, is_terminal);
+
     int dir = vcdp_direction_from_flow_index(b[0]->flow_id);
     vlib_increment_combined_counter(nat->combined_counters + dir, thread_index,
                                     nat_rewrite->nat_idx, 1, vlib_buffer_length_in_chain(vm, b[0]));

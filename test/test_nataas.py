@@ -194,15 +194,15 @@ class TestNATaaS(VppTestCase):
             # Tests for TCP state machine
             {
                 'name': 'TCP state machine 3-way open #1',
-                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
-                'expect': IP(src=pool, dst=dst)/TCP(sport=1234, dport=1234),
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=12345, dport=80),
+                'expect': IP(src=pool, dst=dst)/TCP(sport=12345, dport=80),
                 'npackets': 1,
                 'reply': True,
             },
             {
                 'name': 'TCP state machine 3-way open #2',
-                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="A", sport=1234, dport=1234),
-                'expect': IP(src=pool, dst=dst)/TCP(flags="A", sport=1234, dport=1234),
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="A", sport=12345, dport=80),
+                'expect': IP(src=pool, dst=dst)/TCP(flags="A", sport=12345, dport=80),
                 'npackets': 1,
                 'reply': False,
             },
@@ -216,20 +216,32 @@ class TestNATaaS(VppTestCase):
             #     'reply': False,
             #     'interface': self.pg1  # out2in
             # },
-            # {
-            #     'name': 'ICMP error - truncated',
-            #     'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
-            #     'expect': None,
-            #     'npackets': 1,
-            #     'reply': False,
-            #     'interface': self.pg1  # out2in
-            # },
             {
-                'name': 'ICMP error for established session in2out',
-                'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst=pool)/TCP(flags="S", sport=1234, dport=1234),
+                'name': 'ICMP error - truncated',
+                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
                 'expect': None,
                 'npackets': 1,
                 'reply': False,
+                'interface': self.pg1  # out2in
+            },
+
+            {
+                'name': 'ICMP error for established session from the outside',
+                'send':   IP(src='9.9.9.9', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=pool, dst=dst)/TCP(flags="S", sport=12345, dport=80),
+                'expect':   self.encapsulate(dport, vni, IP(src='9.9.9.9', dst='10.10.10.10')/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234)),
+                'npackets': 1,
+                'reply': False,
+                'interface': self.pg1, # out2in
+                'expect_interface': self.pg0,
+                'validate': False,  # TODO: validate
+            },
+            {
+                'name': 'ICMP error for established session from the inside',
+                'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst='10.10.10.10')/TCP(flags="S", sport=80, dport=12345),
+                'expect':   IP(src=pool, dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+                'npackets': 1,
+                'reply': False,
+                'validate': False,  # TODO: validate
             },
 
             # {
@@ -242,6 +254,8 @@ class TestNATaaS(VppTestCase):
         ]
 
         for t in tests:
+            if 'expect_interface' not in t:
+                t['expect_interface'] = self.pg1
             if t.get('interface', self.pg0) == self.pg0:
                 t['send'] = self.encapsulate(dport, vni, t['send'])
                 t['interface'] = self.pg0
@@ -308,13 +322,16 @@ class TestNATaaS(VppTestCase):
                         continue
                     else:
                         try:
-                            rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
+                            rx = self.send_and_expect(t['interface'], t['send'] * t['npackets'], t['expect_interface'])
                         except Exception:
                             self.fail(f"No packet received for test {t['name']}")
                     print(self.vapi.cli("show vcdp session-table"))
                     for p in rx:
-                        log_packet('Received packet', p)
-                        self.validate(p[1], t['expect'], msg=t)
+                        log_packet('Received packet:', p[1])
+                        log_packet('Expected packet:', t['expect'])
+                        validate = t.get('validate', True)
+                        if validate:
+                            self.validate(p[1], t['expect'], msg=t)
 
                         # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
                         # Send reply back through the opened sessions

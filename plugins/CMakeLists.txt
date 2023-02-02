@@ -30,6 +30,7 @@ add_vpp_library(vcdpcore
   vcdp_services/nat/format.c
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
+  vcdp_services/nat/icmp_error_node.c
 
   gateway/gateway.c
   gateway/interface.c

@@ -195,8 +195,16 @@ format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
 format_function_t format_vcdp_session_key;
+format_function_t format_vcdp_bitmap;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
+
+// TODO: Move this to icmp46_packet.h
+typedef struct
+{
+  u16 identifier;
+  u16 sequence;
+} icmp_echo_header_t;
 
 static_always_inline u32
 vcdp_session_index_from_lookup(u64 val)

@@ -13,13 +13,6 @@
 #include <vnet/udp/udp_packet.h>
 #include <vnet/ip/icmp46_packet.h>
 
-// TODO: Move this to icmp46_packet.h
-typedef struct
-{
-  u16 identifier;
-  u16 sequence;
-} nat_icmp_echo_header_t;
-
 // select service chain
 // TCP
 // ICMP error
@@ -45,7 +38,7 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   int offset = 0;
   udp_header_t *udp;
   icmp46_header_t *icmp;
-  nat_icmp_echo_header_t *echo;
+  icmp_echo_header_t *echo;
   sc[0] = VCDP_SERVICE_CHAIN_DEFAULT;
 
   skey->src = ip->src_address.as_u32;
@@ -68,7 +61,7 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     break;
   case IP_PROTOCOL_ICMP:
     icmp = (icmp46_header_t *) ip4_next_header(ip);
-    echo = (nat_icmp_echo_header_t *) (icmp + 1);
+    echo = (icmp_echo_header_t *) (icmp + 1);
     offset = vcdp_header_offset(ip, echo, sizeof(*echo));
 
     if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
@@ -79,25 +72,26 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
       offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
       sc[0] = VCDP_SERVICE_CHAIN_ICMP_ERROR;
 
-      skey->src = inner_ip->src_address.as_u32;
-      skey->dst = inner_ip->dst_address.as_u32;
+      // Swap lookup key for ICMP error
+      skey->dst = inner_ip->src_address.as_u32;
+      skey->src = inner_ip->dst_address.as_u32;
       skey->proto = inner_ip->protocol;
       switch (inner_ip->protocol) {
       case IP_PROTOCOL_TCP:
         udp = (udp_header_t *) ip4_next_header(inner_ip);
         offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-        skey->sport = udp->src_port;
-        skey->dport = udp->dst_port;
+        skey->dport = udp->src_port;
+        skey->sport = udp->dst_port;
         break;
       case IP_PROTOCOL_UDP:
         udp = (udp_header_t *) ip4_next_header(inner_ip);
         offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-        skey->sport = udp->src_port;
-        skey->dport = udp->dst_port;
+        skey->dport = udp->src_port;
+        skey->sport = udp->dst_port;
         break;
       case IP_PROTOCOL_ICMP:
         icmp = (icmp46_header_t *) ip4_next_header(inner_ip);
-        echo = (nat_icmp_echo_header_t *) (icmp + 1);
+        echo = (icmp_echo_header_t *) (icmp + 1);
         offset = vcdp_header_offset(ip, echo, sizeof(*echo));
         if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
           skey->sport = skey->dport = echo->identifier;

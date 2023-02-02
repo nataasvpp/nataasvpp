@@ -226,6 +226,8 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 }
 
 VCDP_SERVICE_DECLARE(drop)
+VCDP_SERVICE_DECLARE(nat_icmp_error)
+VCDP_SERVICE_DECLARE(nat_early_rewrite)
 
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
@@ -354,6 +356,13 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       session = vcdp_session_at_index(ptd, session_index);
       u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
+      clib_warning("Service chain selector: %d", sc[0]);
+      if (sc[0] == VCDP_SERVICE_CHAIN_ICMP_ERROR) {
+        clib_warning("Setting Service Chain to ICMP ERROR before %U", format_vcdp_bitmap, pbmp);
+        pbmp |= VCDP_SERVICE_MASK(nat_icmp_error);
+        pbmp &= ~VCDP_SERVICE_MASK(nat_early_rewrite);
+        clib_warning("Setting Service Chain to ICMP ERROR after %U", format_vcdp_bitmap, pbmp);
+      }
       vcdp_buffer(b[0])->service_bitmap = pbmp;
 
       /* The tenant of the buffer is the tenant of the session */
