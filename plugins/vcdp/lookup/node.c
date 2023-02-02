@@ -356,7 +356,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       session = vcdp_session_at_index(ptd, session_index);
       u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
-      clib_warning("Service chain selector: %d", sc[0]);
+
       if (sc[0] == VCDP_SERVICE_CHAIN_ICMP_ERROR) {
         clib_warning("Setting Service Chain to ICMP ERROR before %U", format_vcdp_bitmap, pbmp);
         pbmp |= VCDP_SERVICE_MASK(nat_icmp_error);
