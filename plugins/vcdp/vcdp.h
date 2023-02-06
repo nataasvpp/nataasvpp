@@ -40,7 +40,8 @@ typedef enum {
 #define foreach_vcdp_session_state                                                                                     \
   _(FSOL, "embryonic")                                                                                                 \
   _(ESTABLISHED, "established")                                                                                        \
-  _(TIME_WAIT, "time-wait")
+  _(TIME_WAIT, "time-wait")                                                                                            \
+  _(STATIC, "static")
 
 typedef enum {
 #define _(val, str) VCDP_SESSION_STATE_##val,
@@ -49,6 +50,7 @@ typedef enum {
     VCDP_SESSION_N_STATE
 } vcdp_session_state_t;
 
+#if REMOVE
 #define foreach_vcdp_flow_counter _(LOOKUP, "lookup")
 
 typedef enum {
@@ -57,6 +59,8 @@ typedef enum {
 #undef _
     VCDP_FLOW_N_COUNTER
 } vcdp_flow_counter_index_t;
+#endif
+
 
 #define foreach_vcdp_tenant_session_counter                                                                            \
   _(CREATED, "created", "created sessions")                                                                            \
@@ -191,8 +195,16 @@ format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
 format_function_t format_vcdp_session_key;
+format_function_t format_vcdp_bitmap;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
+
+// TODO: Move this to icmp46_packet.h
+typedef struct
+{
+  u16 identifier;
+  u16 sequence;
+} icmp_echo_header_t;
 
 static_always_inline u32
 vcdp_session_index_from_lookup(u64 val)
@@ -254,8 +266,7 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
   return pool_elt_at_index(vcdpm->tenants, idx);
 }
 
-vcdp_tenant_t *
-vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
+vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 static_always_inline u8
 vcdp_session_n_keys(vcdp_session_t *session)
@@ -274,6 +285,7 @@ u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
+int vcdp_create_session_v4_2(u32 context, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
 
 #define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
 

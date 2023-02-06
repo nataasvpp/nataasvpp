@@ -9,6 +9,7 @@
 #include <vcdp/vcdp.api_enum.h>
 #include <vcdp/vcdp.api_types.h>
 #include <vcdp/vcdp_types_funcs.h>
+#include "vcdp.h"
 
 #define REPLY_MSG_ID_BASE vcdp->msg_id_base
 #include <vlibapi/api_helper_macros.h>
@@ -124,6 +125,21 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_in
     }
   }
   vl_api_send_msg(rp, (u8 *) mp);
+}
+
+static void
+vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vl_api_vcdp_session_add_reply_t *rmp;
+
+  ip_address_t src, dst;
+  ip_address_decode2(&mp->src, &src);
+  ip_address_decode2(&mp->dst, &dst);
+
+  int rv = vcdp_create_session_v4_2(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->protocol, &dst, clib_host_to_net_u16(mp->dport));
+
+  REPLY_MACRO_END(VL_API_VCDP_SESSION_ADD_REPLY);
 }
 
 static void

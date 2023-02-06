@@ -225,6 +225,11 @@ test_packets(void)
 clib_error_t *vlib_stats_init(vlib_main_t *vm);
 clib_error_t *vcdp_init(vlib_main_t *vm);
 
+ip_csum_t (*vnet_incremental_checksum_fp) (ip_csum_t, void *, uword);
+
+void checksum_init(void) {
+  vnet_incremental_checksum_fp = 0;
+}
 
 /*
  * Init VPP infrastructure

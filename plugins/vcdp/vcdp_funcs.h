@@ -11,10 +11,13 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   clib_bihash_kv_8_8_t kv2 = {0};
   clib_bihash_kv_16_8_t kv = {0};
   kv2.key = session->session_id;
+
+  // TODO: consider removing the if. A session must always have two keys.
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
     clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_PRIMARY], sizeof(kv.key));
     clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
   }
+
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
     clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_SECONDARY], sizeof(kv.key));
     clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
@@ -71,6 +74,8 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
     session = vcdp_session_at_index(ptd, session_index);
     session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
     session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
+  } else {
+    clib_warning("Adding secondary key failed: %U", format_vcdp_session_key, &kv.key);
   }
   return rv;
 }

@@ -9,7 +9,7 @@
 #include <vnet/feature/feature.h>
 #include <gateway/gateway.h>
 #include <vcdp/common.h>
-#include <vnet/vxlan/vxlan_packet.h>
+#include "vxlan_packet.h"
 #include <vpp_plugins/geneve/geneve_packet.h>
 #include "tunnel.h"
 

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 #
-# Copyright (c) 2022 Cisco and/or its affiliates.
+# Copyright (c) 2023 Cisco and/or its affiliates.
 
  # pylint: disable=line-too-long
  # pylint: disable=invalid-name
 
-"""NATaaS tests"""
+"""NATaaS CPE tests"""
 
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
 import uuid
 from framework import VppTestCase, VppTestRunner
 from scapy.layers.inet import ICMP
+from scapy.layers.dhcp import BOOTP, DHCP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
-from scapy.layers.vxlan import VXLAN
 from vpp_ip import DpoProto
 from vpp_ip_route import FibPathProto, VppIpRoute, VppRoutePath
 from vpp_papi import VppEnum
 
 """
-Tests for NATaaS.
+Tests for NATaaS CPE mode.
 """
 
 DEBUG = True
@@ -33,14 +33,14 @@ def log_error_packet(msg, pkt):
     print(msg)
     pkt.show2()
 
-class TestNATaaS(VppTestCase):
-    """NATaaS Test Case"""
+class TestNATaaSCPE(VppTestCase):
+    """NATaaSCPE Test Case"""
 
     maxDiff = None
     @classmethod
     def setUpClass(cls):
         '''Initialise tests'''
-        super(TestNATaaS, cls).setUpClass()
+        super(TestNATaaSCPE, cls).setUpClass()
         cls.create_pg_interfaces(range(2))
         cls.interfaces = list(cls.pg_interfaces)
         for i in cls.interfaces:
@@ -50,17 +50,12 @@ class TestNATaaS(VppTestCase):
 
         tenant=0
         outside_tenant=1000
-        dport=4789
-        dport2=4790
+
         # vrf=0
         pool = '222.1.1.1'
-        nat_id = 'nat-instance-1'
+        nat_id = 'cpe-nat-instance-1'
         tenant_flags = VppEnum.vl_api_vcdp_tenant_flags_t
-        tunnel_flags = VppEnum.vl_api_vcdp_tunnel_method_t
         services_flags = VppEnum.vl_api_vcdp_session_direction_t
-
-        tunnel_id1 = str(uuid.uuid4())
-        tunnel_id2 = str(uuid.uuid4())
 
         mss = 1280
 
@@ -74,16 +69,10 @@ class TestNATaaS(VppTestCase):
         # Bind tenant to nat
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
 
-        # Tunnels
-        cls.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id1, tenant_id=tenant, method=tunnel_flags.VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2, src=cls.pg0.local_ip4,
-                                  dst=cls.pg0.remote_ip4, dport=dport2)  # Add src_mac, dst_mac
-        cls.vapi.vcdp_tunnel_add(tunnel_id=tunnel_id2, tenant_id=tenant, method=tunnel_flags.VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2, src=cls.pg0.local_ip4,
-                                  dst=cls.pg0.remote_ip4, dport=dport)  # Add src_mac, dst_mac
-
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
         forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-nat-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tunnel-output'}]
+        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-output'}]
         outside_services = [{'data': 'vcdp-bypass'}]
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
                                     n_services=len(forward_services), services=forward_services)
@@ -92,25 +81,30 @@ class TestNATaaS(VppTestCase):
         cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
                                     n_services=len(outside_services), services=outside_services)
 
-        # MSS clamping
-        cls.vapi.vcdp_tcp_mss_enable_disable(tenant_id=tenant, ip4_mss=[mss, 0xFFFF], is_enable=True)
 
         # Enable interfaces
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
-        cls.vapi.vcdp_gateway_tunnel_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True)
+        cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=tenant)
 
-        cls.vxlan_pool = pool
-        cls.vxlan_dport = dport
-        cls.vxlan_dport2 = dport2
+        # Set static sessions
+        static_tenant = 123
+        cls.vapi.vcdp_tenant_add_del(tenant_id=static_tenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_set_services(tenant_id=static_tenant, dir=services_flags.VCDP_API_FORWARD,
+                                    n_services=len(outside_services), services=outside_services)
+        cls.vapi.vcdp_session_add(tenant_id=static_tenant, src='0.0.0.0', dst='255.255.255.255', sport=68, dport=67, protocol=17)
+
+        cls.pool = pool
         cls.mss = mss
         cls.nat_id = nat_id
         cls.tenant = tenant
-        cls.tunnel_id1 = tunnel_id1
+
+        cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")
+
 
     @classmethod
     def tearDownClass(cls):
         '''Clean up after tests'''
-        super(TestNATaaS, cls).tearDownClass()
+        super(TestNATaaSCPE, cls).tearDownClass()
         # if not cls.vpp_dead:
         #     for i in cls.pg_interfaces:
         #         i.unconfig_ip4()
@@ -119,22 +113,42 @@ class TestNATaaS(VppTestCase):
     def encapsulate(self, dport, vni, pkt):
         '''Wrap packet in Ether/IP/UDP/VXLAN. Specific to interface pg0'''
         return (
-            Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)
-            / IP(src=self.pg0.remote_ip4, dst=self.pg0.local_ip4)
-            / UDP(sport=dport, dport=dport, chksum=0)
-            / VXLAN(vni=vni, flags=0) / Ether()
-            / pkt
+            Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac) / pkt
         )
 
-
-    def gen_packets(self, pool, dst, dport, vni):
+    def gen_packets(self, pool, dst, dport):
         '''Array of tests. Returns encapsulated test packets'''
         # in2out packets
         # TODO:Separate test table for out2in packets.
         tests = [
             {
+                'name': 'DHCP Discover',
+                # 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
+                'send': IP(src='0.0.0.0', dst='255.255.255.255')/UDP(sport=68, dport=67)/BOOTP(chaddr='00:00:00:00:00:00', ciaddr='0.0.0.0', xid=0x01020304, flags=1)/DHCP(options=[("message-type", "discover"), "end"]),
+                'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
+                'npackets': 1,
+                'reply': True,
+            },
+            {
+                # Test TTL=1. Expect ICMP error
+                'name': 'Basic ICMP TTL=1',
+                'send': IP(src='10.10.10.12', dst=dst, ttl=1)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'expect_interface': self.pg0,
+            },
+            {
+                # Test hairpinning.
+                'name': 'Basic ICMP hairpinning',
+                'send': IP(src='10.10.10.12', dst=pool, ttl=2)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'expect_interface': self.pg0,
+            },
+            {
                 'name': 'Basic UDP',
-                'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
+                # 'send': IP(src='10.10.10.10', dst=dst)/UDP(sport=123, dport=456),
+                'send': IP(src=self.pg0.remote_ip4, dst=dst)/UDP(sport=123, dport=456),
                 'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
                 'npackets': 1,
                 'reply': True,
@@ -158,14 +172,6 @@ class TestNATaaS(VppTestCase):
                 'send': IP(src='10.10.10.10', dst=dst)/ICMP(id=1234),
                 'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
                 'npackets': 2,
-            },
-            {
-                # Test TTL=1. Expect ICMP error
-                'name': 'Basic ICMP TTL=1',
-                'send': IP(src='10.10.10.12', dst=dst, ttl=1)/ICMP(id=1234),
-                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
-                'npackets': 1,
-                'expect_interface': self.pg0,
             },
             {
                 'name': 'Basic ICMP',
@@ -202,28 +208,28 @@ class TestNATaaS(VppTestCase):
             # Tests for TCP state machine
             {
                 'name': 'TCP state machine 3-way open #1',
-                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=12345, dport=80),
-                'expect': IP(src=pool, dst=dst)/TCP(sport=12345, dport=80),
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': IP(src=pool, dst=dst)/TCP(sport=1234, dport=1234),
                 'npackets': 1,
                 'reply': True,
             },
             {
                 'name': 'TCP state machine 3-way open #2',
-                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="A", sport=12345, dport=80),
-                'expect': IP(src=pool, dst=dst)/TCP(flags="A", sport=12345, dport=80),
+                'send':   IP(src='10.10.10.10', dst=dst)/TCP(flags="A", sport=1234, dport=1234),
+                'expect': IP(src=pool, dst=dst)/TCP(flags="A", sport=1234, dport=1234),
                 'npackets': 1,
                 'reply': False,
             },
 
             # ICMP error
-            # {
-            #     'name': 'ICMP error for established session',
-            #     'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
-            #     'expect': None,
-            #     'npackets': 1,
-            #     'reply': False,
-            #     'interface': self.pg1  # out2in
-            # },
+            {
+                'name': 'ICMP error for established session',
+                'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': None,
+                'npackets': 1,
+                'reply': False,
+                'interface': self.pg1  # out2in
+            },
             {
                 'name': 'ICMP error - truncated',
                 'send':   IP(src='8.8.8.8', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576),
@@ -232,24 +238,12 @@ class TestNATaaS(VppTestCase):
                 'reply': False,
                 'interface': self.pg1  # out2in
             },
-
             {
-                'name': 'ICMP error for established session from the outside',
-                'send':   IP(src='9.9.9.9', dst=pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=pool, dst=dst)/TCP(flags="S", sport=12345, dport=80),
-                'expect':   self.encapsulate(dport, vni, IP(src='9.9.9.9', dst='10.10.10.10')/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234)),
+                'name': 'ICMP error for established session in2out',
+                'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst=pool)/TCP(flags="S", sport=1234, dport=1234),
+                'expect': None,
                 'npackets': 1,
                 'reply': False,
-                'interface': self.pg1, # out2in
-                'expect_interface': self.pg0,
-                'validate': False,  # TODO: validate
-            },
-            {
-                'name': 'ICMP error for established session from the inside',
-                'send':   IP(src='10.10.10.10', dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src=dst, dst='10.10.10.10')/TCP(flags="S", sport=80, dport=12345),
-                'expect':   IP(src=pool, dst=dst)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/IP(src='10.10.10.10', dst=dst)/TCP(flags="S", sport=1234, dport=1234),
-                'npackets': 1,
-                'reply': False,
-                'validate': False,  # TODO: validate
             },
 
             # {
@@ -265,7 +259,7 @@ class TestNATaaS(VppTestCase):
             if 'expect_interface' not in t:
                 t['expect_interface'] = self.pg1
             if t.get('interface', self.pg0) == self.pg0:
-                t['send'] = self.encapsulate(dport, vni, t['send'])
+                t['send'] = self.encapsulate(dport, 0, t['send'])
                 t['interface'] = self.pg0
             else:
                 interface = t['interface']
@@ -315,7 +309,7 @@ class TestNATaaS(VppTestCase):
             log_error_packet('Received VXLAN encapsulated packet', received)
             raise
 
-    def run_tests(self, tests, pool, tunnel_dport, nframes):
+    def run_tests(self, tests, pool, nframes):
         "pg0 is inside nat, pg1 is outside"
         # Send a VXLAN packet and validate that is passes through the service chain and is natively forwarded
 
@@ -325,7 +319,6 @@ class TestNATaaS(VppTestCase):
                 for f in range(nframes):
                     log_packet('Sent packet', t['send'])
                     if t['expect'] is None:
-                        print('Running test: ', t['name'], ' with no reply')
                         self.send_and_assert_no_replies(t['interface'], t['send'] * t['npackets'])
                         continue
                     else:
@@ -335,23 +328,20 @@ class TestNATaaS(VppTestCase):
                             self.fail(f"No packet received for test {t['name']}")
                     print(self.vapi.cli("show vcdp session-table"))
                     for p in rx:
-                        log_packet('Received packet:', p[1])
-                        log_packet('Expected packet:', t['expect'])
-                        validate = t.get('validate', True)
-                        if validate:
-                            self.validate(p[1], t['expect'], msg=t)
+                        log_packet('Received packet', p)
+                        self.validate(p[1], t['expect'], msg=t)
 
-                        # if reply is set, send reply and validate inside packet (VXLAN encapsulated)
+                        # if reply is set, send reply and validate packet
                         # Send reply back through the opened sessions
                         if t.get('reply', False):
                             reply = self.make_reply(p)
                             expected_reply = self.make_reply(t['send'])
-                            log_packet('Expected packet', expected_reply)
-                            log_packet('Reply to send', reply)
+                            log_packet('***Expected packet', expected_reply)
+                            log_packet('***Reply to send:', reply)
                             try:
                                 rx = self.send_and_expect(self.pg1, reply, self.pg0)
                             except:
-                                print('FAIL:', t)
+                                print('***FAIL:', t)
                                 raise
                             log_packet('Out2in packet', rx[0])
                             self.validate_reply_packet(rx[0], t['send'])
@@ -369,14 +359,13 @@ class TestNATaaS(VppTestCase):
         # # Make sure we receive on the same tunnel we sent on.
         # self.assertEqual(rx[0][UDP].dport, tunnel_dport)
 
-    def test_vxlan(self):
-        """VXLAN gateway through NAT"""
+    def test_cpe(self):
+        """CPE gateway through NAT"""
 
-        tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
+        tests = self.gen_packets(self.pool, self.pg1.remote_ip4, 8080) # Move to setup
 
-        # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
-        self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)
-        # self.run_tests(tests[9:], self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests([tests[2]], self.pool, 1)
+        # self.run_tests([tests[13]], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 
@@ -388,9 +377,7 @@ class TestNATaaS(VppTestCase):
         # print(self.vapi.cli('show vcdp tcp session-table'))
         print(self.vapi.cli('show vcdp tenant'))
 
-        self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)
 
-        print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])
         print('NAT statistics', self.statistics[f"/vcdp/nat/{self.nat_id}/forward"], self.statistics[f"/vcdp/nat/{self.nat_id}/reverse"])
         # Delete tenant prematurely
         # self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)
@@ -401,8 +388,6 @@ class TestNATaaS(VppTestCase):
         self.vapi.vcdp_nat_bind_set_unset(tenant_id=self.tenant, nat_id=self.nat_id, is_set=False)
         self.vapi.vcdp_nat_remove(nat_id=self.nat_id)
 
-        # Delete a tunnel
-        self.vapi.vcdp_tunnel_remove(tunnel_id=self.tunnel_id1)
 
         # Delete tenant
         self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)
