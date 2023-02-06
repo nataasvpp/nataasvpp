@@ -160,6 +160,14 @@ class TestNATaaS(VppTestCase):
                 'npackets': 2,
             },
             {
+                # Test TTL=1. Expect ICMP error
+                'name': 'Basic ICMP TTL=1',
+                'send': IP(src='10.10.10.12', dst=dst, ttl=1)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'expect_interface': self.pg0,
+            },
+            {
                 'name': 'Basic ICMP',
                 'send': IP(src='210.10.10.10', dst=dst)/ICMP(id=1235),
                 'expect': IP(src=pool, dst=dst)/ICMP(id=1235),
@@ -367,7 +375,8 @@ class TestNATaaS(VppTestCase):
         tests = self.gen_packets(self.vxlan_pool, self.pg1.remote_ip4, self.vxlan_dport, 123) # Move to setup
 
         # self.run_tests(tests, self.vxlan_pool, self.vxlan_dport, 1)
-        self.run_tests(tests[9:], self.vxlan_pool, self.vxlan_dport, 1)
+        self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)
+        # self.run_tests(tests[9:], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)
 

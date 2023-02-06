@@ -19,6 +19,8 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   ip_sum = ip_csum_sub_even(ip_sum, rewrite->l3_csum_delta);
   ip_sum = ip_csum_fold(ip_sum);
   ip4->checksum = ip_sum;
+  if (ip4->checksum == 0xffff)
+    ip4->checksum = 0;
 
   if (ops & NAT_REWRITE_OP_SADDR)
     ip4->src_address = rewrite->rewrite.saddr;
@@ -69,6 +71,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     // b[0]->error = node->errors[UNSUPPORTED_PROTOCOL]
     // goto end_of_packet;
   }
+  ASSERT(ip4->checksum == ip4_header_checksum(ip4));
 }
 
 #endif

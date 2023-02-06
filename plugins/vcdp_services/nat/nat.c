@@ -10,6 +10,9 @@
 #include <vcdp_services/nat/nat.h>
 #include <vppinfra/pool.h>
 #include <vlib/stats/stats.h>
+#include <vnet/fib/fib_source.h>
+#include <vnet/fib/fib_table.h>
+#include "vcdp_nat_dpo.h"
 
 nat_main_t nat_main;
 
@@ -116,6 +119,7 @@ vcdp_nat_remove_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
   clib_spinlock_unlock (&nat->counter_lock);
 }
 
+// TODO: Support prefixes as well as a vector of addresses
 int
 vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
 {
@@ -139,6 +143,26 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
   // NB: This approach only works for fixed pools
   nat_idx = instance - nat->instances;
   hash_set_mem(nat->uuid_hash, instance->nat_id, nat_idx);
+
+  // Create DPO for the pool
+  vcdp_nat_dpo_module_init();
+  dpo_id_t dpo_v4 = DPO_INVALID;
+  fib_prefix_t pfx = {
+    .fp_proto = FIB_PROTOCOL_IP4,
+    .fp_len = 32,
+    .fp_addr.ip4.as_u32 = addrs[0].as_u32,
+  };
+  // fib_source_t fib_src_low = fib_source_allocate("vcdp-nat-low", FIB_SOURCE_PRIORITY_LOW, FIB_SOURCE_BH_SIMPLE);
+  fib_source_t fib_src_hi = fib_source_allocate("vcdp-nat", FIB_SOURCE_PROXY, FIB_SOURCE_BH_SIMPLE);
+  vcdp_nat_dpo_create(DPO_PROTO_IP4, 0, &dpo_v4);
+  dpo_id_t cc_parent;
+
+  dpo_stack (vcdp_nat_dpo_type, DPO_PROTO_IP4, &cc_parent, drop_dpo_get(DPO_PROTO_IP4));
+
+  // fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+  // fib_flags |= (flags & CNAT_FLAG_EXCLUSIVE) ? FIB_ENTRY_FLAG_EXCLUSIVE : FIB_ENTRY_FLAG_INTERPOSE;
+  fib_table_entry_special_dpo_add(0, &pfx, fib_src_hi, FIB_ENTRY_FLAG_EXCLUSIVE, &dpo_v4);
+  dpo_reset(&dpo_v4);
 
   // Initialise counters. Single dimension.
   vcdp_nat_init_counters_per_instance(instance, nat_idx);

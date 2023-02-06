@@ -13,6 +13,7 @@
 #include "gateway.h"
 
 enum vcdp_input_next_e { VCDP_INPUT_NEXT_LOOKUP, VCDP_INPUT_N_NEXT };
+enum vcdp_output_next_e { VCDP_OUTPUT_NEXT_LOOKUP, VCDP_OUTPUT_N_NEXT };
 
 typedef struct {
   u16 tenant_index;
@@ -26,6 +27,15 @@ format_vcdp_input_trace(u8 *s, va_list *args)
   vcdp_input_trace_t *t = va_arg(*args, vcdp_input_trace_t *);
 
   s = format(s, "vcdp-input: tenant idx %d", t->tenant_index);
+  return s;
+}
+
+static inline u8 *
+format_vcdp_output_trace(u8 *s, va_list *args)
+{
+  CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
+  CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
+  s = format(s, "vcdp-output: terminating VCDP chain");
   return s;
 }
 
@@ -109,31 +119,32 @@ VNET_FEATURE_INIT(vcdp_input_feat, static) = {
 VLIB_NODE_FN(vcdp_output_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
-  u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
-
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
-
-  vlib_get_buffers(vm, from, bufs, n_left);
-
-  while (n_left) {
-    vnet_feature_next_u16(to_next, b[0]);
-
-    b += 1;
-    to_next += 1;
-    n_left -= 1;
+  vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_OUTPUT_NEXT_LOOKUP, n_left);
+  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
+    int i;
+    vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
+    vlib_get_buffers(vm, from, bufs, n_left);
+    b = bufs;
+    for (i = 0; i < frame->n_vectors; i++) {
+      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
+        vlib_add_trace(vm, node, b[0], 0);
+        b++;
+      } else
+        break;
+    }
   }
-  vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE (vcdp_output_node) = {
+VLIB_REGISTER_NODE(vcdp_output_node) = {
   .name = "vcdp-output",
-  .vector_size = sizeof (u32),
-  // .format_trace = format_vcdp_output_trace,
+  .vector_size = sizeof(u32),
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .sibling_of = "vcdp-input"
+  .format_trace = format_vcdp_output_trace,
+  .n_next_nodes = VCDP_OUTPUT_N_NEXT,
+  .next_nodes = { "ip4-lookup" }
 };
 
 VCDP_SERVICE_DEFINE(output) = {
@@ -141,3 +152,4 @@ VCDP_SERVICE_DEFINE(output) = {
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check", "vcdp-nat-early-rewrite"),
   .is_terminal = 1};
+

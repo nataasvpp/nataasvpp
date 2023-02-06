@@ -98,6 +98,9 @@ class TestNATaaSCPE(VppTestCase):
         cls.nat_id = nat_id
         cls.tenant = tenant
 
+        cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")
+
+
     @classmethod
     def tearDownClass(cls):
         '''Clean up after tests'''
@@ -125,6 +128,22 @@ class TestNATaaSCPE(VppTestCase):
                 'expect': IP(src=pool, dst=dst)/UDP(sport=123, dport=456),
                 'npackets': 1,
                 'reply': True,
+            },
+            {
+                # Test TTL=1. Expect ICMP error
+                'name': 'Basic ICMP TTL=1',
+                'send': IP(src='10.10.10.12', dst=dst, ttl=1)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'expect_interface': self.pg0,
+            },
+            {
+                # Test hairpinning.
+                'name': 'Basic ICMP hairpinning',
+                'send': IP(src='10.10.10.12', dst=pool, ttl=2)/ICMP(id=1234),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'expect_interface': self.pg0,
             },
             {
                 'name': 'Basic UDP',
@@ -237,8 +256,14 @@ class TestNATaaSCPE(VppTestCase):
         ]
 
         for t in tests:
-            interface = t.get('interface', self.pg0)
-            t['send'] =  Ether(src=interface.remote_mac, dst=interface.local_mac) / t['send']
+            if 'expect_interface' not in t:
+                t['expect_interface'] = self.pg1
+            if t.get('interface', self.pg0) == self.pg0:
+                t['send'] = self.encapsulate(dport, 0, t['send'])
+                t['interface'] = self.pg0
+            else:
+                interface = t['interface']
+                t['send'] =  Ether(src=interface.remote_mac, dst=interface.local_mac) / t['send']
                 
             if t['expect']: # If a reply is expected
                 t['expect'][IP].ttl -= 1
@@ -298,7 +323,7 @@ class TestNATaaSCPE(VppTestCase):
                         continue
                     else:
                         try:
-                            rx = self.send_and_expect(self.pg0, t['send'] * t['npackets'], self.pg1)
+                            rx = self.send_and_expect(t['interface'], t['send'] * t['npackets'], t['expect_interface'])
                         except Exception:
                             self.fail(f"No packet received for test {t['name']}")
                     print(self.vapi.cli("show vcdp session-table"))
@@ -339,7 +364,7 @@ class TestNATaaSCPE(VppTestCase):
 
         tests = self.gen_packets(self.pool, self.pg1.remote_ip4, 8080) # Move to setup
 
-        self.run_tests([tests[0]], self.pool, 1)
+        self.run_tests([tests[2]], self.pool, 1)
         # self.run_tests([tests[13]], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)

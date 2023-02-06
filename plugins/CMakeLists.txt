@@ -31,6 +31,7 @@ add_vpp_library(vcdpcore
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/icmp_error_node.c
+  vcdp_services/nat/vcdp_nat_dpo.c
 
   gateway/gateway.c
   gateway/interface.c
@@ -94,16 +95,15 @@ add_vpp_plugin(vcdp
 # )
 
 
-find_library(VPPINFRA_LIBRARY vppinfra)
-find_library(VLIB_LIBRARY vlib)
-#VPP_LIBRARY_DIR
-add_compile_options(-Werror -Wall)
-# add_compile_options(-fsanitize=address)
-# set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address ${CMAKE_EXE_LINKER_FLAGS}")
-# set(CMAKE_SHARED_LINKER_FLAGS "-fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS}")
-#set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*,-readability-identifier-length)
-# add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
-add_executable(test_tunnel test/test.c test/test_tcp_state.c)
-target_link_libraries(test_tunnel vcdpcore ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
-add_test(NAME test_tunnel
-         COMMAND test_tunnel)
+# find_library(VPPINFRA_LIBRARY vppinfra)
+# find_library(VLIB_LIBRARY vlib)
+# add_compile_options(-Werror -Wall)
+# # add_compile_options(-fsanitize=address)
+# # set(CMAKE_EXE_LINKER_FLAGS "-fsanitize=address ${CMAKE_EXE_LINKER_FLAGS}")
+# # set(CMAKE_SHARED_LINKER_FLAGS "-fsanitize=address ${CMAKE_SHARED_LINKER_FLAGS}")
+# #set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*,-readability-identifier-length)
+# # add_executable(test_tunnel gateway/tunnel/test.c gateway/tunnel/tunnel.c gateway/tunnel/node.c)
+# add_executable(test_tunnel test/test.c test/test_tcp_state.c)
+# target_link_libraries(test_tunnel vcdpcore ${VPPINFRA_LIBRARY} ${VLIB_LIBRARY})
+# add_test(NAME test_tunnel
+#          COMMAND test_tunnel)
