@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools","setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.pylint.main]
+
+[tool.pylint.basic]
+
+[tool.pylint."messages control"]
+disable = ["missing-function-docstring", "missing-module-docstring", "missing-class-docstring", "too-few-public-methods"]
+
+[tool.setuptools_scm]

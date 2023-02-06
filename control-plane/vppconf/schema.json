@@ -108,6 +108,14 @@
                     }
                 }
             }
+        },
+        "interface_list": {
+            "description": "A hash of interfaces available on the host",
+            "type": "object"
+        },
+        "boottime": {
+            "description": "A epoch time of when the vpp process started",
+            "type": "number"
         }
     },
     "required": [
