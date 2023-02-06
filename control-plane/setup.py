@@ -4,7 +4,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="vppconf",
-    use_scm_version=True,
+    use_scm_version={
+        "root": "..",
+    },
     install_requires=[
         "deepdiff",
     ],

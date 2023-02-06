@@ -10,3 +10,4 @@ build-backend = "setuptools.build_meta"
 disable = ["missing-function-docstring", "missing-module-docstring", "missing-class-docstring", "too-few-public-methods"]
 
 [tool.setuptools_scm]
+root = ".."
