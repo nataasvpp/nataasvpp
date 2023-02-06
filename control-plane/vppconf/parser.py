@@ -133,7 +133,6 @@ class VcdpTenant(VppCall):
         name = "vcdp_tcp_mss_enable_disable"
         params = {
             "tenant_id": tenant_id,
-            "dir": 0,
             "ip4_mss": mss,
             "is_enable": is_add,
         }
