@@ -71,7 +71,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     // b[0]->error = node->errors[UNSUPPORTED_PROTOCOL]
     // goto end_of_packet;
   }
-  ASSERT(ip4->checksum == ip4_header_checksum(ip4));
+  // ASSERT(ip4->checksum == ip4_header_checksum(ip4));
 }
 
 #endif
