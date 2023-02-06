@@ -27,7 +27,7 @@ try:
 except ImportError:
     pass
 
-# from vppconf.caller import VppAsyncBatchCaller, VppBatchCaller, VppNoopCaller
+from vppconf.caller import VppAsyncBatchCaller, VppBatchCaller, VppNoopCaller
 from vppconf.exceptions import VppControlPlaneError
 from vppconf.parser import VppConfigParser
 
@@ -190,7 +190,7 @@ def main():
     except VppControlPlaneError as exc:
         logger.error(
             "*** Programming VPP FAILED. VPP is left in an indeterminate state. %s\n",
-            repr(e),
+            repr(exc),
         )
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(traceback.print_exc())
