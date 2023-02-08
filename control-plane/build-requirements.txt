@@ -1,0 +1,9 @@
+# build requirements only
+# vppconf runtime requirements are specified in setup.py
+
+bandit
+black
+build
+pylint
+setuptools
+setuptools_scm
