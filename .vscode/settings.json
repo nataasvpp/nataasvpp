@@ -15,7 +15,8 @@
         "test_stubs.h": "c",
         "test_node_macros.h": "c",
         "vcdp.h": "c",
-        "vcdp_nat_dpo.h": "c"
+        "vcdp_nat_dpo.h": "c",
+        "ip4.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

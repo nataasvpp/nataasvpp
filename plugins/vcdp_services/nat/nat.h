@@ -106,7 +106,7 @@ extern nat_main_t nat_main;
 
 format_function_t format_vcdp_nat_rewrite;
 
-int vcdp_nat_add(char *natid, ip4_address_t *addr);
+int vcdp_nat_add(char *natid, ip4_address_t *addr, bool is_if);
 int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);
 int vcdp_nat_remove(char *nat_id);
 int vcdp_nat_bind_set_unset(u32 tenant_id, char *nat_id, bool is_set);

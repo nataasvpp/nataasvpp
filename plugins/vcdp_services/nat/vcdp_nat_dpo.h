@@ -8,7 +8,8 @@
 #include <vnet/dpo/drop_dpo.h>
 
 extern dpo_type_t vcdp_nat_dpo_type;
-void vcdp_nat_dpo_create (dpo_proto_t dproto, u32 aftr_index, dpo_id_t *dpo);
+extern dpo_type_t vcdp_nat_if_dpo_type;
+void vcdp_nat_dpo_create (dpo_proto_t dproto, u32 natindex, dpo_id_t *dpo, bool is_if);
 
 u8 *format_vcdp_nat_dpo (u8 *s, va_list *args);
 

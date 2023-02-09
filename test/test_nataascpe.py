@@ -52,7 +52,7 @@ class TestNATaaSCPE(VppTestCase):
         outside_tenant=1000
 
         # vrf=0
-        pool = '222.1.1.1'
+        pool = cls.pg1.local_ip4
         nat_id = 'cpe-nat-instance-1'
         tenant_flags = VppEnum.vl_api_vcdp_tenant_flags_t
         services_flags = VppEnum.vl_api_vcdp_session_direction_t
@@ -60,7 +60,8 @@ class TestNATaaSCPE(VppTestCase):
         mss = 1280
 
         # NATs
-        cls.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
+        # cls.vapi.vcdp_nat_add(nat_id=nat_id, addr=[pool], n_addr=len([pool]))
+        cls.vapi.vcdp_nat_if_add(nat_id=nat_id, sw_if_index=cls.pg1.sw_if_index)
 
         # Tenants
         cls.vapi.vcdp_tenant_add_del(tenant_id=tenant, context_id=0, is_add=True)
@@ -144,6 +145,15 @@ class TestNATaaSCPE(VppTestCase):
                 'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
                 'npackets': 1,
                 'expect_interface': self.pg0,
+            },
+            {
+                # Random outside packet to test bypass.
+                'name': 'Basic outside bypass',
+                'send': IP(src='8.8.8.8', dst=pool, ttl=64)/ICMP(id=8888),
+                'expect': IP(src=pool, dst=dst)/ICMP(id=1234),
+                'npackets': 1,
+                'interface': self.pg1,
+                # 'expect_interface': self.pg0,
             },
             {
                 'name': 'Basic UDP',
@@ -364,7 +374,7 @@ class TestNATaaSCPE(VppTestCase):
 
         tests = self.gen_packets(self.pool, self.pg1.remote_ip4, 8080) # Move to setup
 
-        self.run_tests([tests[2]], self.pool, 1)
+        self.run_tests(tests[2:4], self.pool, 1)
         # self.run_tests([tests[13]], self.vxlan_pool, self.vxlan_dport, 1)
 
         # verify that packet from outside does not create session (default drop for tenant 1000)

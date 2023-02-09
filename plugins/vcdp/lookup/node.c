@@ -230,7 +230,7 @@ VCDP_SERVICE_DECLARE(nat_icmp_error)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
 
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool no_create)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -303,7 +303,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       // TODO: What about traffic not for VCDP?
       // Some sort of policy lookup required? Unless no-create is set???
-      if (sc[0] > VCDP_SERVICE_CHAIN_TCP) {
+      if (no_create || sc[0] > VCDP_SERVICE_CHAIN_TCP) {
         // Not creating sessions for drop or icmp errors
         vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
         b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_KEY];
@@ -318,6 +318,12 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
+      // If local address => ip4-receive
+      // 
+#if 0
+      if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE)
+        return 2;
+#endif
       int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
       switch (rv) {
         case 1: // full
@@ -438,7 +444,15 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame) { return vcdp_lookup_inline(vm, node, frame); }
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, false);
+}
+
+VLIB_NODE_FN(vcdp_lookup_ip4_nocreate_node)(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, true);
+}
 
 VLIB_NODE_FN(vcdp_handoff_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
@@ -527,6 +541,16 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = ARRAY_LEN(vcdp_lookup_error_counters),
   .error_counters = vcdp_lookup_error_counters,
+};
+
+VLIB_REGISTER_NODE(vcdp_lookup_ip4_nocreate_node) = {
+  .name = "vcdp-lookup-ip4-nocreate",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = ARRAY_LEN(vcdp_lookup_error_counters),
+  .error_counters = vcdp_lookup_error_counters,
+  .sibling_of = "vcdp-lookup-ip4",
 };
 
 VLIB_REGISTER_NODE(vcdp_handoff_node) = {

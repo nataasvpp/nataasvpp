@@ -144,7 +144,7 @@ typedef struct {
 } vcdp_per_thread_data_t;
 
 typedef enum {
-  VCDP_TENANT_FLAG_NO_CREATE = 1 << 1,
+  VCDP_TENANT_FLAG_NO_CREATE = 1 << 0,
 } vcdp_tenant_flags_t;
 
 typedef struct {

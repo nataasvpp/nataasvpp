@@ -119,9 +119,28 @@ vcdp_nat_remove_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
   clib_spinlock_unlock (&nat->counter_lock);
 }
 
+/*
+ * Call this if the pool address isn't already in the FIB
+ */
+static void
+vcdp_nat_dpo_no_entry(ip4_address_t address, u16 nat_idx, bool is_if) {
+    // Create DPO for the pool
+  dpo_id_t dpo_v4 = DPO_INVALID;
+  fib_prefix_t pfx = {
+    .fp_proto = FIB_PROTOCOL_IP4,
+    .fp_len = 32,
+    .fp_addr.ip4.as_u32 = address.as_u32,
+  };
+  fib_source_t fib_src = fib_source_allocate("dpo-vcdp-nat_source", 0x2, FIB_SOURCE_BH_SIMPLE);
+  vcdp_nat_dpo_create(DPO_PROTO_IP4, nat_idx, &dpo_v4, is_if);
+  u32 fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+  fib_flags |= FIB_ENTRY_FLAG_EXCLUSIVE ;
+  fib_table_entry_special_dpo_add(0, &pfx, fib_src, fib_flags, &dpo_v4);
+  dpo_reset(&dpo_v4);
+}
 // TODO: Support prefixes as well as a vector of addresses
 int
-vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
+vcdp_nat_add(char *nat_id, ip4_address_t *addrs, bool is_if)
 {
   nat_main_t *nat = &nat_main;
   nat_instance_t *instance;
@@ -145,24 +164,7 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs)
   hash_set_mem(nat->uuid_hash, instance->nat_id, nat_idx);
 
   // Create DPO for the pool
-  vcdp_nat_dpo_module_init();
-  dpo_id_t dpo_v4 = DPO_INVALID;
-  fib_prefix_t pfx = {
-    .fp_proto = FIB_PROTOCOL_IP4,
-    .fp_len = 32,
-    .fp_addr.ip4.as_u32 = addrs[0].as_u32,
-  };
-  // fib_source_t fib_src_low = fib_source_allocate("vcdp-nat-low", FIB_SOURCE_PRIORITY_LOW, FIB_SOURCE_BH_SIMPLE);
-  fib_source_t fib_src_hi = fib_source_allocate("vcdp-nat", FIB_SOURCE_PROXY, FIB_SOURCE_BH_SIMPLE);
-  vcdp_nat_dpo_create(DPO_PROTO_IP4, 0, &dpo_v4);
-  dpo_id_t cc_parent;
-
-  dpo_stack (vcdp_nat_dpo_type, DPO_PROTO_IP4, &cc_parent, drop_dpo_get(DPO_PROTO_IP4));
-
-  // fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
-  // fib_flags |= (flags & CNAT_FLAG_EXCLUSIVE) ? FIB_ENTRY_FLAG_EXCLUSIVE : FIB_ENTRY_FLAG_INTERPOSE;
-  fib_table_entry_special_dpo_add(0, &pfx, fib_src_hi, FIB_ENTRY_FLAG_EXCLUSIVE, &dpo_v4);
-  dpo_reset(&dpo_v4);
+  vcdp_nat_dpo_no_entry(addrs[0], nat_idx, is_if);
 
   // Initialise counters. Single dimension.
   vcdp_nat_init_counters_per_instance(instance, nat_idx);
@@ -272,7 +274,7 @@ vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_i
     clib_warning("Creating NAT instance %s with address %U", if_instance->nat_id, format_ip4_address, address);
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(if_instance->nat_id, v);
+    vcdp_nat_add(if_instance->nat_id, v, true);
     vec_free(v);
 
     // Check if we have any pending tenant bindings
@@ -345,7 +347,7 @@ vcdp_nat_if_add(char *nat_id, u32 sw_if_index)
   if (address) {
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(if_instance->nat_id, v);
+    vcdp_nat_add(if_instance->nat_id, v, true);
     vec_free(v);
   }
 
@@ -367,6 +369,10 @@ nat_init(vlib_main_t *vm)
     pool_init_fixed(ptd->flows, vcdp_cfg_main.no_sessions_per_thread);
 
   vcdp_nat_init_counters();
+
+  // Create a FIB entry for the NAT pool addresses.
+  vcdp_nat_dpo_module_init();
+
   return 0;
 }
 VLIB_INIT_FUNCTION(nat_init);

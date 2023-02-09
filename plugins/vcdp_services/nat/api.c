@@ -24,7 +24,7 @@ vl_api_vcdp_nat_add_t_handler(vl_api_vcdp_nat_add_t *mp)
   vec_resize(addrs, mp->n_addr);
   for (int i = 0; i < mp->n_addr; i++)
     ip4_address_decode(mp->addr[i], addrs + i);
-  int rv = vcdp_nat_add((char *)mp->nat_id, addrs);
+  int rv = vcdp_nat_add((char *)mp->nat_id, addrs, false);
   vec_free(addrs);
   REPLY_MACRO_END(VL_API_VCDP_NAT_ADD_REPLY);
 }

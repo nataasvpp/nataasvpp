@@ -44,7 +44,7 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
   } else if (sw_if_index != ~0) {
     rv = vcdp_nat_if_add((char *)nat_id, sw_if_index);
   } else {
-    rv = vcdp_nat_add((char *)nat_id, addr);
+    rv = vcdp_nat_add((char *)nat_id, addr, false);
   }
   if (rv != 0) {
     err = clib_error_return (0, "NAT instance command failed");
