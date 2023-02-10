@@ -117,7 +117,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
 
   /* First try with original src port */
   ip4_new_port = ip4_old_port;
-  // TODO TODO TODO: Swap keys somehow somewhere???
+
   // TODO: The secondary key should be added by create session and modified by the NAT node?????
   while ((++n_retries) < VCDP_NAT_MAX_PORT_ALLOC_RETRIES &&
          vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
@@ -138,6 +138,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     goto end_of_packet;
   }
+  if (n_retries)
+    vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_RETRIES], thread_index, nat_idx, n_retries);
 
   /* Build the rewrites in both directions */
   l3_sum_delta_forward = ip_csum_add_even(l3_sum_delta_forward, ip4_new_src_addr);

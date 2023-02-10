@@ -35,6 +35,7 @@ static struct {
 } nat_simple_counters[] = {
   {.name = "sessions_created"},
   {.name = "sessions_expired"},
+  {.name = "port_allocation_retries"},
   {.name = "port_allocation_failures"},
 };
 

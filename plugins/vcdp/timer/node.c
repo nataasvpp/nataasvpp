@@ -3,21 +3,6 @@
 #include <vlib/vlib.h>
 #include <vcdp/vcdp_funcs.h>
 
-#define foreach_vcdp_timer_expire_error _(EXPIRED, "session expired")
-
-typedef enum {
-#define _(sym, str) VCDP_TIMER_EXPIRE_ERROR_##sym,
-  foreach_vcdp_timer_expire_error
-#undef _
-    VCDP_TIMER_EXPIRE_N_ERROR,
-} vcdp_timer_expire_error_t;
-
-static char *vcdp_timer_expire_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_timer_expire_error
-#undef _
-};
-
 // TODO: Why is this a forwarding node?
 VLIB_NODE_FN(vcdp_timer_expire_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
@@ -35,8 +20,6 @@ VLIB_NODE_FN(vcdp_timer_expire_node)
     vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
     count += 1;
   }
-  if (PREDICT_FALSE(count))
-    vlib_node_increment_counter(vm, node->node_index, VCDP_TIMER_EXPIRE_ERROR_EXPIRED, count);
 
   /* TODO: some logic so that we are not called too often */
   return 0;
@@ -44,6 +27,4 @@ VLIB_NODE_FN(vcdp_timer_expire_node)
 
 VLIB_REGISTER_NODE(vcdp_timer_expire_node) = {.name = "vcdp-timer-expire",
                                               .type = VLIB_NODE_TYPE_INPUT,
-                                              .n_errors = VCDP_TIMER_EXPIRE_N_ERROR,
-                                              .error_strings = vcdp_timer_expire_error_strings,
                                               .state = VLIB_NODE_STATE_DISABLED};

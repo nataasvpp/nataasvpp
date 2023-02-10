@@ -74,8 +74,6 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
     session = vcdp_session_at_index(ptd, session_index);
     session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
     session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
-  } else {
-    clib_warning("Adding secondary key failed: %U", format_vcdp_session_key, &kv.key);
   }
   return rv;
 }
