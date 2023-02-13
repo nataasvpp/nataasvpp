@@ -63,14 +63,22 @@ vcdp_nat_init_counters(void)
   for (i = 0; i < ARRAY_LEN(nat_simple_counters); i++) {
     name = format(0, "%s/%s%c", prefix, nat_simple_counters[i].name, 0);
     nat->simple_counters[i].stat_segment_name = (char *)name;
+    nat->simple_counters[i].name = (char *) name;
+    vlib_validate_simple_counter(&nat->simple_counters[i], 0);
+    vlib_zero_simple_counter(&nat->simple_counters[i], 0);
+
     vec_reset_length(name);
   }
   for (i = 0; i < ARRAY_LEN(nat_combined_counters); i++) {
     name = format(0, "%s/%s%c", prefix, nat_combined_counters[i].name, 0);
     nat->combined_counters[i].stat_segment_name = (char *)name;
+    nat->simple_counters[i].name = (char *) name;
+    vlib_validate_combined_counter(&nat->combined_counters[i], 0);
+    vlib_zero_combined_counter(&nat->combined_counters[i], 0);
+
     vec_reset_length(name);
   }
-  vec_free(name);
+  vec_free(name); //validate counter will copy the name
 }
 static u32 **simple_dir_entry_indices = 0;
 static u32 **combined_dir_entry_indices = 0;
@@ -100,6 +108,7 @@ vcdp_nat_init_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
     assert(symlink_index != ~0);
     vec_add1 (combined_dir_entry_indices[nat_idx], symlink_index);
   }
+
   clib_spinlock_unlock (&nat->counter_lock);
 }
 
