@@ -220,7 +220,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
-  vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_CREATED], thread_index,
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index,
                                 tenant_idx, 1);
   return 0;
 }

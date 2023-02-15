@@ -6,6 +6,7 @@
 #include <vlib/vlib.h>
 #include <vcdp/vcdp.h>
 #include <vnet/ip/ip46_address.h>
+#include <vcdp_services/nat/nat_counter.json.h>
 
 #define NAT_INVALID_TENANT_IDX  (u16)(~0)
 
@@ -18,21 +19,6 @@ enum {
 #undef _
     NAT_TENANT_N_FLAGS
 };
-
-
-typedef enum {
-  /* Simple counters. */
-  VCDP_NAT_COUNTER_SESSION_CREATED = 0,
-  VCDP_NAT_COUNTER_SESSION_EXPIRED,
-  VCDP_NAT_COUNTER_PORT_ALLOC_RETRIES,
-  VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES,
-  VCDP_NAT_COUNTER_N_SIMPLE,
-
-  /* Combined counters. */
-  VCDP_NAT_COUNTER_FORWARD = 0,
-  VCDP_NAT_COUNTER_REVERSE,
-  VCDP_NAT_COUNTER_N_COMBINED,
-} vcdp_nat_counter_type_t;
 
 typedef struct {
   u16 flags;

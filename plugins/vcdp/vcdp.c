@@ -37,25 +37,6 @@ vcdp_timer_expired(u32 *expired)
   }
 }
 
-static void
-vcdp_init_tenant_counters(vcdp_main_t *vcdp, u32 no_tenants)
-{
-#define _(x, y, z)                                                                                                     \
-  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;                                                  \
-  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].stat_segment_name = "/vcdp/tenant_session/" y;             \
-  vlib_validate_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], no_tenants);
-
-  foreach_vcdp_tenant_session_counter
-#undef _
-#define _(x, y, z)                                                                                                     \
-  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;                                                        \
-  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name = "/vcdp/tenant_data/" y;                      \
-  vlib_validate_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], no_tenants);
-
-    foreach_vcdp_tenant_data_counter
-#undef _
-}
-
 vcdp_cfg_main_t vcdp_cfg_main;
 
 static void
@@ -95,7 +76,8 @@ vcdp_init(vlib_main_t *vm)
     ptd->session_id_template |= (u64) i << template_shift;
   }
   pool_init_fixed(vcdp->tenants, vcdp_cfg_main.no_tenants);
-  vcdp_init_tenant_counters(vcdp, vcdp_cfg_main.no_tenants);
+  vcdp_tenant_init_counters_simple(vcdp->tenant_simple_ctr);
+  vcdp_tenant_init_counters_combined(vcdp->tenant_combined_ctr);
 
   u32 session_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_sessions_per_thread);
   u32 tenant_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tenants);
@@ -111,31 +93,43 @@ vcdp_init(vlib_main_t *vm)
   return 0;
 }
 
-void
-vcdp_tenant_clear_counters(vcdp_main_t *vcdp, u32 tenant_idx)
-{
-#define _(x, y, z)                                                                                                     \
-  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].name = y;                                                  \
-  vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;        \
-  vlib_zero_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], tenant_idx);
-
-  foreach_vcdp_tenant_session_counter
-#undef _
-#define _(x, y, z)                                                                                                     \
-  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].name = y;                                                        \
-  vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x].stat_segment_name = "/vcdp/per_tenant_counters/" y;              \
-  vlib_zero_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], tenant_idx);
-
-    foreach_vcdp_tenant_data_counter
-#undef _
-}
-
 static void
 vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
 {
 #define _(x, y, z) tenant->timeouts[VCDP_TIMEOUT_##x] = y;
   foreach_vcdp_timeout
 #undef _
+}
+
+static u32 **simple_dir_entry_indices = 0;
+static u32 **combined_dir_entry_indices = 0;
+static void
+vcdp_tenant_init_counters_per_instance(vcdp_main_t *vcdp, u16 tenant_idx, u32 tenant_id)
+{
+  /* Allocate counters for this interface. */
+  vec_validate(simple_dir_entry_indices, tenant_idx);
+  vec_validate(combined_dir_entry_indices, tenant_idx);
+  u8 *tenant_name = format(0, "%d%c", tenant_id, 0);
+  // clib_spinlock_lock (&nat->counter_lock);
+  vcdp_tenant_init_counters_simple_per_instance(vcdp->tenant_simple_ctr, tenant_idx, (char *) tenant_name,
+                                                        simple_dir_entry_indices[tenant_idx]);
+  vcdp_tenant_init_counters_combined_per_instance(vcdp->tenant_combined_ctr, tenant_idx, (char *) tenant_name,
+                                                       combined_dir_entry_indices[tenant_idx]);
+  vec_free(tenant_name);
+  // clib_spinlock_unlock (&nat->counter_lock);
+}
+
+static void
+vcdp_tenant_remove_counters_per_instance(vcdp_main_t *vcdp, u16 tenant_idx)
+{
+  // Remove symlink
+
+  // clib_spinlock_lock (&nat->counter_lock);
+  vcdp_tenant_remove_counters_simple_per_instance(simple_dir_entry_indices[tenant_idx]);
+  vcdp_tenant_remove_counters_combined_per_instance(combined_dir_entry_indices[tenant_idx]);
+  vec_free(simple_dir_entry_indices[tenant_idx]);
+  vec_free(combined_dir_entry_indices[tenant_idx]);
+  // clib_spinlock_unlock (&nat->counter_lock);
 }
 
 clib_error_t *
@@ -163,7 +157,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
       kv.key = tenant_id;
       kv.value = tenant_idx;
       clib_bihash_add_del_8_8(&vcdp->tenant_idx_by_id, &kv, 1);
-      vcdp_tenant_clear_counters(vcdp, tenant_idx);
+      vcdp_tenant_init_counters_per_instance(vcdp, tenant_idx, tenant_id);
     } else {
       err = clib_error_return(0,
                               "Can't create tenant with id %d"
@@ -177,7 +171,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
                               " (not found)",
                               tenant_id);
     } else {
-      vcdp_tenant_clear_counters(vcdp, kv.value);
+      vcdp_tenant_remove_counters_per_instance(vcdp, kv.value);
       pool_put_index(vcdp->tenants, kv.value);
       clib_bihash_add_del_8_8(&vcdp->tenant_idx_by_id, &kv, 0);
       /* TODO: Notify other users of "tenants" (like gw)?

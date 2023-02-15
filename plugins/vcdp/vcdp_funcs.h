@@ -23,7 +23,7 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
     clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
   }
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0);
-  vlib_increment_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_REMOVED], thread_index,
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
                                 session->tenant_idx, 1);
   pool_put_index(ptd->sessions, session_index);
 }

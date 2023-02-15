@@ -29,86 +29,31 @@ vcdp_nat_lookup_by_uuid(char *uuid, u16 *nat_idx)
   return pool_elt_at_index(nat->instances, p[0]);
 }
 
-static struct {
-  char *name;
-  u32 index;
-} nat_simple_counters[] = {
-  {.name = "sessions_created"},
-  {.name = "sessions_expired"},
-  {.name = "port_allocation_retries"},
-  {.name = "port_allocation_failures"},
-};
-
-static struct {
-  char *name;
-  u32 index;
-} nat_combined_counters[] = {
-  {.name = "forward"},
-  {.name = "reverse"},
-};
-
 // The NAT node counters are a set of two dimensional vectors (thread, NAT instance index).
 // The NAT instance names are symlinked into the vectors.
 static void
 vcdp_nat_init_counters(void)
 {
   nat_main_t *nat = &nat_main;
-  int i;
-  char *prefix = "/vcdp/nat";
-  u8 *name;
-
   clib_spinlock_init(&nat->counter_lock);
-  static_assert(ARRAY_LEN(nat_simple_counters) == ARRAY_LEN(nat->simple_counters), "Missing simple counter");
-  static_assert(ARRAY_LEN(nat_combined_counters) == ARRAY_LEN(nat->combined_counters), "Missing combined counter");
-  for (i = 0; i < ARRAY_LEN(nat_simple_counters); i++) {
-    name = format(0, "%s/%s%c", prefix, nat_simple_counters[i].name, 0);
-    nat->simple_counters[i].stat_segment_name = (char *)name;
-    nat->simple_counters[i].name = (char *) name;
-    vlib_validate_simple_counter(&nat->simple_counters[i], 0);
-    vlib_zero_simple_counter(&nat->simple_counters[i], 0);
-
-    vec_reset_length(name);
-  }
-  for (i = 0; i < ARRAY_LEN(nat_combined_counters); i++) {
-    name = format(0, "%s/%s%c", prefix, nat_combined_counters[i].name, 0);
-    nat->combined_counters[i].stat_segment_name = (char *)name;
-    nat->simple_counters[i].name = (char *) name;
-    vlib_validate_combined_counter(&nat->combined_counters[i], 0);
-    vlib_zero_combined_counter(&nat->combined_counters[i], 0);
-
-    vec_reset_length(name);
-  }
-  vec_free(name); //validate counter will copy the name
+  vcdp_nat_init_counters_simple(nat->simple_counters);
+  vcdp_nat_init_counters_combined(nat->combined_counters);
 }
+
 static u32 **simple_dir_entry_indices = 0;
 static u32 **combined_dir_entry_indices = 0;
+
 static void
 vcdp_nat_init_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
 {
   /* Allocate counters for this interface. */
-
-  u32 i, symlink_index;
   nat_main_t *nat = &nat_main;
   vec_validate (simple_dir_entry_indices, nat_idx);
   vec_validate (combined_dir_entry_indices, nat_idx);
 
   clib_spinlock_lock (&nat->counter_lock);
-  for (i = 0; i < ARRAY_LEN(nat->simple_counters); i++) {
-    vlib_validate_simple_counter(&nat->simple_counters[i], nat_idx);
-    vlib_zero_simple_counter(&nat->simple_counters[i], nat_idx);
-    symlink_index = vlib_stats_add_symlink(nat->simple_counters[i].stats_entry_index, nat_idx, "/vcdp/nat/%s/%s", instance->nat_id, nat_simple_counters[i].name);
-    assert(symlink_index != ~0);
-    vec_add1 (simple_dir_entry_indices[nat_idx], symlink_index);
-  }
-
-  for (i = 0; i < ARRAY_LEN(nat->combined_counters); i++) {
-    vlib_validate_combined_counter(&nat->combined_counters[i], nat_idx);
-    vlib_zero_combined_counter(&nat->combined_counters[i], nat_idx);
-    symlink_index = vlib_stats_add_symlink(nat->combined_counters[i].stats_entry_index, nat_idx, "/vcdp/nat/%s/%s", instance->nat_id, nat_combined_counters[i].name);
-    assert(symlink_index != ~0);
-    vec_add1 (combined_dir_entry_indices[nat_idx], symlink_index);
-  }
-
+  vcdp_nat_init_counters_simple_per_instance(nat->simple_counters, nat_idx, instance->nat_id, simple_dir_entry_indices[nat_idx]);
+  vcdp_nat_init_counters_combined_per_instance(nat->combined_counters, nat_idx, instance->nat_id, simple_dir_entry_indices[nat_idx]);
   clib_spinlock_unlock (&nat->counter_lock);
 }
 
@@ -117,13 +62,10 @@ vcdp_nat_remove_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
 {
   // Remove symlink
   nat_main_t *nat = &nat_main;
-  int i;
 
   clib_spinlock_lock (&nat->counter_lock);
-  for (i = 0; i < ARRAY_LEN(nat->simple_counters); i++)
-    vlib_stats_remove_entry (simple_dir_entry_indices[nat_idx][i]);
-  for (i = 0; i < ARRAY_LEN(nat->combined_counters); i++)
-    vlib_stats_remove_entry (combined_dir_entry_indices[nat_idx][i]);
+  vcdp_nat_remove_counters_simple_per_instance(simple_dir_entry_indices[nat_idx]);
+  vcdp_nat_remove_counters_combined_per_instance(combined_dir_entry_indices[nat_idx]);
   vec_free(simple_dir_entry_indices[nat_idx]);
   vec_free(combined_dir_entry_indices[nat_idx]);
   clib_spinlock_unlock (&nat->counter_lock);

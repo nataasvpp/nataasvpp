@@ -148,10 +148,12 @@ format_vcdp_tenant(u8 *s, va_list *args)
 u8 *
 format_vcdp_tenant_extra(u8 *s, va_list *args)
 {
-  u32 indent = format_get_indent(s);
-  vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
-  u32 tenant_idx = va_arg(*args, u32);
+  //u32 indent = format_get_indent(s);
+  //vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
+  __clib_unused u32 tenant_idx = va_arg(*args, u32);
   __clib_unused vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
+  s = format(s, "Not implemented");
+#if 0
   counter_t ctr;
   vlib_counter_t ctr2;
   s = format(s, "%s\n", "Counters:");
@@ -173,7 +175,7 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
   s = format(s, "%U%s: %d seconds\n", format_white_space, indent + 2, z, tenant->timeouts[VCDP_TIMEOUT_##x]);
   foreach_vcdp_timeout
 #undef _
-
+#endif
     return s;
 }
 

@@ -1,0 +1,26 @@
+[
+	{
+		"description": "NAT per-instance packet statistics",
+		"type": "combined",
+		"unit": "octets-and-pkts",
+		"symlink": true,
+		"prefix": "/vcdp/nat",
+		"symlink_prefix": "/vcdp/nats",
+		"counter": [
+			"rx",
+			"tx"
+		]
+	},
+	{
+		"description": "NAT per-instance error statistics",
+		"type": "simple",
+		"unit": "pkts",
+		"symlink": true,
+		"prefix": "/vcdp/nat",
+		"symlink_prefix": "/vcdp/nats",
+		"counter": [
+			"port-alloc-retries",
+			"port-alloc-failures"
+		]
+	}
+]

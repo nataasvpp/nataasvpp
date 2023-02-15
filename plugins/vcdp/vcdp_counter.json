@@ -1,0 +1,26 @@
+[
+	{
+		"description": "Per-tenant packet statistics",
+		"type": "combined",
+		"unit": "octets-and-pkts",
+		"symlink": true,
+		"prefix": "/vcdp/tenant",
+		"symlink_prefix": "/vcdp/tenants",
+		"counter": [
+			"rx",
+			"tx"
+		]
+	},
+	{
+		"description": "Per-tenant session statistics",
+		"type": "simple",
+		"unit": "sessions",
+		"symlink": true,
+		"prefix": "/vcdp/tenant",
+		"symlink_prefix": "/vcdp/tenants",
+		"counter": [
+			"created",
+			"removed"
+		]
+	}
+]

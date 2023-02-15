@@ -392,6 +392,9 @@ class TestNATaaS(VppTestCase):
 
         print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])
         print('NAT statistics', self.statistics[f"/vcdp/nat/{self.nat_id}/forward"], self.statistics[f"/vcdp/nat/{self.nat_id}/reverse"])
+
+        print('Tenant session statistics', self.statistics["/vcdp/tenant_session/created"], self.statistics["/vcdp/tenant_session/removed"])
+
         # Delete tenant prematurely
         # self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)
         # self.run_tests([tests[0]], self.vxlan_pool, self.vxlan_dport, 1)

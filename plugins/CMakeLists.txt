@@ -4,6 +4,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
+include(cmake/counter.cmake)
 #
 # Core VCDP library. None of these files can depend on APIs
 #
@@ -16,6 +17,8 @@ add_vpp_library(vcdpcore
   vcdp/service.c
   vcdp/timer/node.c
   vcdp/bypass/node.c
+  vcdp/vcdp_counter.json.c
+
 
   vcdp_services/tcp-check/node.c
   vcdp_services/tcp-check/tcp_check.c
@@ -32,6 +35,7 @@ add_vpp_library(vcdpcore
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/icmp_error_node.c
   vcdp_services/nat/vcdp_nat_dpo.c
+  vcdp_services/nat/nat_counter.json.c
 
   gateway/gateway.c
   gateway/interface.c
@@ -78,6 +82,12 @@ add_vpp_plugin(vcdp
   LINK_LIBRARIES
   vcdpcore
 
+)
+
+add_vpp_counters(
+  COUNTERS
+  vcdp_services/nat/nat_counter.json
+  vcdp/vcdp_counter.json
 )
 
 # add_vpp_library(vcdp
