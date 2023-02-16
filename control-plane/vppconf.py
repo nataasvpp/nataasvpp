@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 # Copyright(c) 2022 Cisco Systems, Inc.
 

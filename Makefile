@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2022 Cisco and/or its affiliates.
 
 VPP_DIR?=$(PWD)/../vpp
