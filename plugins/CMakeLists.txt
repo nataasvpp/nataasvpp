@@ -17,6 +17,8 @@ add_vpp_library(vcdpcore
   vcdp/service.c
   vcdp/timer/node.c
   vcdp/bypass/node.c
+  vcdp/punt/node.c
+  vcdp/punt/punt.c
   vcdp/vcdp_counter.json.c
 
 
@@ -81,6 +83,7 @@ add_vpp_plugin(vcdp
 
   LINK_LIBRARIES
   vcdpcore
+  cbor
 
 )
 
