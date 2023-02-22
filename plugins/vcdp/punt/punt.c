@@ -32,7 +32,7 @@ set_vcdp_punt_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
   pm->src.as_u32 = src.ip.ip4.as_u32;
   pm->dst.as_u32 = dst.ip.ip4.as_u32;
 
-  udp_register_dst_port(vm, 65000, vcdp_punt_input_node.index, 1 /* is_ip4*/);
+  udp_register_dst_port(vm, 33434, vcdp_punt_input_node.index, 1 /* is_ip4*/);
 
 done:
   unformat_free(line_input);
