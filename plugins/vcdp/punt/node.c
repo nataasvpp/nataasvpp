@@ -247,7 +247,7 @@ VLIB_NODE_FN(vcdp_punt_node)
 
     udp_header_t *udp = (udp_header_t *)(ip + 1);
     udp->src_port = clib_host_to_net_u16(33434);
-    udp->dst_port = clib_host_to_net_u16(65000);
+    udp->dst_port = clib_host_to_net_u16(33434);
     udp->checksum = 0;
     u8 *data = (u8 *)(udp + 1);
 
