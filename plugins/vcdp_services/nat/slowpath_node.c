@@ -53,6 +53,7 @@ format_vcdp_nat_slowpath_trace(u8 *s, va_list *args)
 VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_output)
+VCDP_SERVICE_DECLARE(vcdp_punt)
 
 static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
@@ -194,6 +195,71 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
 end_of_packet:
   vcdp_next(b[0], to_next);
   return;
+}
+
+int
+vcdp_nat_session_create(u32 session_idx, int instr, u8 proto, ip4_address_t old_addr, u16 old_port,
+                        ip4_address_t new_addr, u16 new_port)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  nat_main_t *nat = &nat_main;
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, 0); /* Not dealing with threads */
+  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, 0);
+  vcdp_session_t *session;
+  nat_rewrite_data_t *nat_session; /* rewrite data in both directions */
+
+  session = vcdp_session_at_index(ptd, session_idx);
+  nat_session = vec_elt_at_index(nptd->flows, session_idx << 1);
+
+  uword l3_sum_delta = 0;
+  uword l4_sum_delta = 0;
+
+  if (PREDICT_FALSE(session->session_version == nat_session->version)) {
+    /* NAT State is already created, certainly a packet in flight. Refresh
+     * bitmap */
+    // vcdp_buffer(b[0])->service_bitmap = session->bitmaps[b[0]->flow_id & 0x1];
+    // goto end_of_packet;
+  }
+
+  /* Build the rewrites in both directions */
+  l3_sum_delta = ip_csum_add_even(l3_sum_delta, new_addr.as_u32);
+  l3_sum_delta = ip_csum_sub_even(l3_sum_delta, old_addr.as_u32);
+  l4_sum_delta = ip_csum_add_even(l4_sum_delta, new_port);
+  l4_sum_delta = ip_csum_sub_even(l4_sum_delta, old_port);
+
+  nat_session[0].version = session->session_version;
+
+  if (PREDICT_TRUE(proto != IP_PROTOCOL_ICMP)) {
+    if (instr == 0) {
+      nat_session[0].ops = NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT;
+      nat_session[0].rewrite.sport = new_port; // TODO: Depend on instruction
+    } else {
+      nat_session[0].ops = NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT;
+      nat_session[0].rewrite.dport = new_port; // TODO: Depend on instruction
+    }
+  } else {
+    if (instr == 0) {
+      nat_session[0].ops = NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_ICMP_ID;
+    } else {
+      nat_session[0].ops = NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID;
+    }
+    nat_session[0].rewrite.icmp_id = new_port;
+  }
+
+  if (instr == 0) {
+    nat_session[0].rewrite.saddr.as_u32 = new_addr.as_u32;
+  } else {
+    nat_session[0].rewrite.daddr.as_u32 = new_addr.as_u32;
+  }
+  nat_session[0].rewrite.proto = proto;
+  nat_session[0].l3_csum_delta = l3_sum_delta;
+  nat_session[0].l4_csum_delta = l4_sum_delta;
+
+  // Remove punt?
+  session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_punt);
+  session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(nat_output);
+  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_late_rewrite);
+  return 0;
 }
 
 VLIB_NODE_FN(vcdp_nat_slowpath_node)

@@ -100,8 +100,8 @@ vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, 
  */
 VCDP_SERVICE_DECLARE(bypass)
 
-int
-vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
+u32
+vcdp_create_session_v4_core(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
 {
   // Create a new VCDP session
   clib_bihash_kv_16_8_t kv = {};
@@ -114,7 +114,7 @@ vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protoco
   ASSERT(thread_index == 0); // ??
   u16 tenant_idx;
   vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
-  if (!tenant) return -1;
+  if (!tenant) return ~0;
   u32 context_id = tenant->context_id;
 
   vcdp_session_ip4_key_t k = {
@@ -138,7 +138,7 @@ vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protoco
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
     /* already exists */
     pool_put(ptd->sessions, session);
-    return 1;
+    return ~0;
   }
   session->type = VCDP_SESSION_TYPE_IP4;
   session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
@@ -160,9 +160,15 @@ vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protoco
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], &k, sizeof(session->keys[0]));
   session->proto = protocol;
 
+  return session_idx;
+}
+int
+vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
+{
+  u32 session_idx = vcdp_create_session_v4_core(tenant_id, src, sport, protocol, dst, dport);
+  if (session_idx == ~0) return 1;
   return 0;
 }
-
 int
 vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tenant_t *tenant, u16 tenant_idx,
                        u32 thread_index, f64 time_now, vcdp_session_ip4_key_t *k, u32 rx_id, u64 *lookup_val, vcdp_service_chain_selector_t sc)
