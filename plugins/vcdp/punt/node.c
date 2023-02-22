@@ -69,32 +69,36 @@ static void process_item(cbor_item_t *item)
   u8 *rwr_addr = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 7)));
   u16 rwr_port = cbor_get_int(cbor_array_get(item, 8));
 
-  if (action != 1) {
+  switch (action) {
+  case 1: // Create session
+    u32 tenant_id = 0;
+    ip_address_t ipsrc, ipdst;
+    clib_memcpy(&ipsrc.ip.ip4, src, 4);
+    clib_memcpy(&ipdst.ip.ip4, dst, 4);
+
+    u32 session_idx = vcdp_create_session_v4_core(tenant_id, &ipsrc, clib_host_to_net_u16(sport), proto, &ipdst,
+                                                  clib_host_to_net_u16(dport));
+
+    clib_warning("Create session: %d", session_idx);
+    clib_warning("Action: %d %U %U %d %d %d %U %d", action, format_ip4_address, src, format_ip4_address, dst, sport,
+                 dport, instr, format_ip4_address, rwr_addr, rwr_port);
+
+    // Create NAT rewrite
+    ip4_address_t rewrite;
+    clib_memcpy(&rewrite, rwr_addr, 4);
+    if (instr == 0)
+      vcdp_nat_session_create(session_idx, instr, proto, ipsrc.ip.ip4, clib_host_to_net_u16(sport), rewrite,
+                              clib_host_to_net_u16(rwr_port));
+    else
+      vcdp_nat_session_create(session_idx, instr, proto, ipdst.ip.ip4, clib_host_to_net_u16(dport), rewrite,
+                              clib_host_to_net_u16(rwr_port));
+    break;
+  case 2: // Delete session
+    // NOT YET IMPLEMENTED
+  default:
     clib_warning("Action not supported: %d", action);
     return;
   }
-  // Create VCDP session
-  u32 tenant_id = 42;
-  ip_address_t ipsrc, ipdst;
-  clib_memcpy(&ipsrc.ip.ip4, src, 4);
-  clib_memcpy(&ipdst.ip.ip4, dst, 4);
-
-  u32 session_idx = vcdp_create_session_v4_core(tenant_id, &ipsrc, clib_host_to_net_u16(sport), proto, &ipdst,
-                                                        clib_host_to_net_u16(dport));
-
-  clib_warning("Create session: %d", session_idx);
-  clib_warning("Action: %d %U %U %d %d %d %U %d", action, format_ip4_address, src, format_ip4_address, dst, sport,
-                dport, instr, format_ip4_address, rwr_addr, rwr_port);
-
-  // Create NAT rewrite
-  ip4_address_t rewrite;
-  clib_memcpy(&rewrite, rwr_addr, 4);
-  if (instr == 0)
-    vcdp_nat_session_create(session_idx, instr, proto, ipsrc.ip.ip4, clib_host_to_net_u16(sport), rewrite,
-                            clib_host_to_net_u16(rwr_port));
-  else
-    vcdp_nat_session_create(session_idx, instr, proto, ipdst.ip.ip4, clib_host_to_net_u16(dport), rewrite,
-                            clib_host_to_net_u16(rwr_port));
 }
 
 VLIB_NODE_FN(vcdp_punt_input_node)
@@ -171,9 +175,6 @@ VLIB_REGISTER_NODE(vcdp_punt_input_node) = {
   .n_next_nodes = VCDP_PUNT_INPUT_N_NEXT,
   .next_nodes = { "error-drop"}
 };
-
-
-
 
 cbor_item_t *
 vcdp_encode_key (vcdp_session_ip4_key_t *key)
