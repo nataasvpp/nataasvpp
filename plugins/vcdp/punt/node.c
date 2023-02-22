@@ -257,9 +257,8 @@ VLIB_NODE_FN(vcdp_punt_node)
     cbor_array_push(root, cbor_move(vcdp_encode_key(k4)));
 
     /* Output: `buffer_size` bytes of data in the `buffer` */
-    size_t buffer_size;
-    cbor_serialize_alloc(root, &data, &buffer_size);
-
+    size_t buffer_size = 512;
+    buffer_size = cbor_serialize(root, data, buffer_size);
     clib_warning("Serialized CBOR %d bytes: %U", buffer_size, format_hex_bytes, data, buffer_size);
     cbor_describe(root, stdout);
     cbor_decref(&root);
