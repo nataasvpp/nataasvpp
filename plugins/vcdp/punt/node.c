@@ -57,7 +57,7 @@ int
 vcdp_nat_session_create(u32 session_idx, int instr, u8 proto, ip4_address_t old_addr, u16 old_port,
                         ip4_address_t new_addr, u16 new_port);
 
-  static void process_item(cbor_item_t *item)
+static void process_item(cbor_item_t *item)
 {
   u8 action = cbor_get_int(cbor_array_get(item, 0));
   u8 *src = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 2)));
@@ -69,6 +69,10 @@ vcdp_nat_session_create(u32 session_idx, int instr, u8 proto, ip4_address_t old_
   u8 *rwr_addr = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 7)));
   u16 rwr_port = cbor_get_int(cbor_array_get(item, 8));
 
+  if (action != 1) {
+    clib_warning("Action not supported: %d", action);
+    return;
+  }
   // Create VCDP session
   u32 tenant_id = 42;
   ip_address_t ipsrc, ipdst;
@@ -111,13 +115,9 @@ VLIB_NODE_FN(vcdp_punt_input_node)
 
   while (n_left > 0) {
     next[0] = VCDP_PUNT_INPUT_NEXT_DROP;
-    clib_warning("Receiving packet from control-plane");
+    clib_warning("Receiving instructions from the control-plane");
     b[0]->error = 0;
     size_t length;
-    // Decode CBOR mapping responses
-    // Create session entry. Forward and Reverse.
-    // Create NAT state
-    // Modify service chain??
     void *data = vlib_buffer_get_current(b[0]);
     udp_header_t *udp = (udp_header_t *) (vlib_buffer_get_current(b[0]) - sizeof(udp_header_t));
     length = udp->length - sizeof(udp_header_t);
@@ -184,10 +184,10 @@ vcdp_encode_key (vcdp_session_ip4_key_t *key)
   cbor_item_t *array = cbor_new_definite_array(6);
 
   cbor_array_push(array, cbor_move(cbor_build_uint8(0))); // Mapping request
-  cbor_array_push(array, cbor_move(cbor_build_uint8(key->proto)));
   cbor_array_push(array, cbor_move(src));
-  cbor_array_push(array, cbor_move(dst));
   cbor_array_push(array, cbor_move(cbor_build_uint16(clib_net_to_host_u16(key->sport))));
+  cbor_array_push(array, cbor_move(cbor_build_uint8(key->proto)));
+  cbor_array_push(array, cbor_move(dst));
   cbor_array_push(array, cbor_move(cbor_build_uint16(clib_net_to_host_u16(key->dport))));
   return array;
 }
