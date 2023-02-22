@@ -60,10 +60,10 @@ vcdp_nat_session_create(u32 session_idx, int instr, u8 proto, ip4_address_t old_
 static void process_item(cbor_item_t *item)
 {
   u8 action = cbor_get_int(cbor_array_get(item, 0));
-  u8 *src = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 2)));
-  u16 sport = cbor_get_int(cbor_array_get(item, 4));
-  u8 proto = cbor_get_int(cbor_array_get(item, 1));
-  u8 *dst = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 3)));
+  u8 *src = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 1)));
+  u16 sport = cbor_get_int(cbor_array_get(item, 2));
+  u8 proto = cbor_get_int(cbor_array_get(item, 3));
+  u8 *dst = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 4)));
   u16 dport = cbor_get_int(cbor_array_get(item, 5));
   int instr = cbor_get_int(cbor_array_get(item, 6));
   u8 *rwr_addr = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 7)));
