@@ -69,14 +69,18 @@ static void process_item(cbor_item_t *item)
   u8 *rwr_addr = cbor_bytestring_handle(cbor_tag_item(cbor_array_get(item, 7)));
   u16 rwr_port = cbor_get_int(cbor_array_get(item, 8));
 
+u32 tenant_id = 0;
+    ip_address_t ipsrc, ipdst;
+u32 session_idx;
+ip4_address_t rewrite;
+
   switch (action) {
   case 1: // Create session
-    u32 tenant_id = 0;
-    ip_address_t ipsrc, ipdst;
+    
     clib_memcpy(&ipsrc.ip.ip4, src, 4);
     clib_memcpy(&ipdst.ip.ip4, dst, 4);
 
-    u32 session_idx = vcdp_create_session_v4_core(tenant_id, &ipsrc, clib_host_to_net_u16(sport), proto, &ipdst,
+    session_idx = vcdp_create_session_v4_core(tenant_id, &ipsrc, clib_host_to_net_u16(sport), proto, &ipdst,
                                                   clib_host_to_net_u16(dport));
 
     clib_warning("Create session: %d", session_idx);
@@ -84,7 +88,7 @@ static void process_item(cbor_item_t *item)
                  dport, instr, format_ip4_address, rwr_addr, rwr_port);
 
     // Create NAT rewrite
-    ip4_address_t rewrite;
+    
     clib_memcpy(&rewrite, rwr_addr, 4);
     if (instr == 0)
       vcdp_nat_session_create(session_idx, instr, proto, ipsrc.ip.ip4, clib_host_to_net_u16(sport), rewrite,
