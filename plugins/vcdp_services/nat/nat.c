@@ -53,8 +53,8 @@ vcdp_nat_init_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
   vec_validate (combined_dir_entry_indices, nat_idx);
 
   clib_spinlock_lock (&nat->counter_lock);
-  vcdp_nat_init_counters_simple_per_instance(nat->simple_counters, nat_idx, instance->nat_id, simple_dir_entry_indices[nat_idx]);
-  vcdp_nat_init_counters_combined_per_instance(nat->combined_counters, nat_idx, instance->nat_id, simple_dir_entry_indices[nat_idx]);
+  vcdp_nat_init_counters_simple_per_instance(nat->simple_counters, nat_idx, instance->nat_id, &simple_dir_entry_indices[nat_idx]);
+  vcdp_nat_init_counters_combined_per_instance(nat->combined_counters, nat_idx, instance->nat_id, &combined_dir_entry_indices[nat_idx]);
   clib_spinlock_unlock (&nat->counter_lock);
 }
 

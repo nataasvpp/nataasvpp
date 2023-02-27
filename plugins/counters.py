@@ -66,7 +66,7 @@ class Counter(BaseModel):
 
         # Prototypes
         s += f'void {basename}_init_counters_{self.type}(vlib_{self.type}_counter_main_t *cm);\n'
-        s += f'void {basename}_init_counters_{self.type}_per_instance(vlib_{self.type}_counter_main_t *, u32, char *, u32 *);\n'
+        s += f'void {basename}_init_counters_{self.type}_per_instance(vlib_{self.type}_counter_main_t *, u32, char *, u32 **);\n'
         s += f'void {basename}_remove_counters_{self.type}_per_instance(u32 *);\n'
         return s
 
@@ -110,7 +110,7 @@ class Counter(BaseModel):
         prefix = basename.upper() + '_COUNTER_'
 
         s = 'void\n'
-        s += f'{basename}_init_counters_{self.type}_per_instance(vlib_{self.type}_counter_main_t *cm, u32 index, char *symlink_name, u32 *entry_index)\n'
+        s += f'{basename}_init_counters_{self.type}_per_instance(vlib_{self.type}_counter_main_t *cm, u32 index, char *symlink_name, u32 **entry_index)\n'
         s += '{\n'
         if self.symlink:
             s += '  u32 symlink_index;\n'
@@ -121,7 +121,7 @@ class Counter(BaseModel):
             if self.symlink:
                 symlink_name = self.statseg_symlinkname(name)
                 s += f'  symlink_index = vlib_stats_add_symlink(cm[{enum_name}].stats_entry_index, index, "{self.symlink_prefix}/%s/{symlink_name}", symlink_name);\n'
-                s += '  vec_add1(entry_index, symlink_index);\n'
+                s += '  vec_add1(*entry_index, symlink_index);\n'
 
         s += '}\n'
 

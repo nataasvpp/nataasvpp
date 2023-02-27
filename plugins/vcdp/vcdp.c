@@ -113,9 +113,9 @@ vcdp_tenant_init_counters_per_instance(vcdp_main_t *vcdp, u16 tenant_idx, u32 te
   u8 *tenant_name = format(0, "%d%c", tenant_id, 0);
   // clib_spinlock_lock (&nat->counter_lock);
   vcdp_tenant_init_counters_simple_per_instance(vcdp->tenant_simple_ctr, tenant_idx, (char *) tenant_name,
-                                                        simple_dir_entry_indices[tenant_idx]);
+                                                        &simple_dir_entry_indices[tenant_idx]);
   vcdp_tenant_init_counters_combined_per_instance(vcdp->tenant_combined_ctr, tenant_idx, (char *) tenant_name,
-                                                       combined_dir_entry_indices[tenant_idx]);
+                                                       &combined_dir_entry_indices[tenant_idx]);
   vec_free(tenant_name);
   // clib_spinlock_unlock (&nat->counter_lock);
 }

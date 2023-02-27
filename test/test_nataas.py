@@ -391,10 +391,10 @@ class TestNATaaS(VppTestCase):
 
         self.assertEqual(self.statistics["/vcdp/tunnels/no"], 2)
 
-        print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])
-        print('NAT statistics', self.statistics[f"/vcdp/nat/{self.nat_id}/forward"], self.statistics[f"/vcdp/nat/{self.nat_id}/reverse"])
+        # print('Tunnel statistics:', self.statistics["/vcdp/tunnels/rx"], self.statistics["/vcdp/tunnels/tx"])
+        print('NAT statistics', self.statistics[f"/vcdp/nats/{self.nat_id}/rx-octets-and-pkts"], self.statistics[f"/vcdp/nats/{self.nat_id}/tx-octets-and-pkts"])
 
-        print('Tenant session statistics', self.statistics["/vcdp/tenant_session/created"], self.statistics["/vcdp/tenant_session/removed"])
+        print('Tenant session statistics', self.statistics["/vcdp/tenant/created-sessions"], self.statistics["/vcdp/tenant/removed-sessions"])
 
         # Delete tenant prematurely
         # self.vapi.vcdp_tenant_add_del(tenant_id=self.tenant, is_add=False)
