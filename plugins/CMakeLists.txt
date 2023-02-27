@@ -45,6 +45,8 @@ add_vpp_library(vcdpcore
   vcdp_services/tcp-mss/tcp_mss.c
   vcdp_services/tcp-mss/node.c
 
+  vcdp_services/stats/stats.c
+  vcdp_services/stats/node.c
 
   INSTALL_HEADERS
   vcdp/vcdp.h

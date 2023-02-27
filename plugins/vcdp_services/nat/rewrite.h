@@ -4,6 +4,10 @@
 #ifndef nat_rewrite_h
 #define nat_rewrite_h
 
+#include <vnet/ip/ip.h>
+#include <vnet/tcp/tcp_packet.h>
+#include "nat.h"
+
 static inline void 
 nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
 {

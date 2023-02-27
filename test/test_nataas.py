@@ -83,8 +83,8 @@ class TestNATaaS(VppTestCase):
 
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
-        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-nat-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tunnel-output'}]
+        forward_services = [{'data': 'vcdp-stats'}, {'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-nat-output'}]
+        reverse_services = [{'data': 'vcdp-stats'}, {'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tunnel-output'}]
         outside_services = [{'data': 'vcdp-bypass'}]
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
                                     n_services=len(forward_services), services=forward_services)
