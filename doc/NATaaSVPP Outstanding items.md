@@ -56,15 +56,20 @@ gantt
 ## Task list
 ### Development
 
-- [ ] ICMP error handing
-- [ ] Hairpinning
+- [x] ICMP error handing
+- [x] Hairpinning
 - [ ] VRFs
 - [ ] Multiworker
 - [ ] Counters
 	- [ ] Data-model (split gauge / counter)
 	- [ ] Per-tunnel instance
-	- [ ] Per-tenant instance
+	- [x] Per-tenant instance
 	- [ ] Per protocol (from telemetry service)
+	- [x] Counter definitions in JSON for code generation and data model
+	- [x] Expose symlink names in stat segment (Gerrit 38298)
+- [ ] Rust stats client:
+	- [ ] Symlink names as labels
+	- [ ] Prometheus gauge vs counter
 - [ ] Telemetry service
 	- [ ] Most active speaker
 - [ ] Add more information to tracing
@@ -82,7 +87,7 @@ gantt
 ### Testing
 #### Development
 - [ ] Isolated unit tests (including per node performance and scale tests)
-- [ ] Sanitizers: clang-tidy, valigrind
+- [ ] Sanitizers: clang-tidy, valgrind
 - [ ] Complete feature tests (make test)
 	- [ ] ICMP error
 	- [ ] PMTU
