@@ -1,25 +1,25 @@
-name: Makefile CI
+name: Build, Test and Create NATaaS VPP plugin
 
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+on: [push]
 
 jobs:
   build:
 
-    runs-on: [ self-hosted ]
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
-    
-    - name: Build NATaaS plugin
-      run: make VPP_DIR=/usr/local/src/vpp build
-      
-    - name: Run check
-      run: make check
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
 
-    - name: Run feature tests
-      run: make VPP_DIR=/usr/local/src/vpp test-debug
+    - name: Run the build in the container
+      run: |
+        docker buildx build -f Dockerfile --output . .
+    - name: Look at what is here
+      run: |
+        ls -la
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: nataasvpp package
+        path: nataasvpp*.deb
