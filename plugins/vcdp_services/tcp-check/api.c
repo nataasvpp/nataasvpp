@@ -26,16 +26,12 @@ vcdp_tcp_send_session_details(vl_api_registration_t *rp, u32 context, u32 sessio
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_check_main_t *tcp = &vcdp_tcp;
   vl_api_vcdp_tcp_session_details_t *mp;
-  vcdp_session_ip4_key_t skey;
   vcdp_tenant_t *tenant;
   u32 tenant_id;
-  size_t msg_size;
-  u8 n_keys = vcdp_session_n_keys(session);
   tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
   tenant_id = tenant->tenant_id;
-  msg_size = sizeof(*mp) + sizeof(mp->keys[0]) * n_keys;
 
-  mp = vl_msg_api_alloc_zero(msg_size);
+  mp = vl_msg_api_alloc_zero(sizeof(*mp));
   mp->_vl_msg_id = ntohs(VL_API_VCDP_TCP_SESSION_DETAILS + tcp->msg_id_base);
 
   /* fill in the message */
@@ -46,13 +42,8 @@ vcdp_tcp_send_session_details(vl_api_registration_t *rp, u32 context, u32 sessio
   mp->session_idx = clib_host_to_net_u32(session_index);
   mp->session_type = vcdp_session_type_encode(session->type);
   mp->flags = vcdp_tcp_check_session_flags_encode(tcp_session->flags);
-  mp->n_keys = n_keys;
-  for (int i = 0; i < n_keys; i++) {
-    if ((i == 0 && session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
-        (i == 1 && session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
-      vcdp_session_ip4_key_encode(&skey, &mp->keys[i]);
-    }
-  }
+  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4], &mp->primary_key);
+  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4], &mp->secondary_key);
   vl_api_send_msg(rp, (u8 *) mp);
 }
 

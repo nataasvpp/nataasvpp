@@ -237,6 +237,7 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
 
 vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
+// TODO: Remove
 static_always_inline u8
 vcdp_session_n_keys(vcdp_session_t *session)
 {

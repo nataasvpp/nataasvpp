@@ -34,6 +34,6 @@ define vcdp_tcp_session_details
   u32 session_idx;
   vl_api_vcdp_session_type_t session_type;
   vl_api_vcdp_tcp_check_session_flags_t flags;
-  u8 n_keys;
-  vl_api_vcdp_session_key_t keys[n_keys];
+  vl_api_vcdp_session_key_t primary_key;
+  vl_api_vcdp_session_key_t secondary_key;
 };

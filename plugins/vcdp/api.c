@@ -92,18 +92,14 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_in
   vcdp_main_t *vcdp = &vcdp_main;
   vlib_main_t *vm = vlib_get_main();
   vl_api_vcdp_session_details_t *mp;
-  vcdp_session_ip4_key_t skey;
   vcdp_tenant_t *tenant;
   u32 tenant_id;
   f64 remaining_time;
   remaining_time = session->timer.next_expiration - vlib_time_now(vm);
-  size_t msg_size;
-  u8 n_keys = vcdp_session_n_keys(session);
   tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
   tenant_id = tenant->tenant_id;
-  msg_size = sizeof(*mp) + sizeof(mp->keys[0]) * n_keys;
 
-  mp = vl_msg_api_alloc_zero(msg_size);
+  mp = vl_msg_api_alloc_zero(sizeof(*mp));
   mp->_vl_msg_id = ntohs(VL_API_VCDP_SESSION_DETAILS + vcdp->msg_id_base);
 
   /* fill in the message */
@@ -118,13 +114,8 @@ vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_in
   mp->remaining_time = clib_host_to_net_f64(remaining_time);
   mp->forward_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_FORWARD]);
   mp->reverse_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_REVERSE]);
-  mp->n_keys = n_keys;
-  for (int i = 0; i < n_keys; i++) {
-    if ((i == 0 && session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) ||
-        (i == 1 && session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
-      vcdp_session_ip4_key_encode(&skey, &mp->keys[i]);
-    }
-  }
+  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4], &mp->primary_key);
+  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4], &mp->secondary_key);
   vl_api_send_msg(rp, (u8 *) mp);
 }
 

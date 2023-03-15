@@ -64,8 +64,8 @@ define vcdp_session_details
 /* Avoid service strings to keep it compact */
   u32 forward_bitmap;
   u32 reverse_bitmap;
-  u8 n_keys;
-  vl_api_vcdp_session_key_t keys[n_keys];
+  vl_api_vcdp_session_key_t primary_key;
+  vl_api_vcdp_session_key_t secondary_key;
 };
 
 define vcdp_tenant_dump
