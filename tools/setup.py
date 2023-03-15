@@ -13,7 +13,7 @@ setup(
     author="O. Troan",
     author_email="otroan@employees.org",
     packages=find_packages(),
-    python_requires=">=3.10",
+    python_requires=">=3.9",
     install_requires=["pydantic", "typer"],
     entry_points={
         "console_scripts": [

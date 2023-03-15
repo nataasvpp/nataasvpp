@@ -39,3 +39,17 @@ endif (VCDP_SANITIZE_ADDR)
 include(CTest)
 
 add_subdirectory(plugins)
+
+set(CPACK_PACKAGE_NAME "NATaaSVPP")
+set(CPACK_PACKAGE_VENDOR "Cisco Systems Inc")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+	"NATaaS/VPP Plugin")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_VERSION_MAJOR "1")
+set(CPACK_PACKAGE_VERSION_MINOR "0")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "CPack Component Example")
+set(CPACK_PACKAGE_CONTACT "otroan@employees.org")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Ole Troan")
+include(CPack)
+#include (Packing.cmake)

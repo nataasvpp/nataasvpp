@@ -25,12 +25,17 @@ $(debug_build_dir):
 $(release_build_dir):
 	$(call configure,release,vpp)
 
-.PHONY: build
+.PHONY: build build-release
 build: $(debug_build_dir)
 	@cmake --build $<
 
 build-release: $(release_build_dir)
 	@cmake --build $<
+
+pkg-deb: build-release
+	@cd $(release_build_dir) && cpack -G DEB
+pkg-deb-debug: build
+	@cd $(debug_build_dir) && cpack -G DEB
 
 install: $(debug_build_dir)
 	@cmake --build $< -- install
@@ -79,6 +84,8 @@ help:
 	@echo " debug-release        - run release binary with debugger"
 	@echo " clean                - wipe all build products"
 	@echo " compdb               - (re)generate compile_commands.json"
+	@echo " pkg-deb	             - build DEB packages
+	@echo " pkg-deb-debug        - build DEB debug packages
 	@echo ""
 	@echo "Make Arguments:"
 	@echo " VPP_DIR=<path>       - path to VPP directory"
