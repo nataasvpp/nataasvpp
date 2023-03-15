@@ -11,10 +11,11 @@ unset (Python3_EXECUTABLE)
 ## Launch a new search
 find_package (Python3 COMPONENTS Interpreter Development)
 
-# install PyPI Python package using pip
-set (_pypkg "pydantic")
-set (_pip_args "")
-execute_process(COMMAND ${Python3_EXECUTABLE} -m pip install ${_pip_args} ${_pypkg})
+# Install the counter generator
+execute_process(COMMAND ${Python3_EXECUTABLE} -m pip install -e ${CMAKE_SOURCE_DIR}/tools)
+set (vppcounters ${CMAKE_BINARY_DIR}/.venv/bin/vppcounters)
+
+message(STATUS, "Python3 interpreter ${Python3_EXECUTABLE}")
 
 # set (CounterName vcdp_services/nat/nat_counter)
 # add_custom_command(
@@ -38,9 +39,9 @@ macro(add_vpp_counters)
         set (CFile ${CMAKE_BINARY_DIR}/plugins/${CounterName}.c)
         message(STATUS, "Compile counter ${f} into ${HeaderFile}")
         add_custom_command(
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py --header ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName} ${CounterName}> ${HeaderFile}
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName} ${CounterName}> ${CFile}
-            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/counters.py ${CounterName}
+            COMMAND ${vppcounters} --header ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName} ${CounterName}> ${HeaderFile}
+            COMMAND ${vppcounters} ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName} ${CounterName}> ${CFile}
+            DEPENDS ${CMAKE_SOURCE_DIR}/tools/counters.py ${CounterName}
             OUTPUT ${HeaderFile} ${CFile}
 
             COMMENT "Generating code for ${CounterName}."

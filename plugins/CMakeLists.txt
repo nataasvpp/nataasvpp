@@ -85,7 +85,6 @@ add_vpp_plugin(vcdp
   vcdpcore
 
 )
-
 add_vpp_counters(
   COUNTERS
   vcdp_services/nat/nat_counter.json

@@ -9,15 +9,12 @@
 # Generate clear function
 
 import os
-import sys
 import json
 from enum import Enum
 from pydantic import BaseModel
+import typer
 
-def json_load(path):
-    '''Load counter definitions from JSON file'''
-    with open(path, encoding='utf-8') as f:
-        return json.load(f)
+app = typer.Typer()
 
 def enum_element(prefix, name):
     '''Generate enum element name'''
@@ -177,24 +174,14 @@ class Counters:
         '''Generate init functions'''
         return self.counters.gen_c(self.includepath)
 
-def main():
-    '''Main function'''
-    headers = False
-    argindex = 2
-    if len(sys.argv) > 3:
-        headers = True
-        filename = sys.argv[2]
-        argindex = 3
-    else:
-        filename = sys.argv[1]
-    relpath = sys.argv[argindex]
-    data = json_load(filename)
+@app.command()
+def main(jsonfile: typer.FileText, relpath: str, header: bool = False):
+    '''Reads counter definitions from a JSON file and generates .c/.h counter definitions for the VPP stats segment'''
+    data = json.load(jsonfile)
     c = Counters(counters=data, filename=relpath)
-    if headers:
+    if header:
         s = c.gen_headers()
     else:
         s = c.gen_c()
     print(s)
 
-if __name__ == '__main__':
-    main()
