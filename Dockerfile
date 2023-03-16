@@ -8,6 +8,7 @@ RUN apt-get -y update && apt-get install -y libvppinfra libvppinfra-dev vpp-dev
 #RUN dpkg --unpack vpp*.deb
 #RUN rm /var/lib/dpkg/info/vpp.postinst -f
 
+COPY library.cmake /usr/lib/x86_64-linux-gnu/cmake/vpp/library.cmake
 WORKDIR /build
 COPY . .
 RUN make pkg-deb-debug

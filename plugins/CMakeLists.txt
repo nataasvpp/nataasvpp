@@ -5,6 +5,8 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
 include(cmake/counter.cmake)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 #
 # Core VCDP library. None of these files can depend on APIs
 #

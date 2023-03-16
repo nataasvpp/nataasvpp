@@ -44,7 +44,7 @@ macro(add_vpp_counters)
             DEPENDS ${CMAKE_SOURCE_DIR}/tools/counters.py ${CounterName}
             OUTPUT ${HeaderFile} ${CFile}
 
-            COMMENT "Generating code for ${CounterName}."
+	    COMMENT "Generating code for ${CounterName} ${HeaderFile} ${CFile}."
         )
     endforeach()
 endmacro()
