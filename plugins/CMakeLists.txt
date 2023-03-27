@@ -80,8 +80,8 @@ add_vpp_plugin(vcdp
   gateway/gateway.api
   vcdp_services/tcp-mss/tcp_mss.api
 
-  DEPENDS
-  vcdp_api_headers
+  # DEPENDS
+  # vcdp_api_headers
 
   LINK_LIBRARIES
   vcdpcore
