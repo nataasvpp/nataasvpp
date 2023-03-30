@@ -16,14 +16,17 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   // TODO: consider removing the if. A session must always have two keys.
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
     clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_PRIMARY], sizeof(kv.key));
-    clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
+    if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0))
+      clib_warning("Failed to remove session from table4");
   }
 
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
     clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_SECONDARY], sizeof(kv.key));
-    clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0);
+    if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0))
+      clib_warning("Failed to remove session from table4 - secondary");
   }
-  clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0);
+  if (clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0))
+    clib_warning("Failed to remove session from session_index_by_id");
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
                                 session->tenant_idx, 1);
   pool_put_index(ptd->sessions, session_index);

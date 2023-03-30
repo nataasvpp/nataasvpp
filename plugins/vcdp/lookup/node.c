@@ -137,6 +137,7 @@ vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protoco
 
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
     /* already exists */
+    clib_warning("session already exists");
     pool_put(ptd->sessions, session);
     return 1;
   }
@@ -193,6 +194,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
     /* collision - previous packet created same entry */
+    clib_warning("session already exists collision");
     pool_put(ptd->sessions, session);
     return 3;
   }
@@ -257,13 +259,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   ptd->current_time = time_now;
   vcdp_expire_timers(&ptd->wheel, time_now);
 
-  // Note this is a macro
-  vcdp_session_index_iterate_expired(ptd, session_index)
-    vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
-
   // Calculate key and hash
   while (n_left) {
-    vcdp_calc_key_v4 (b[0], b[0]->flow_id, k4, h, sc);
+    vcdp_calc_key_v4(b[0], b[0]->flow_id, k4, h, sc);
 
     h += 1;
     k4 += 1;
@@ -301,7 +299,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       // - Session table is full
       // - Tenant has no-create flag
       // - Can't find key
-
       // TODO: What about traffic not for VCDP?
       // Some sort of policy lookup required? Unless no-create is set???
       if (no_create || sc[0] > VCDP_SERVICE_CHAIN_TCP) {
@@ -326,6 +323,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         return 2;
 #endif
       int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
+      if (rv != 0)
+        clib_warning("Create session failed: %U", format_vcdp_session_key, k4);
+
       switch (rv) {
         case 1: // full
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
@@ -534,6 +534,33 @@ format_vcdp_handoff_trace(u8 *s, va_list *args)
              t->next_index, t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
+
+/*
+ * Deleting sessions is done as a pre-input node to ensure it's run at the beginning of a scheduler iteration.
+ * This is to ensure that the session is removed before any other nodes are run and buffers are in flight using a
+ * removed session.
+ */
+VLIB_NODE_FN(vcdp_session_expire_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 thread_index = vm->thread_index;
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  u32 session_index;
+
+  for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
+    session_index = vec_pop(ptd->expired_sessions);
+    vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
+  }
+  return 0;
+}
+
+VLIB_REGISTER_NODE (vcdp_session_expire_node) =
+{
+  .type = VLIB_NODE_TYPE_PRE_INPUT,
+  .name = "vcdp-session-expire",
+  .state = VLIB_NODE_STATE_DISABLED,
+};
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .name = "vcdp-lookup-ip4",

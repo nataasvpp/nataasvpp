@@ -84,8 +84,8 @@ help:
 	@echo " debug-release        - run release binary with debugger"
 	@echo " clean                - wipe all build products"
 	@echo " compdb               - (re)generate compile_commands.json"
-	@echo " pkg-deb	             - build DEB packages
-	@echo " pkg-deb-debug        - build DEB debug packages
+	@echo " pkg-deb	             - build DEB packages"
+	@echo " pkg-deb-debug        - build DEB debug packages"
 	@echo ""
 	@echo "Make Arguments:"
 	@echo " VPP_DIR=<path>       - path to VPP directory"

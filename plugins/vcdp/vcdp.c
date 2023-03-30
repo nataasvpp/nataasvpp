@@ -48,7 +48,7 @@ vcdp_enable_disable_timer_expire_node(bool is_enable)
   /* Maybe disable main thread if workers are present */
   for (int i = 0; i < n_vms; i++) {
     vm = vlib_get_main_by_index(i);
-    vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) "vcdp-timer-expire");
+    vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) "vcdp-session-expire");
     vlib_node_set_state(vm, node->index, is_enable ? VLIB_NODE_STATE_POLLING : VLIB_NODE_STATE_DISABLED);
   }
 }

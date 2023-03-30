@@ -18,7 +18,7 @@
 #include <vppinfra/tw_timer_2t_1w_2048sl.h>
 #include <vppinfra/format_table.h>
 
-#include <vcdp/timer/timer.h>
+#include <vcdp/timer.h>
 #include <vcdp/vcdp_counter.json.h>
 
 
@@ -99,7 +99,7 @@ typedef struct {
   u8 state; /* see vcdp_session_state_t */ // 1
   u8 proto;                     // 1 TODO: Needed?
   u8 type; /* see vcdp_session_type_t */ // 1
-  u8 key_flags;                         // 1
+  u8 key_flags;                 // 1
 } vcdp_session_t; /* TODO: optimise mem layout */
 STATIC_ASSERT_SIZEOF(vcdp_session_t, 128);
 

@@ -17,7 +17,6 @@ add_vpp_library(vcdpcore
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/service.c
-  vcdp/timer/node.c
   vcdp/bypass/node.c
   vcdp/vcdp_counter.json.c
 
@@ -56,7 +55,7 @@ add_vpp_library(vcdpcore
   vcdp/vcdp_funcs.h
   vcdp/vcdp_types_funcs.h
   vcdp/common.h
-  vcdp/timer/timer.h
+  vcdp/timer.h
 )
 
 add_vpp_plugin(vcdp
