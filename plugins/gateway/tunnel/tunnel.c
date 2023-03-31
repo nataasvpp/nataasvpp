@@ -262,6 +262,8 @@ vcdp_tunnel_enable_disable_input(u32 sw_if_index, bool is_enable)
 clib_error_t *
 vcdp_tunnel_init(vlib_main_t *vm)
 {
+  if (vcdp_cfg_main.no_tunnels == 0)
+    return 0;
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
   tm->log_default = vlib_log_register_class("vcdp", 0);
   tm->uuid_hash = hash_create_string(0, sizeof(uword));

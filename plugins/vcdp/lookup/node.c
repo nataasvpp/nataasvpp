@@ -178,8 +178,9 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   u64 session_id;
 
   // Session table is full
-  if (pool_elts(ptd->sessions) == vcdp_cfg_main.no_sessions_per_thread)
+  if (pool_elts(ptd->sessions) >= vcdp_cfg_main.no_sessions_per_thread) {
     return 1;
+  }
   if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE)
     return 2;
 
@@ -323,9 +324,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         return 2;
 #endif
       int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
-      if (rv != 0)
-        clib_warning("Create session failed: %U", format_vcdp_session_key, k4);
-
       switch (rv) {
         case 1: // full
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
@@ -559,7 +557,6 @@ VLIB_REGISTER_NODE (vcdp_session_expire_node) =
 {
   .type = VLIB_NODE_TYPE_PRE_INPUT,
   .name = "vcdp-session-expire",
-  .state = VLIB_NODE_STATE_DISABLED,
 };
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {

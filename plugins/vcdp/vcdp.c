@@ -40,19 +40,6 @@ vcdp_timer_expired(u32 *expired)
 
 vcdp_cfg_main_t vcdp_cfg_main;
 
-static void
-vcdp_enable_disable_timer_expire_node(bool is_enable)
-{
-  vlib_main_t *vm;
-  u32 n_vms = vlib_num_workers() + 1;
-  /* Maybe disable main thread if workers are present */
-  for (int i = 0; i < n_vms; i++) {
-    vm = vlib_get_main_by_index(i);
-    vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) "vcdp-session-expire");
-    vlib_node_set_state(vm, node->index, is_enable ? VLIB_NODE_STATE_POLLING : VLIB_NODE_STATE_DISABLED);
-  }
-}
-
 clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
@@ -88,8 +75,6 @@ vcdp_init(vlib_main_t *vm)
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 
   vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
-
-  vcdp_enable_disable_timer_expire_node(true);
 
   return 0;
 }

@@ -318,9 +318,11 @@ nat_init(vlib_main_t *vm)
   nat->uuid_hash = hash_create_string(0, sizeof(uword));
   pool_init_fixed(nat->instances, vcdp_cfg_main.no_nat_instances);
   vec_validate(nat->ptd, n_threads);
-  vec_foreach (ptd, nat->ptd)
-    pool_init_fixed(ptd->flows, vcdp_cfg_main.no_sessions_per_thread);
 
+  // Two flows per session
+  vec_foreach (ptd, nat->ptd) {
+    vec_validate(ptd->flows, 2 * vcdp_cfg_main.no_sessions_per_thread);
+  }
   vcdp_nat_init_counters();
 
   // Create a FIB entry for the NAT pool addresses.
