@@ -43,14 +43,27 @@ vcdp_cfg_main_t vcdp_cfg_main;
 static void
 vcdp_enable_disable_timer_expire_node(bool is_enable)
 {
-  vlib_main_t *vm;
-  u32 n_vms = vlib_num_workers() + 1;
-  /* Maybe disable main thread if workers are present */
-  for (int i = 0; i < n_vms; i++) {
-    vm = vlib_get_main_by_index(i);
+  u32 n_threads = vlib_get_n_threads();
+
+  for (int i = 0; i < n_threads; i++) {
+    vlib_main_t *vm = vlib_get_main_by_index(i);
     vlib_node_t *node = vlib_get_node_by_name(vm, (u8 *) "vcdp-session-expire");
-    vlib_node_set_state(vm, node->index, is_enable ? VLIB_NODE_STATE_POLLING : VLIB_NODE_STATE_DISABLED);
+    if (i == 0 && n_threads > 1) {
+      vlib_node_set_state(vm, node->index, VLIB_NODE_STATE_DISABLED);
+      continue;
+    }
+    vlib_node_set_state(vm, node->index,
+                        is_enable ? VLIB_NODE_STATE_POLLING
+                                  : VLIB_NODE_STATE_DISABLED);
   }
+}
+
+static clib_error_t *
+vcdp_main_loop_init(vlib_main_t *vm)
+{
+  vcdp_enable_disable_timer_expire_node(true);
+
+  return 0;
 }
 
 clib_error_t *
@@ -88,8 +101,6 @@ vcdp_init(vlib_main_t *vm)
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 
   vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
-
-  vcdp_enable_disable_timer_expire_node(true);
 
   return 0;
 }
@@ -244,6 +255,10 @@ vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
 }
 
 VLIB_INIT_FUNCTION(vcdp_init);
+
+VLIB_MAIN_LOOP_ENTER_FUNCTION(vcdp_main_loop_init) = {
+    .runs_after = VLIB_INITS("start_workers")
+};
 
 VLIB_PLUGIN_REGISTER() = {
   .version = VCDP_CORE_PLUGIN_BUILD_VER,
