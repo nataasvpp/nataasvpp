@@ -8,10 +8,9 @@ vcdp_tcp_check_main_t vcdp_tcp;
 static clib_error_t *
 vcdp_tcp_check_init(vlib_main_t *vm)
 {
-  vlib_thread_main_t *tm = vlib_get_thread_main();
   vcdp_tcp_check_main_t *vtcm = &vcdp_tcp;
   vcdp_tcp_check_per_thread_data_t *ptd;
-  vec_validate(vtcm->ptd, tm->n_vlib_mains - 1);
+  vec_validate(vtcm->ptd, vlib_num_workers());
   vec_foreach (ptd, vtcm->ptd)
     vec_validate(ptd->state, vcdp_cfg_main.no_sessions_per_thread);
   return 0;

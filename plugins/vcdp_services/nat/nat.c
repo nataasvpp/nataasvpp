@@ -314,7 +314,7 @@ nat_init(vlib_main_t *vm)
 {
   nat_main_t *nat = &nat_main;
   nat_per_thread_data_t *ptd;
-  uword n_threads = vlib_get_n_threads();
+  uword n_threads = vlib_num_workers();
   nat->uuid_hash = hash_create_string(0, sizeof(uword));
   pool_init_fixed(nat->instances, vcdp_cfg_main.no_nat_instances);
   vec_validate(nat->ptd, n_threads);

@@ -49,14 +49,13 @@ vcdp_init(vlib_main_t *vm)
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
   vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
 
-  vlib_thread_main_t *tm = vlib_get_thread_main();
   time_t epoch = time(NULL);
-  uword log_n_thread = max_log2(tm->n_vlib_mains);
+  uword log_n_thread = max_log2(vlib_num_workers());
   uword template_shift = VCDP_SESSION_ID_TOTAL_BITS - VCDP_SESSION_ID_EPOCH_N_BITS - log_n_thread;
   vcdp->session_id_ctr_mask = (((u64) 1 << template_shift) - 1);
   /* initialize per-thread data */
-  vec_validate(vcdp->per_thread_data, tm->n_vlib_mains - 1);
-  for (int i = 0; i < tm->n_vlib_mains; i++) {
+  vec_validate(vcdp->per_thread_data, vlib_num_workers());
+  for (int i = 0; i < vlib_num_workers(); i++) {
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, i);
     pool_init_fixed(ptd->sessions, vcdp_cfg_main.no_sessions_per_thread);
     vcdp_tw_init(&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);

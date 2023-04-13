@@ -21,10 +21,9 @@ vcdp_stats_packet_size_to_bin(u32 packet_size)
 clib_error_t *
 vcdp_stats_init(vlib_main_t *vm)
 {
-  vlib_thread_main_t *tm = vlib_get_thread_main();
   vcdp_stats_main_t *vsm = &vcdp_stats_main;
   vcdp_stats_per_thread_data_t *ptd;
-  vec_validate(vsm->ptd, tm->n_vlib_mains - 1);
+  vec_validate(vsm->ptd, vlib_num_workers());
   vec_foreach (ptd, vsm->ptd)
     vec_validate(ptd->state, vcdp_cfg_main.no_sessions_per_thread);
   return 0;
