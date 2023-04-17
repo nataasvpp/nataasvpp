@@ -284,6 +284,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   while (n_left) {
     // clib_memcpy_fast(&kv, k4, 16);
+    b[0]->error = 0;
     clib_bihash_kv_16_8_t kv;
     kv.key[0] = k4->as_u64[0];
     kv.key[1] = k4->as_u64[1];
