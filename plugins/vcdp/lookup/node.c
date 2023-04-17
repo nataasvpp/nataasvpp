@@ -57,6 +57,10 @@ typedef struct
   u64 hash;
   u32 flow_id;
   u32 error;
+<<<<<<< HEAD
+=======
+  u32 remote_worker;
+>>>>>>> d70ed07 (fix lookup trace to include error or handoff)
   vcdp_session_ip4_key_t k4;
 } vcdp_lookup_trace_t;
 
@@ -430,7 +434,12 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           t->next_index = local_next_indices[(in_local++) - to_local];
         } else {
           t->next_index = ~0;
-          in_remote++;
+          t->remote_worker = thread_indices[(in_remote++) - to_remote];
+        }
+        if (b[0]->error) {
+          t->error = b[0]->error;
+        } else {
+          t->error = 0;
         }
         if (b[0]->error) {
           t->error = b[0]->error;
@@ -520,26 +529,17 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
 
-  if (t->error) {
-    s = format(s,
-               "vcdp-lookup (error %u): sw_if_index %d, next index %d hash 0x%x "
-               "flow-id %u  key 0x%U",
-               t->error, t->sw_if_index, t->next_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4,
-               sizeof(t->k4));
+  if (t->error)
+    s = format(s, "vcdp-lookup (error: %u): ", t->error);
+  else if (t->next_index == ~0)
+    s = format(s, "vcdp-lookup (handoff: %u): ", t->remote_worker);
+  else
+    s = format(s, "vcdp-lookup (next index: %u): ", t->next_index);
 
-  } else if (t->next_index == ~0) {
-    s = format(s,
-               "vcdp-lookup (handoff): sw_if_index %d, next index %d hash 0x%x "
-               "flow-id %u (session %u, %s) key 0x%U",
-               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
-               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
-  } else {
-    s = format(s,
-               "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
-               "flow-id %u (session %u, %s) key 0x%U",
-               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
-               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
-  }
+  s = format(s, "sw_if_index %d, next index %d hash 0x%x "
+             "flow-id %u  key 0x%U",
+             t->sw_if_index, t->next_index, t->hash, t->flow_id, format_hex_bytes_no_wrap,
+             (u8 *) &t->k4, sizeof(t->k4));
   return s;
 }
 
