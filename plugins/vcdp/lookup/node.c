@@ -534,10 +534,8 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
   else
     s = format(s, "vcdp-lookup (next index: %u): ", t->next_index);
 
-  s = format(s, "sw_if_index %d, next index %d hash 0x%x "
-             "flow-id %u  key 0x%U",
-             t->sw_if_index, t->next_index, t->hash, t->flow_id, format_hex_bytes_no_wrap,
-             (u8 *) &t->k4, sizeof(t->k4));
+  s = format(s, "sw_if_index %d, hash 0x%x flow-id %u  key 0x%U",
+             t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
   return s;
 }
 
