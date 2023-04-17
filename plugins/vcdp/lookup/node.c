@@ -56,6 +56,7 @@ typedef struct
   u32 sw_if_index;
   u64 hash;
   u32 flow_id;
+  u32 error;
   vcdp_session_ip4_key_t k4;
 } vcdp_lookup_trace_t;
 
@@ -431,6 +432,11 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           t->next_index = ~0;
           in_remote++;
         }
+        if (b[0]->error) {
+          t->error = b[0]->error;
+        } else {
+          t->error = 0;
+        }
         clib_memcpy(&t->k4, &keys[i], sizeof(t->k4));
         bi++;
         b++;
@@ -503,6 +509,10 @@ VLIB_NODE_FN(vcdp_handoff_node)
   return frame->n_vectors;
 }
 
+/*
+ * next_index is ~0 if the packet was enqueued to the remote node
+ * TODO: Handle the case where the lookup fails
+ */
 static u8 *
 format_vcdp_lookup_trace(u8 *s, va_list *args)
 {
@@ -510,12 +520,26 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
 
-  s = format (s,
-	      "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
-	      "flow-id %u (session %u, %s) key 0x%U",
-	      t->sw_if_index, t->next_index, t->hash, t->flow_id,
-	      t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
-	      format_hex_bytes_no_wrap,(u8 *) &t->k4, sizeof (t->k4));
+  if (t->error) {
+    s = format(s,
+               "vcdp-lookup (error %u): sw_if_index %d, next index %d hash 0x%x "
+               "flow-id %u  key 0x%U",
+               t->error, t->sw_if_index, t->next_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4,
+               sizeof(t->k4));
+
+  } else if (t->next_index == ~0) {
+    s = format(s,
+               "vcdp-lookup (handoff): sw_if_index %d, next index %d hash 0x%x "
+               "flow-id %u (session %u, %s) key 0x%U",
+               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
+               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
+  } else {
+    s = format(s,
+               "vcdp-lookup: sw_if_index %d, next index %d hash 0x%x "
+               "flow-id %u (session %u, %s) key 0x%U",
+               t->sw_if_index, t->next_index, t->hash, t->flow_id, t->flow_id >> 1,
+               t->flow_id & 0x1 ? "reverse" : "forward", format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
+  }
   return s;
 }
 
