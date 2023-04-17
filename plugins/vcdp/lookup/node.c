@@ -57,10 +57,7 @@ typedef struct
   u64 hash;
   u32 flow_id;
   u32 error;
-<<<<<<< HEAD
-=======
   u32 remote_worker;
->>>>>>> d70ed07 (fix lookup trace to include error or handoff)
   vcdp_session_ip4_key_t k4;
 } vcdp_lookup_trace_t;
 
