@@ -211,6 +211,14 @@ vcdp_session_at_index(vcdp_per_thread_data_t *ptd, u32 idx)
   return pool_elt_at_index(ptd->sessions, idx);
 }
 
+static_always_inline vcdp_session_t *
+vcdp_session_at_index_check(vcdp_per_thread_data_t *ptd, u32 idx)
+{
+  if (pool_is_free_index(ptd->sessions, idx))
+    return 0;
+  return pool_elt_at_index(ptd->sessions, idx);
+}
+
 static_always_inline u32
 vcdp_mk_flow_index(u32 session_index, u8 dir)
 {

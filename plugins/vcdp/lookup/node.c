@@ -35,10 +35,13 @@ static vlib_error_desc_t vcdp_lookup_error_counters[] = {
 #undef _
 };
 
-#define foreach_vcdp_handoff_error _(NOERROR, noerror, INFO, "no error")
+#define foreach_vcdp_handoff_error \
+ _(NOERROR, noerror, INFO, "no error") \
+ _(NO_SESSION, nosession, ERROR, "no session")
+
 typedef enum
 {
-#define _(f, n, s, d) VCDP_LOOKUP_ERROR_##f,
+#define _(f, n, s, d) VCDP_HANDOFF_ERROR_##f,
   foreach_vcdp_handoff_error
 #undef _
     VCDP_HANDOFF_N_ERROR,
@@ -487,11 +490,17 @@ VLIB_NODE_FN(vcdp_handoff_node)
   while (n_left) {
     u32 flow_index = b[0]->flow_id;
     u32 session_index = flow_index >> 1;
-    vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
+    vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
+    if (!session) {
+      // Session has been deleted underneath us
+        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        b[0]->error = node->errors[VCDP_HANDOFF_ERROR_NO_SESSION];
+        goto next;
+    }
     u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
     vcdp_buffer(b[0])->service_bitmap = pbmp;
+  next:
     vcdp_next(b[0], current_next);
-
     current_next += 1;
     b += 1;
     n_left -= 1;
@@ -518,7 +527,6 @@ VLIB_NODE_FN(vcdp_handoff_node)
 
 /*
  * next_index is ~0 if the packet was enqueued to the remote node
- * TODO: Handle the case where the lookup fails
  */
 static u8 *
 format_vcdp_lookup_trace(u8 *s, va_list *args)
