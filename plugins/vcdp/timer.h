@@ -63,9 +63,16 @@ vcdp_session_timer_update(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now, u
 static_always_inline void
 vcdp_session_timer_update_maybe_past(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now, u32 ticks)
 {
-  if (timer->next_expiration > now + (ticks * VCDP_TIMER_INTERVAL))
-    vcdp_timer_update_internal(tw, timer->handle, ticks);
-  timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
+  if (timer->next_expiration > now + (ticks * VCDP_TIMER_INTERVAL)) {
+    if (tw_timer_handle_is_free_2t_1w_2048sl(tw, timer->handle)) {
+      // restart timer
+      vcdp_session_timer_start(tw, timer, (timer->handle & VCDP_TIMER_SI_MASK), now, ticks);
+    } else {
+      // update timer
+      vcdp_timer_update_internal(tw, timer->handle, ticks);
+    }
+    timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
+  }
 }
 
 static_always_inline uword
@@ -74,10 +81,5 @@ vec_reset_len_return(u32 *v)
   vec_reset_length(v);
   return 0;
 }
-
-#define vcdp_session_index_iterate_expired(ptd, s)                                                                     \
-  for (u32 *s_ptr = (ptd)->expired_sessions; ((s_ptr < vec_end(ptd->expired_sessions)) && (((s) = s_ptr[0]) || 1)) ||  \
-                                             vec_reset_len_return((ptd)->expired_sessions);                            \
-       s_ptr++)
 
 #endif
