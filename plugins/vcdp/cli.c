@@ -132,12 +132,19 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   vcdp_tenant_t *tenant;
   u32 thread_index;
   u32 tenant_id = ~0;
-  u8 first;
   f64 now = vlib_time_now(vm);
+  clib_bihash_kv_8_8_t kv = {0};
+  u32 session_index;
+  u64 session_id;
+  bool session_id_set = false;
+
   if (unformat_user(input, unformat_line_input, line_input)) {
     while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
       if (unformat(line_input, "tenant %d", &tenant_id))
         ;
+      else if (unformat_check_input(line_input) == UNFORMAT_END_OF_INPUT ||
+               unformat(line_input, "0x%X", sizeof(session_id), &session_id) == 0)
+        session_id_set = true;
       else {
         err = unformat_parse_error(line_input);
         break;
@@ -146,54 +153,10 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     unformat_free(line_input);
   }
 
-  if (!err)
-    vec_foreach_index (thread_index, vcdp->per_thread_data) {
-      ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-      first = 1;
-      table_t session_table_ = {}, *session_table = &session_table_;
-      u32 n = 0;
-      table_add_header_col(session_table, 10, "id", "tenant", "index", "type", "proto", "context", "ingress", "egress",
-                           "state", "TTL(s)");
-      pool_foreach (session, ptd->sessions) {
-        tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
-        if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
-          continue;
-        if (first) {
-          first = 0;
-          table_format_title(session_table, "Thread #%d:", thread_index);
-        }
-        n =
-          vcdp_table_format_insert_session(session_table, n, session - ptd->sessions, session, tenant->tenant_id, now);
-      }
-      if (!first)
-        vlib_cli_output(vm, "%U", format_table, session_table);
-      table_free(session_table);
-    }
+  if (err)
+    return err;
 
-  return err;
-}
-
-static clib_error_t *
-vcdp_show_session_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
-{
-  unformat_input_t line_input_, *line_input = &line_input_;
-  clib_error_t *err = 0;
-  vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
-  clib_bihash_kv_8_8_t kv = {0};
-  u32 thread_index;
-  f64 now = vlib_time_now(vm);
-  u32 session_index;
-  u64 session_id;
-  if (unformat_user(input, unformat_line_input, line_input)) {
-    if (unformat_check_input(line_input) == UNFORMAT_END_OF_INPUT ||
-        unformat(line_input, "0x%X", sizeof(session_id), &session_id) == 0)
-      err = unformat_parse_error(line_input);
-    unformat_free(line_input);
-  } else
-    err = clib_error_return(0, "No session id provided");
-
-  if (!err) {
+  if (session_id_set) {
     kv.key = session_id;
     if (!clib_bihash_search_inline_8_8(&vcdp->session_index_by_id, &kv)) {
       thread_index = vcdp_thread_index_from_lookup(kv.value);
@@ -202,6 +165,36 @@ vcdp_show_session_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vl
       vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_index, now);
     } else {
       err = clib_error_return(0, "Session id 0x%llx not found", session_id);
+    }
+    return err;
+  }
+
+  vec_foreach_index (thread_index, vcdp->per_thread_data) {
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    vlib_cli_output(vm, "Thread #%d:", thread_index);
+    vlib_cli_output(vm, "id tenant index type proto context ingress egress state TTL(s)");
+    pool_foreach (session, ptd->sessions) {
+      tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
+      if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
+        continue;
+
+      // vlib_cli_output(vm, n, session - ptd->sessions, session, tenant->tenant_id, now);
+
+      f64 remaining_time = session->timer.next_expiration - now;
+      if (remaining_time < 0)
+        continue;
+      u64 session_net = clib_host_to_net_u64(session->session_id);
+      vcdp_session_ip4_key_t *k1, *k2;
+      vlib_cli_output(vm, "0x%U %6d %6d %U %U %U %6f", format_hex_bytes, &session_net, sizeof(session_net),
+                      tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                      format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
+
+      k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+      k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+      vlib_cli_output(vm, "\t\t\t%d %15U:%5u -> %15U:%5u", k1->context_id, format_ip4_address, &k1->src,
+                      clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
+      vlib_cli_output(vm, "\t\t\t%d %15U:%5u -> %15U:%5u", k2->context_id, format_ip4_address, &k2->src,
+                      clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
     }
   }
   return err;
@@ -262,15 +255,9 @@ VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {
 };
 
 VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
-  .path = "show vcdp session-table",
-  .short_help = "show vcdp session-table [tenant <tenant-id>]",
+  .path = "show vcdp session",
+  .short_help = "show vcdp session [tenant <tenant-id>] [0x<session-id>]",
   .function = vcdp_show_sessions_command_fn,
-};
-
-VLIB_CLI_COMMAND(show_vcdp_detail_command, static) = {
-  .path = "show vcdp session-detail",
-  .short_help = "show vcdp session-detail 0x<session-id>",
-  .function = vcdp_show_session_detail_command_fn,
 };
 
 VLIB_CLI_COMMAND(show_vcdp_tenant, static) = {
@@ -288,18 +275,17 @@ VLIB_CLI_COMMAND(vcdp_set_timeout_command, static) = {.path = "set vcdp timeout"
  * Display the set of available services.
  */
 static clib_error_t *
-vcdp_show_services_command_fn(vlib_main_t *vm, unformat_input_t *input,
-                              vlib_cli_command_t *cmd)
+vcdp_show_services_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   vcdp_service_main_t *sm = &vcdp_service_main;
   vcdp_service_registration_t **services = sm->services;
   vcdp_service_registration_t *service;
   char **p;
-  vlib_cli_output (vm, "Available services:");
+  vlib_cli_output(vm, "Available services:");
 
   for (uword i = 0; i < vec_len(services); i++) {
     service = vec_elt_at_index(services, i)[0];
-          vlib_cli_output (vm, "  %s%s", service->node_name, service->is_terminal ? " (terminal)": "");
+    vlib_cli_output(vm, "  %s%s", service->node_name, service->is_terminal ? " (terminal)" : "");
     p = service->runs_before;
     while (*p) {
       vlib_cli_output(vm, "     %s (before)", *p);
@@ -314,7 +300,7 @@ vcdp_show_services_command_fn(vlib_main_t *vm, unformat_input_t *input,
   return 0;
 }
 
-VLIB_CLI_COMMAND (vcdp_show_services_command, static) = {
+VLIB_CLI_COMMAND(vcdp_show_services_command, static) = {
   .path = "show vcdp services",
   .short_help = "show vcdp services [verbose]",
   .function = vcdp_show_services_command_fn,
@@ -335,8 +321,8 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip_address, &src, &sport, unformat_ip_protocol,
-                 &proto, unformat_ip_address, &dst, &dport)) {
+    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip_address, &src, &sport,
+                 unformat_ip_protocol, &proto, unformat_ip_address, &dst, &dport)) {
       if (sport == 0 || sport > 65535) {
         error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
         goto done;
@@ -367,7 +353,7 @@ done:
 }
 
 VLIB_CLI_COMMAND(set_vcdp_session_command, static) = {
-    .path = "set vcdp session",
-    .short_help = "set vcdp session tenant <tenant> <ipaddr:port> <protocol> <ipaddr:port>",
-    .function = set_vcdp_session_command_fn,
+  .path = "set vcdp session",
+  .short_help = "set vcdp session tenant <tenant> <ipaddr:port> <protocol> <ipaddr:port>",
+  .function = set_vcdp_session_command_fn,
 };
