@@ -142,10 +142,9 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
       if (unformat(line_input, "tenant %d", &tenant_id))
         ;
-      else if (unformat_check_input(line_input) == UNFORMAT_END_OF_INPUT ||
-               unformat(line_input, "0x%X", sizeof(session_id), &session_id) == 0)
+      else if (unformat(line_input, "0x%X", sizeof(session_id), &session_id)) {
         session_id_set = true;
-      else {
+      } else {
         err = unformat_parse_error(line_input);
         break;
       }
@@ -171,8 +170,9 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
 
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    vlib_cli_output(vm, "Thread #%d:", thread_index);
-    vlib_cli_output(vm, "id tenant index type proto context ingress egress state TTL(s)");
+    if (vec_len(vcdp->per_thread_data) > 1)
+      vlib_cli_output(vm, "Thread #%d:", thread_index);
+    vlib_cli_output(vm, "session id         tenant  index type proto      state TTL(s)");
     pool_foreach (session, ptd->sessions) {
       tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
@@ -185,21 +185,56 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         continue;
       u64 session_net = clib_host_to_net_u64(session->session_id);
       vcdp_session_ip4_key_t *k1, *k2;
-      vlib_cli_output(vm, "0x%U %6d %6d %U %U %U %6f", format_hex_bytes, &session_net, sizeof(session_net),
+      vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
                       tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
                       format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
 
       k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
       k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-      vlib_cli_output(vm, "\t\t\t%d %15U:%5u -> %15U:%5u", k1->context_id, format_ip4_address, &k1->src,
+      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
                       clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
-      vlib_cli_output(vm, "\t\t\t%d %15U:%5u -> %15U:%5u", k2->context_id, format_ip4_address, &k2->src,
+      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
                       clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
     }
   }
   return err;
 }
 
+static clib_error_t *
+vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd;
+  u32 thread_index;
+  // u32 n_threads = vlib_num_workers();
+
+  vlib_cli_output(vm, "Configuration:");
+  vlib_cli_output(vm, "Max Tenants: %d", vcdp_cfg_main.no_tenants);
+  vlib_cli_output(vm, "Max Sessions per thread: %d", vcdp_cfg_main.no_sessions_per_thread);
+  vlib_cli_output(vm, "Max NAT instances: %d", vcdp_cfg_main.no_nat_instances);
+  vlib_cli_output(vm, "Max Tunnels: %d", vcdp_cfg_main.no_tunnels);
+
+  vlib_cli_output(vm, "Threads: %d", vec_len(vcdp->per_thread_data));
+  vlib_cli_output(vm, "Active tenants: %d", pool_elts(vcdp->tenants));
+
+  vec_foreach_index (thread_index, vcdp->per_thread_data) {
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
+  }
+  vcdp_tenant_t *tenant;
+  pool_foreach(tenant, vcdp->tenants) {
+    u32 idx = vcdp->tenants - tenant;
+
+    if (idx >= vlib_simple_counter_n_counters(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED]))
+      break;
+
+    counter_t created = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], idx);
+    counter_t removed = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], idx);
+    vlib_cli_output(vm, "Tenant: %d created %ld expired %ld", idx, created, removed);
+  }
+
+  return 0;
+}
 static clib_error_t *
 vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
@@ -264,6 +299,12 @@ VLIB_CLI_COMMAND(show_vcdp_tenant, static) = {
   .path = "show vcdp tenant",
   .short_help = "show vcdp tenant [<tenant-id> [detail]]",
   .function = vcdp_show_tenant_detail_command_fn,
+};
+
+VLIB_CLI_COMMAND(show_vcdp_summary, static) = {
+  .path = "show vcdp summary",
+  .short_help = "show vcdp summary",
+  .function = vcdp_show_summary_command_fn,
 };
 
 VLIB_CLI_COMMAND(vcdp_set_timeout_command, static) = {.path = "set vcdp timeout",
