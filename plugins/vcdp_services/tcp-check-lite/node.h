@@ -53,6 +53,21 @@ format_tcp_flags (u8 * s, va_list * args)
     return s;
 }
 
+static u32
+vcdp_tcp_state_to_timeout (vcdp_tcp_check_lite_tcp_state_t state)
+{
+  switch (state) {
+    case VCDP_TCP_CHECK_LITE_STATE_CLOSED:
+      return VCDP_TIMEOUT_EMBRYONIC;
+    case VCDP_TCP_CHECK_LITE_STATE_ESTABLISHED:
+      return VCDP_TIMEOUT_TCP_ESTABLISHED;
+    case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
+      return VCDP_TIMEOUT_TCP_TRANSITORY;
+    default:
+      return VCDP_TIMEOUT_EMBRYONIC;
+  }
+}
+
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_session_state_t *tcp_session,
@@ -72,7 +87,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   }
   /* Note: We don't care about SYNs */
   u8 flags = tcp->flags & (TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
-  u32 next_timeout = tenant->timeouts[tcp_session->state];
+  u32 next_timeout = tenant->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
 
   if (PREDICT_FALSE(tcp_session->version != session->session_version)) {
     tcp_session->version = session->session_version;
