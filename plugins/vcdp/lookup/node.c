@@ -267,7 +267,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-    vcdp_calc_key_v4(b[0], b[0]->flow_id, k4, h, sc);
+    vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h, sc);
 
     h += 1;
     k4 += 1;

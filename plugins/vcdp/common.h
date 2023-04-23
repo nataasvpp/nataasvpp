@@ -23,6 +23,7 @@ enum {
 
 typedef struct {
   u32 service_bitmap;
+  u32 context_id;
   u16 tenant_index;
   u8 flags;
   u8 tcp_flags;
