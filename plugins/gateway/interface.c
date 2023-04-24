@@ -72,7 +72,6 @@ VLIB_NODE_FN(vcdp_input_node)
     }
     vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx[0]);
     vcdp_buffer(b[0])->context_id = tenant->context_id;
-
     vcdp_buffer(b[0])->tenant_index = tenant_idx[0];
     current_next[0] = VCDP_INPUT_NEXT_LOOKUP;
 

@@ -45,7 +45,7 @@ format_vcdp_tcp_check_trace(u8 *s, va_list *args)
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_session_state_t *tcp_session,
-                     vcdp_session_t *session, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
+                     vcdp_session_t *session, u32 session_index, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
                      u32 *nsf)
 {
   /* Parse the packet */
@@ -167,7 +167,7 @@ out:
   else
     next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];
 
-  vcdp_session_timer_update_maybe_past(tw, &session->timer, current_time, next_timeout);
+  vcdp_session_timer_update_maybe_past(tw, &session->timer, session_index, current_time, next_timeout);
   vcdp_next(b[0], to_next);
   return;
 }
@@ -201,9 +201,9 @@ VLIB_NODE_FN(vcdp_tcp_check_node)
     tcp_session = vec_elt_at_index(tptd->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
     if (vcdp_direction_from_flow_index(b[0]->flow_id) == VCDP_FLOW_FORWARD)
-      update_state_one_pkt(tw, tenant, tcp_session, session, current_time, VCDP_FLOW_FORWARD, to_next, b, sf, nsf);
+      update_state_one_pkt(tw, tenant, tcp_session, session, session_idx, current_time, VCDP_FLOW_FORWARD, to_next, b, sf, nsf);
     else
-      update_state_one_pkt(tw, tenant, tcp_session, session, current_time, VCDP_FLOW_REVERSE, to_next, b, sf, nsf);
+      update_state_one_pkt(tw, tenant, tcp_session, session, session_idx, current_time, VCDP_FLOW_REVERSE, to_next, b, sf, nsf);
     n_left -= 1;
     b += 1;
     to_next += 1;

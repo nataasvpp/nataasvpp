@@ -6,6 +6,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp.h>
 #include <vppinfra/format_table.h>
+#include <vcdp/timer.h>
 
 u8 *
 format_vcdp_session_state(u8 *s, va_list *args)
@@ -110,34 +111,32 @@ format_vcdp_tenant(u8 *s, va_list *args)
 u8 *
 format_vcdp_tenant_extra(u8 *s, va_list *args)
 {
-  //u32 indent = format_get_indent(s);
-  //vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
-  __clib_unused u32 tenant_idx = va_arg(*args, u32);
-  __clib_unused vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
-  s = format(s, "Not implemented");
-#if 0
+  u32 indent = format_get_indent(s);
+  vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
+  u32 tenant_idx = va_arg(*args, u32);
+  vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
+
   counter_t ctr;
   vlib_counter_t ctr2;
   s = format(s, "%s\n", "Counters:");
 
-#define _(x, y, z)                                                                                                     \
-  ctr = vlib_get_simple_counter(&vcdp->tenant_session_ctr[VCDP_TENANT_SESSION_COUNTER_##x], tenant_idx);               \
-  s = format(s, "%U%s: %llu\n", format_white_space, indent + 2, z, ctr);
-  foreach_vcdp_tenant_session_counter
-#undef _
-#define _(x, y, z)                                                                                                     \
-  vlib_get_combined_counter(&vcdp->tenant_data_ctr[VCDP_TENANT_DATA_COUNTER_##x], tenant_idx, &ctr2);                  \
-  s = format(s, "%U%s: %llu packets\n", format_white_space, indent + 2, z, ctr2.packets);                              \
-  s = format(s, "%U  %llu bytes\n", format_white_space, indent + strlen(z) + 2, ctr2.bytes);
-    foreach_vcdp_tenant_data_counter
-#undef _
-      s = format(s, "%U%s\n", format_white_space, indent, "Configured Timeout:");
+  ctr = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], tenant_idx);
+  s = format(s, "%Ucreated: %llu\n", format_white_space, indent + 2, ctr);
+  ctr = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], tenant_idx);
+  s = format(s, "%Uexpired: %llu\n", format_white_space, indent + 2, ctr);
 
+  vlib_get_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], tenant_idx, &ctr2);
+  s = format(s, "%Urx: %llu packets\n", format_white_space, indent + 2, ctr2.packets);
+  s = format(s, "%U  %llu bytes\n", format_white_space, indent + strlen("rx") + 2, ctr2.bytes);
+  vlib_get_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_TX], tenant_idx, &ctr2);
+  s = format(s, "%Utx: %llu packets\n", format_white_space, indent + 2, ctr2.packets);
+  s = format(s, "%U  %llu bytes\n", format_white_space, indent + strlen("tx") + 2, ctr2.bytes);
+
+  s = format(s, "%U%s\n", format_white_space, indent-2, "Configured Timeout:");
 #define _(x, y, z)                                                                                                     \
   s = format(s, "%U%s: %d seconds\n", format_white_space, indent + 2, z, tenant->timeouts[VCDP_TIMEOUT_##x]);
   foreach_vcdp_timeout
 #undef _
-#endif
     return s;
 }
 

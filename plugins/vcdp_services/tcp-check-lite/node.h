@@ -71,7 +71,7 @@ vcdp_tcp_state_to_timeout (vcdp_tcp_check_lite_tcp_state_t state)
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_session_state_t *tcp_session,
-                     vcdp_session_t *session, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
+                     vcdp_session_t *session, u32 session_index, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
                      u32 *nsf)
 {
   ip4_header_t *ip4 = (ip4_header_t *) vlib_buffer_get_current(b[0]);
@@ -128,7 +128,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
     // Allow a transitory session to reopen
     if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) ==
-        (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
+        (TCP_FLAG_ACK)) {
       // nat44_ed_session_reopen(thread_index, ses);
       tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_ESTABLISHED;
       next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_ESTABLISHED];
@@ -142,7 +142,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
 out:
 
   nsf[0] = tcp_session->state;
-  vcdp_session_timer_update_maybe_past(tw, &session->timer, current_time, next_timeout);
+  vcdp_session_timer_update_maybe_past(tw, &session->timer, session_index, current_time, next_timeout);
   vcdp_next(b[0], to_next);
   return;
 }
@@ -166,7 +166,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 state[VLIB_FRAME_SIZE], *sf = state;
   u32 new_state[VLIB_FRAME_SIZE], *nsf = new_state;
-  f64 current_time = ptd->current_time;
+  f64 current_time = vlib_time_now(vm);
 
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
@@ -174,7 +174,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
     session = vcdp_session_at_index(ptd, session_idx);
     tcp_session = vec_elt_at_index(tptd->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
-    update_state_one_pkt(tw, tenant, tcp_session, session, current_time, vcdp_direction_from_flow_index(b[0]->flow_id),
+    update_state_one_pkt(tw, tenant, tcp_session, session, session_idx, current_time, vcdp_direction_from_flow_index(b[0]->flow_id),
                          to_next, b, sf, nsf);
     n_left -= 1;
     b += 1;

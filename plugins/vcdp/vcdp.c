@@ -34,6 +34,10 @@ vcdp_timer_expired(u32 *expired)
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vec_foreach (e, expired) {
     u32 session_idx = e[0] & VCDP_TIMER_SI_MASK;
+    if (pool_is_free_index(ptd->sessions, session_idx)) {
+      clib_warning("*** Expired session does not exists %d", session_idx);
+      continue;
+    }
     vec_add1(ptd->expired_sessions, session_idx);
   }
 }

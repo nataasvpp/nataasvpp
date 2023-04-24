@@ -181,8 +181,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       // vlib_cli_output(vm, n, session - ptd->sessions, session, tenant->tenant_id, now);
 
       f64 remaining_time = session->timer.next_expiration - now;
-      if (remaining_time < 0)
-        continue;
+      // if (remaining_time < 0)
+      //   continue;
       u64 session_net = clib_host_to_net_u64(session->session_id);
       vcdp_session_ip4_key_t *k1, *k2;
       vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),

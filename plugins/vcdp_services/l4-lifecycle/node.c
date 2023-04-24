@@ -50,6 +50,7 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
   u32 n_left = frame->n_vectors;
 
   vlib_get_buffers(vm, from, bufs, n_left);
+  f64 time_now = vlib_time_now(vm);
 
   while (n_left) {
     u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
@@ -64,8 +65,7 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
 
     if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
-      /* TODO: must be configurable per tenant */
-      vcdp_session_timer_update(&ptd->wheel, &session->timer, ptd->current_time,
+      vcdp_session_timer_update(&ptd->wheel, &session->timer, time_now,
                                 tenant->timeouts[VCDP_TIMEOUT_ESTABLISHED]);
     }
 

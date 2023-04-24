@@ -29,6 +29,12 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
     clib_warning("Failed to remove session from session_index_by_id");
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
                                 session->tenant_idx, 1);
+
+
+  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_TX], thread_index,
+                                  session->tenant_idx, session->pkts[VCDP_FLOW_FORWARD], session->bytes[VCDP_FLOW_FORWARD]);
+  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], thread_index,
+                                  session->tenant_idx, session->pkts[VCDP_FLOW_REVERSE], session->bytes[VCDP_FLOW_REVERSE]);
   pool_put_index(ptd->sessions, session_index);
 }
 
@@ -37,11 +43,16 @@ vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32
 {
   vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
   f64 diff = (session->timer.next_expiration - (ptd->current_time + VCDP_TIMER_INTERVAL)) / VCDP_TIMER_INTERVAL;
-  if (diff > (f64) 1.)
+  if (diff > (f64) 1.) {
     /* Rearm the timer accordingly */
-    vcdp_session_timer_start(&ptd->wheel, &session->timer, session_index, ptd->current_time, diff);
-  else
+    if (tw_timer_handle_is_free_2t_1w_2048sl(&ptd->wheel, session->timer.handle)) {
+      vcdp_session_timer_start(&ptd->wheel, &session->timer, session_index, ptd->current_time, diff);
+    } else {
+      vcdp_timer_update_internal(&ptd->wheel, session->timer.handle, diff);
+    }
+  } else {
     vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
+  }
 }
 
 static void
