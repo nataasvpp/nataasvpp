@@ -59,6 +59,8 @@ add_vpp_library(vcdpcore
 )
 
 add_vpp_plugin(vcdp
+  VAT_AUTO_TEST OFF
+
   SOURCES
   vcdp/plugin.c
   vcdp/cli.c
@@ -79,9 +81,6 @@ add_vpp_plugin(vcdp
   gateway/gateway.api
   vcdp_services/tcp-mss/tcp_mss.api
 
-  # DEPENDS
-  # vcdp_api_headers
-
   LINK_LIBRARIES
   vcdpcore
 
@@ -91,21 +90,6 @@ add_vpp_counters(
   vcdp_services/nat/nat_counter.json
   vcdp/vcdp_counter.json
 )
-
-# add_vpp_library(vcdp
-#   SOURCES
-
-#   INSTALL_HEADERS
-
-#   ####################
-#   # This is a hack   #
-#   # remove when VPP  #
-#   # fixed            #
-#   ####################
-#   # DEPENDS
-#   # vcdp_api_headers
-# )
-
 
 # find_library(VPPINFRA_LIBRARY vppinfra)
 # find_library(VLIB_LIBRARY vlib)
