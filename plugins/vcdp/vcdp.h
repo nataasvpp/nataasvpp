@@ -265,6 +265,4 @@ int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 int vcdp_create_session_v4_2(u32 context, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
 
-#define VCDP_CORE_PLUGIN_BUILD_VER "1.0"
-
 #endif

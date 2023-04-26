@@ -6,7 +6,6 @@
 
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_template.c>
-#include <vpp/app/version.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/service.h>
@@ -235,12 +234,6 @@ vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
 
 VLIB_INIT_FUNCTION(vcdp_init) = {
   .runs_after = VLIB_INITS("threads_init"),
-};
-
-VLIB_PLUGIN_REGISTER() = {
-  .version = VCDP_CORE_PLUGIN_BUILD_VER,
-  .version_required = VPP_BUILD_VER,
-  .description = "vCDP Core Plugin",
 };
 
 static clib_error_t *

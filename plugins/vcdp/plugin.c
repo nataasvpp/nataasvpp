@@ -2,10 +2,11 @@
 // Copyright(c) 2022 Cisco Systems, Inc.
 
 #include <vnet/plugin/plugin.h>
-
-#define VCDP_PLUGIN_BUILD_VER "1.0"
+#include <vpp/app/version.h>
 
 VLIB_PLUGIN_REGISTER() = {
-  .version = VCDP_PLUGIN_BUILD_VER,
-  .description = "vCDP Plugin",
+  .version = VPP_BUILD_VER,
+  .version_required = VPP_BUILD_VER,
+  .description = "nataasvpp Plugin",
 };
+
