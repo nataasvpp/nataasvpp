@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright(c) 2022 Cisco Systems, Inc.
+
 option version = "0.0.1";
 
-import "plugins/vcdp/vcdp_types.api";
 autoreply autoendian define vcdp_tcp_mss_enable_disable {
   u32 client_index;
   u32 context;

@@ -441,11 +441,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         } else {
           t->error = 0;
         }
-        if (b[0]->error) {
-          t->error = b[0]->error;
-        } else {
-          t->error = 0;
-        }
         clib_memcpy(&t->k4, &keys[i], sizeof(t->k4));
         bi++;
         b++;

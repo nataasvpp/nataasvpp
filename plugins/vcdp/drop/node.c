@@ -3,23 +3,8 @@
 
 #include <vlib/vlib.h>
 #include <vcdp/service.h>
-#define foreach_vcdp_drop_error _(DROP, "drop")
-
-typedef enum {
-#define _(sym, str) VCDP_DROP_ERROR_##sym,
-  foreach_vcdp_drop_error
-#undef _
-    VCDP_DROP_N_ERROR,
-} vcdp_drop_error_t;
-
-static char *vcdp_drop_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_drop_error
-#undef _
-};
 
 #define foreach_vcdp_drop_next _(DROP, "error-drop")
-
 typedef enum {
 #define _(n, x) VCDP_DROP_NEXT_##n,
   foreach_vcdp_drop_next
@@ -51,7 +36,6 @@ VLIB_NODE_FN(vcdp_drop_node)
   u32 n_left = frame->n_vectors;
 
   vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_DROP_NEXT_DROP, n_left);
-  vlib_node_increment_counter(vm, node->node_index, VCDP_DROP_ERROR_DROP, n_left);
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
     vlib_get_buffers(vm, from, bufs, n_left);
@@ -72,10 +56,6 @@ VLIB_REGISTER_NODE(vcdp_drop_node) = {.name = "vcdp-drop",
                                       .vector_size = sizeof(u32),
                                       .format_trace = format_vcdp_drop_trace,
                                       .type = VLIB_NODE_TYPE_INTERNAL,
-
-                                      .n_errors = ARRAY_LEN(vcdp_drop_error_strings),
-                                      .error_strings = vcdp_drop_error_strings,
-
                                       .n_next_nodes = VCDP_DROP_N_NEXT,
                                       .next_nodes =
                                         {
