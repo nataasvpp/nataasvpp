@@ -250,7 +250,8 @@ vcdp_session_clear (void)
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vec_reset_length(ptd->expired_sessions);
     pool_foreach(session, ptd->sessions) {
-      vec_add1(to_delete, session - ptd->sessions);
+      if (session->state != VCDP_SESSION_STATE_STATIC)
+        vec_add1(to_delete, session - ptd->sessions);
     }
     vec_foreach(session_index, to_delete) {
       session = vcdp_session_at_index(ptd, *session_index);

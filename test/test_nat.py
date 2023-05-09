@@ -4,6 +4,7 @@ import time
 import pytest
 from scapy.all import sendp, sniff
 from scapy.layers.inet import IP, UDP, TCP, ICMP, GRE, IPerror
+from scapy.layers.dhcp import BOOTP, DHCP
 from scapy.all import AsyncSniffer, sendp
 from scapy.packet import Packet
 from scapy.layers.l2 import Ether
@@ -336,6 +337,26 @@ test_cases = [
         'name': 'GRE TTL=1, check ICMP error',
         'send': IP(src=dst_ip, dst=nat_ip, ttl=1) / GRE() / "Test NAT GRE data",
         'expect': IP(src=nat_ip, dst=dst_ip, id=0) / ICMP(type='time-exceeded', code='ttl-zero-during-transit') / IP(src=dst_ip, dst=nat_ip, ttl=0) / GRE() / "Test NAT GRE data",
+        'send_iface': outside_iface,
+        'receive_iface': outside_iface,
+    },
+
+    # test18 Test bypass feature
+    {
+        # Random outside packet to test bypass.
+        'name': 'Basic outside bypass',
+        'send': IP(src='9.9.9.9', dst=nat_ip, ttl=64)/ICMP(id=8888),
+        'expect': IP(src=nat_ip, dst='9.9.9.9')/ICMP(type='echo-reply', id=8888),
+        'send_iface': outside_iface,
+        'receive_iface': outside_iface,
+    },
+
+    # test19 Test static mapping with bypass
+    # DHCP only works for Ethernet interfaces?
+    {
+        'name': 'DHCP packet against static binding',
+        'send': IP(src='0.0.0.0', dst='255.255.255.255')/UDP(sport=68, dport=67),
+        'expect': IP(src=nat_ip, dst='9.9.9.9')/ICMP(type='echo-reply', id=8888),
         'send_iface': outside_iface,
         'receive_iface': outside_iface,
     },

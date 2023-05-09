@@ -265,7 +265,9 @@ VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {.name = "vcdp-nat-output",
 
 };
 
-VCDP_SERVICE_DEFINE(nat_output) = {.node_name = "vcdp-nat-output",
-                                   .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
-                                   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
-                                   .is_terminal = 0};
+VCDP_SERVICE_DEFINE(nat_output) = {
+  .node_name = "vcdp-nat-output",
+  .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
+  .is_terminal = 0
+};

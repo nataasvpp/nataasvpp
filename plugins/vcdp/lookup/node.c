@@ -141,10 +141,12 @@ vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol,
   return 0;
 }
 
+/*
+ * Create a static VCDP session. (No timer)
+ */
 int
 vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
 {
-  // Create a new VCDP session
   clib_bihash_kv_16_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
 
@@ -404,7 +406,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
-      if (session->timer.next_expiration - time_now < 1) {
+      if (session->state != VCDP_SESSION_STATE_STATIC && session->timer.next_expiration - time_now < 1) {
         // Received a packet against an expired session. Let's restart the timer to avoid the session being deleted
         // underneath us.
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
