@@ -58,7 +58,7 @@ format_vcdp_nat_icmp_error_trace(u8 *s, va_list *args)
   nat_rewrite_data_t *  rewrites = vec_elt_at_index(ptd->flows, session_idx << 1);
   
   s = format(s, "vcdp-nat-icmp-error: flow-id %u (session %u, %s) rewrite #1: %U rewrite #2: %U\n", t->flow_id, t->flow_id >> 1,
-             t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_nat_rewrite, rewrites[0], format_vcdp_nat_rewrite, rewrites[1]);
+             t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_nat_rewrite, &rewrites[0], format_vcdp_nat_rewrite, &rewrites[1]);
 
   return s;
 }

@@ -410,7 +410,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
-        clib_warning("Restarting timer for expired session: %u", session_index);
         vcdp_session_timer_start(&ptd->wheel, &session->timer, session_index, time_now,
                                  tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
       }
@@ -625,7 +624,6 @@ VLIB_NODE_FN(vcdp_session_expire_node)
 
   for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
     session_index = vec_pop(ptd->expired_sessions);
-    clib_warning("Removing session %u", session_index);
     vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
   }
   return 0;
