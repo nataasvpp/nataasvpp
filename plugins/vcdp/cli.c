@@ -235,6 +235,14 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
 
   return 0;
 }
+
+static clib_error_t *
+vcdp_clear_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  vcdp_session_clear();
+  return 0;
+}
+
 static clib_error_t *
 vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
@@ -305,6 +313,12 @@ VLIB_CLI_COMMAND(show_vcdp_summary, static) = {
   .path = "show vcdp summary",
   .short_help = "show vcdp summary",
   .function = vcdp_show_summary_command_fn,
+};
+
+VLIB_CLI_COMMAND(clear_vcdp_sessions, static) = {
+  .path = "clear vcdp sessions",
+  .short_help = "clear vcdp serssions",
+  .function = vcdp_clear_sessions_command_fn,
 };
 
 VLIB_CLI_COMMAND(vcdp_set_timeout_command, static) = {.path = "set vcdp timeout",

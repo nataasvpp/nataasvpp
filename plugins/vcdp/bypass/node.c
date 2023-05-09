@@ -7,7 +7,6 @@
 #include <vnet/ip/ip4.h>
 #include <vnet/fib/ip4_fib.h>
 #include <vnet/dpo/load_balance.h>
-#include <vcdp_services/nat/vcdp_nat_dpo.h>
 
 #define foreach_vcdp_bypass_error _(BYPASS, "bypass")
 
@@ -60,9 +59,9 @@ VLIB_NODE_FN(vcdp_bypass_node)
   u32 *from;
   u32 n_left = frame->n_vectors;
   u16 nexts[VLIB_FRAME_SIZE] = {0}, *next = nexts;
-  const dpo_id_t *dpo;
-  load_balance_t *lb;
-  u32 lbi;
+  // const dpo_id_t *dpo;
+  // load_balance_t *lb;
+  // u32 lbi;
 
   from = vlib_frame_vector_args(frame);
   vlib_get_buffers(vm, from, b, n_left);
@@ -73,9 +72,10 @@ VLIB_NODE_FN(vcdp_bypass_node)
     // vnet_feature_next_u16(next, b[0]);
     next[0] = VCDP_BYPASS_NEXT_LOOKUP;
 
-    ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+    // ip4_header_t *ip = vlib_buffer_get_current(b[0]);
     // u32 lbi = ip4_fib_forwarding_lookup(vnet_buffer(b)->ip.fib_index, &ip0->src_address);
     // TODO: Fix VRF
+#if 0
     lbi = ip4_fib_forwarding_lookup(0, &ip->dst_address);
     lb = load_balance_get(lbi);
     dpo = load_balance_get_bucket_i(lb, 0);
@@ -86,6 +86,7 @@ VLIB_NODE_FN(vcdp_bypass_node)
      } else if (dpo->dpoi_type == vcdp_nat_if_dpo_type) { // matches interface pool
       next[0] = VCDP_BYPASS_NEXT_RECEIVE;
      }    
+#endif
 
     b[0]->error = 0;
     next += 1;

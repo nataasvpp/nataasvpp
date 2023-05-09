@@ -43,15 +43,24 @@ autoreply autoendian define vcdp_session_add
   u16 dport;
 };
 
-define vcdp_session_dump
+autoendian define vcdp_session_lookup
 {
   u32 client_index;
   u32 context;
+
+  u32 tenant_id;
+  vl_api_address_t src;
+  vl_api_address_t dst;
+  u8 protocol;
+  u16 sport;
+  u16 dport;
 };
 
-define vcdp_session_details
+autoendian define vcdp_session_lookup_reply
 {
   u32 context;
+  i32 retval;
+  u32 client_index;
   
   u64 session_id;
   u32 thread_index;
@@ -94,4 +103,10 @@ autoreply define vcdp_set_timeout
   u32 tenant_id;
   u32 timeout_id;
   u32 timeout_value;
+};
+
+autoendian autoreply define vcdp_session_clear
+{
+  u32 client_index;
+  u32 context;
 };

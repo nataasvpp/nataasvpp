@@ -205,10 +205,13 @@ typedef struct {
 typedef enum {
   VCDP_TUNNEL_OUTPUT_NEXT_DROP,
   VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP,
+  VCDP_TUNNEL_OUTPUT_NEXT_ICMP_ERROR,
   VCDP_TUNNEL_OUTPUT_N_NEXT
 } vcdp_tunnel_output_next_t;
 
-#define foreach_vcdp_tunnel_output_error _(NO_TENANT, no_tenant, ERROR, "no tenant")
+#define foreach_vcdp_tunnel_output_error                                                                               \
+  _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
+  _(TIME_EXPIRED, time_expired, INFO, "ttl expired")
 
 // Error counters
 typedef enum {
@@ -271,6 +274,26 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     b[0]->flags |= (VNET_BUFFER_F_IS_IP4 | VNET_BUFFER_F_L3_HDR_OFFSET_VALID | VNET_BUFFER_F_L4_HDR_OFFSET_VALID);
     vnet_buffer(b[0])->oflags |= VNET_BUFFER_OFFLOAD_F_UDP_CKSUM | VNET_BUFFER_OFFLOAD_F_IP_CKSUM;
     ip4_header_t *inner_ip = vlib_buffer_get_current(b[0]);
+
+    /*
+     * If the ttl drops below 1 when forwarding, generate
+     * an ICMP response.
+     */
+    i32 ttl = inner_ip->ttl;
+    u32 checksum = inner_ip->checksum + clib_host_to_net_u16 (0x0100);
+    checksum += checksum >= 0xffff;
+    inner_ip->checksum = checksum;
+    ttl -= 1;
+    inner_ip->ttl = ttl;
+
+    if (PREDICT_FALSE(ttl <= 0)) {
+      b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
+      vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
+      icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
+      to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_ICMP_ERROR;
+      goto done;
+    }
+
     vlib_buffer_advance(b[0], -t->encap_size);
     ip4_header_t *ip = vlib_buffer_get_current(b[0]);
     vnet_buffer(b[0])->l3_hdr_offset = b[0]->current_data;

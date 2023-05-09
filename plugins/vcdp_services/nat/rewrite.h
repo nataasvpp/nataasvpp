@@ -86,4 +86,15 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   }
 }
 
+static inline void
+nat_rewrite_outer(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
+{
+  u32 ops = rewrite->ops;
+  if (ops & NAT_REWRITE_OP_SADDR)
+    ip4->src_address = rewrite->rewrite.saddr;
+  if (ops & NAT_REWRITE_OP_DADDR)
+    ip4->dst_address = rewrite->rewrite.daddr;
+  ip4->checksum = ip4_header_checksum(ip4);
+}
+
 #endif

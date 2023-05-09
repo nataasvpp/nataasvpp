@@ -14,7 +14,7 @@
 #include "gateway.h"
 
 enum vcdp_input_next_e { VCDP_INPUT_NEXT_LOOKUP, VCDP_INPUT_N_NEXT };
-enum vcdp_output_next_e { VCDP_OUTPUT_NEXT_LOOKUP, VCDP_OUTPUT_N_NEXT };
+enum vcdp_output_next_e { VCDP_OUTPUT_NEXT_LOOKUP, VCDP_OUTPUT_NEXT_ICMP_ERROR, VCDP_OUTPUT_N_NEXT };
 
 typedef struct {
   u16 tenant_index;
@@ -122,11 +122,36 @@ VLIB_NODE_FN(vcdp_output_node)
 {
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
-  vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_OUTPUT_NEXT_LOOKUP, n_left);
+  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
+  u16 nexts[VLIB_FRAME_SIZE], *next = nexts;
+
+  vlib_get_buffers(vm, from, bufs, n_left);
+  b = bufs;
+
+  while (n_left > 0) {
+    next[0] = VCDP_OUTPUT_NEXT_LOOKUP;
+
+    /*
+     * If the ttl drops below 1 when forwarding, generate
+     * an ICMP response.
+     */
+    ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+    if (PREDICT_FALSE(ip->ttl <= 1)) {
+      // b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
+      vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
+      icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
+      next[0] = VCDP_OUTPUT_NEXT_ICMP_ERROR;
+    }
+
+    b++;
+    next++;
+    n_left--;
+  }
+
+  vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
+
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
-    vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
-    vlib_get_buffers(vm, from, bufs, n_left);
     b = bufs;
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
@@ -145,12 +170,13 @@ VLIB_REGISTER_NODE(vcdp_output_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .format_trace = format_vcdp_output_trace,
   .n_next_nodes = VCDP_OUTPUT_N_NEXT,
-  .next_nodes = { "ip4-lookup" }
+  .next_nodes = { "ip4-lookup", "vcdp-icmp-error" }
 };
 
 VCDP_SERVICE_DEFINE(output) = {
   .node_name = "vcdp-output",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check", "vcdp-nat-early-rewrite"),
-  .is_terminal = 1};
-
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check",
+                              "vcdp-nat-late-rewrite", "vcdp-nat-early-rewrite"),
+  .is_terminal = 1
+};

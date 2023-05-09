@@ -105,6 +105,42 @@ vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, 
  */
 VCDP_SERVICE_DECLARE(bypass)
 
+vcdp_session_t *
+vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+
+  u16 tenant_idx;
+  vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
+  if (!tenant) return 0;
+  u32 context_id = tenant->context_id;
+
+  vcdp_session_ip4_key_t k = {
+    .context_id = context_id,
+    .src = src->ip.ip4.as_u32,
+    .dst = dst->ip.ip4.as_u32,
+    .sport = sport,
+    .dport = dport,
+    .proto = protocol,
+  };
+  clib_bihash_kv_16_8_t kv = {.key[0] = k.as_u64[0],
+                              .key[1] = k.as_u64[1],
+                              .value = 0};
+
+
+  if (clib_bihash_search_inline_16_8(&vcdp->table4, &kv) == 0) {
+      // Figure out if this is local or remote thread
+      u32 thread_index = vcdp_thread_index_from_lookup(kv.value);
+      /* known flow which belongs to this thread */
+      u32 flow_index = kv.value & (~(u32) 0);
+      u32 session_index = flow_index >> 1;
+      vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+      return pool_elt_at_index(ptd->sessions, session_index);
+  }
+
+  return 0;
+}
+
 int
 vcdp_create_session_v4_2(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
 {
@@ -237,6 +273,8 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 VCDP_SERVICE_DECLARE(drop)
 VCDP_SERVICE_DECLARE(nat_icmp_error)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
+VCDP_SERVICE_DECLARE(nat_late_rewrite)
+VCDP_SERVICE_DECLARE(l4_lifecycle)
 
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool no_create)
@@ -366,12 +404,23 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
+      if (session->timer.next_expiration - time_now < 1) {
+        // Received a packet against an expired session. Let's restart the timer to avoid the session being deleted
+        // underneath us.
+        u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
+        vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+
+        clib_warning("Restarting timer for expired session: %u", session_index);
+        vcdp_session_timer_start(&ptd->wheel, &session->timer, session_index, time_now,
+                                 tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
+      }
       u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
 
       if (sc[0] == VCDP_SERVICE_CHAIN_ICMP_ERROR) {
         pbmp |= VCDP_SERVICE_MASK(nat_icmp_error);
         pbmp &= ~VCDP_SERVICE_MASK(nat_early_rewrite);
-        // clib_warning("Setting Service Chain to ICMP ERROR after %U", format_vcdp_bitmap, pbmp);
+        pbmp &= ~VCDP_SERVICE_MASK(nat_late_rewrite);
+        pbmp &= ~VCDP_SERVICE_MASK(l4_lifecycle);
       }
       vcdp_buffer(b[0])->service_bitmap = pbmp;
 
@@ -458,11 +507,17 @@ VLIB_NODE_FN(vcdp_lookup_ip4_node)
    return vcdp_lookup_inline(vm, node, frame, false);
 }
 
+/*
+ * This node is used to lookup a session without creating one if it doesn't exist.
+ */
 VLIB_NODE_FN(vcdp_lookup_ip4_nocreate_node)(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
    return vcdp_lookup_inline(vm, node, frame, true);
 }
 
+/*
+ * This node is used to handoff packets to the correct thread.
+ */
 VLIB_NODE_FN(vcdp_handoff_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -570,6 +625,7 @@ VLIB_NODE_FN(vcdp_session_expire_node)
 
   for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
     session_index = vec_pop(ptd->expired_sessions);
+    clib_warning("Removing session %u", session_index);
     vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
   }
   return 0;

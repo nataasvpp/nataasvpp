@@ -86,40 +86,6 @@ vcdp_session_state_encode(vcdp_session_state_t x)
 };
 
 static void
-vcdp_send_session_details(vl_api_registration_t *rp, u32 context, u32 session_index, u32 thread_index,
-                          vcdp_session_t *session)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  vlib_main_t *vm = vlib_get_main();
-  vl_api_vcdp_session_details_t *mp;
-  vcdp_tenant_t *tenant;
-  u32 tenant_id;
-  f64 remaining_time;
-  remaining_time = session->timer.next_expiration - vlib_time_now(vm);
-  tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
-  tenant_id = tenant->tenant_id;
-
-  mp = vl_msg_api_alloc_zero(sizeof(*mp));
-  mp->_vl_msg_id = ntohs(VL_API_VCDP_SESSION_DETAILS + vcdp->msg_id_base);
-
-  /* fill in the message */
-  mp->context = context;
-  mp->session_id = clib_host_to_net_u64(session->session_id);
-  mp->thread_index = clib_host_to_net_u32(thread_index);
-  mp->tenant_id = clib_host_to_net_u32(tenant_id);
-  mp->session_idx = clib_host_to_net_u32(session_index);
-  mp->session_type = vcdp_session_type_encode(session->type);
-  mp->protocol = ip_proto_encode(session->proto);
-  mp->state = vcdp_session_state_encode(session->state);
-  mp->remaining_time = clib_host_to_net_f64(remaining_time);
-  mp->forward_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_FORWARD]);
-  mp->reverse_bitmap = clib_host_to_net_u32(session->bitmaps[VCDP_FLOW_REVERSE]);
-  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4], &mp->primary_key);
-  vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4], &mp->secondary_key);
-  vl_api_send_msg(rp, (u8 *) mp);
-}
-
-static void
 vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
@@ -135,25 +101,49 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
 }
 
 static void
-vl_api_vcdp_session_dump_t_handler(vl_api_vcdp_session_dump_t *mp)
+vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
 {
+  vl_api_vcdp_session_lookup_reply_t *rmp;
+  int rv = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
+  // vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
-  uword thread_index;
-  uword session_index;
-  vl_api_registration_t *rp;
-  rp = vl_api_client_index_to_registration(mp->client_index);
-  if (rp == 0)
-    return;
+  // uword thread_index;
+  // uword session_index;
 
-  vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    pool_foreach_index (session_index, ptd->sessions) {
-      session = vcdp_session_at_index(ptd, session_index);
-      vcdp_send_session_details(rp, mp->context, session_index, thread_index, session);
-    }
-  }
+  // vcdp_tenant_t *tenant;
+  // u32 tenant_id;
+  f64 now = vlib_time_now(vlib_get_main());
+
+  // Lookup session in the flow table
+  ip_address_t src, dst;
+  ip_address_decode2(&mp->src, &src);
+  ip_address_decode2(&mp->dst, &dst);
+
+  session = vcdp_lookup_session_v4(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport),
+                                   mp->protocol, &dst,
+                                   clib_host_to_net_u16(mp->dport));
+  if (!session)
+    rv = -1;
+
+  // Return session details from the per-thread session table
+  // This is accessed outside of the lock, so it may be stale?
+  REPLY_MACRO2_END(VL_API_VCDP_SESSION_LOOKUP_REPLY,
+  ({
+  if (session) {
+    rmp->session_id = session->session_id;
+    rmp->thread_index = 0; //thread_index;
+    rmp->tenant_id = mp->tenant_id;
+    rmp->session_idx = 0; //session_index;
+    rmp->session_type = vcdp_session_type_encode(session->type);
+    rmp->protocol = ip_proto_encode(session->proto);
+    rmp->state = vcdp_session_state_encode(session->state);
+    rmp->remaining_time = session->timer.next_expiration - now;
+    rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
+    rmp->reverse_bitmap = session->bitmaps[VCDP_FLOW_REVERSE];
+    vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
+    vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
+  }}));
 }
 
 static void
@@ -196,6 +186,18 @@ vl_api_vcdp_tenant_dump_t_handler(vl_api_vcdp_tenant_dump_t *mp)
     tenant = vcdp_tenant_at_index(vcdp, tenant_index);
     vcdp_send_tenant_details(rp, mp->context, tenant_index, tenant);
   }
+}
+
+static void
+vl_api_vcdp_session_clear_t_handler(vl_api_vcdp_session_clear_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  int rv = 0;
+  vl_api_vcdp_session_clear_reply_t *rmp;
+
+  vcdp_session_clear();
+
+  REPLY_MACRO_END(VL_API_VCDP_SESSION_CLEAR_REPLY);
 }
 
 #include <vcdp/vcdp.api.c>

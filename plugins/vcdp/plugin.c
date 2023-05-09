@@ -9,4 +9,3 @@ VLIB_PLUGIN_REGISTER() = {
   .version_required = VPP_BUILD_VER,
   .description = "nataasvpp Plugin",
 };
-

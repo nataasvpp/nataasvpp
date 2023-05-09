@@ -232,6 +232,33 @@ vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
   return vcdp_tenant_at_index(&vcdp_main, *tenant_idx);
 }
 
+/*
+ * vcdp_session_clear. Delete all sessions.
+ * This requires to be called within a barrier.
+ */
+void
+vcdp_session_clear (void)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd;
+  u32 thread_index;
+  u32 *to_delete = 0;
+  u32 *session_index;
+  vcdp_session_t *session;
+
+  vec_foreach_index(thread_index, vcdp->per_thread_data) {
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    vec_reset_length(ptd->expired_sessions);
+    pool_foreach(session, ptd->sessions) {
+      vec_add1(to_delete, session - ptd->sessions);
+    }
+    vec_foreach(session_index, to_delete) {
+      session = vcdp_session_at_index(ptd, *session_index);
+      vcdp_session_remove(vcdp, ptd, session, thread_index, *session_index);
+    }
+  }
+}
+
 VLIB_INIT_FUNCTION(vcdp_init) = {
   .runs_after = VLIB_INITS("threads_init"),
 };

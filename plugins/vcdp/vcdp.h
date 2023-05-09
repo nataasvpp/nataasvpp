@@ -143,6 +143,8 @@ typedef struct {
   /* per-thread data */
   vcdp_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
+
+  u32 icmp_error_node_index;
 } vcdp_main_t;
 
 typedef struct {
@@ -156,6 +158,7 @@ extern vcdp_main_t vcdp_main;
 extern vcdp_cfg_main_t vcdp_cfg_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
+extern vlib_node_registration_t vcdp_input_node;
 
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;
@@ -264,5 +267,7 @@ int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 int vcdp_create_session_v4_2(u32 context, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
+vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
+void vcdp_session_clear(void);
 
 #endif

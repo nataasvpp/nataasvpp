@@ -21,8 +21,8 @@ make_static_key_v4(u32 context_id, ip4_address_t src, ip4_address_t dst, u8 prot
   k->context_id = context_id;
   k->src = src;
   k->dst = dst;
-  k->sport = sport;
-  k->dport = dport;
+  k->sport = sport; // network order
+  k->dport = dport; // network order
   k->proto = proto;
 }
 

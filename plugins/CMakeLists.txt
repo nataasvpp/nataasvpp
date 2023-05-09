@@ -19,6 +19,7 @@ add_vpp_library(vcdpcore
   vcdp/service.c
   vcdp/bypass/node.c
   vcdp/vcdp_counter.json.c
+  vcdp/icmp/icmp4.c
 
 
   vcdp_services/tcp-check/node.c
@@ -35,7 +36,6 @@ add_vpp_library(vcdpcore
   vcdp_services/nat/fastpath_node.c
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/icmp_error_node.c
-  vcdp_services/nat/vcdp_nat_dpo.c
   vcdp_services/nat/nat_counter.json.c
 
   gateway/gateway.c

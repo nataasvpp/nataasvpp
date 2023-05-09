@@ -54,19 +54,20 @@ vlib_error_desc_t vcdp_tunnel_output_error_counters[] = {
 #undef _
 };
 
-VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {.name = "vcdp-tunnel-output",
-                                               .vector_size = sizeof(u32),
-                                               .format_trace = format_vcdp_tunnel_trace,
-                                               .type = VLIB_NODE_TYPE_INTERNAL,
-
-                                               .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
-                                               .error_counters = vcdp_tunnel_output_error_counters,
-                                               .n_next_nodes = VCDP_TUNNEL_OUTPUT_N_NEXT,
-                                               .next_nodes =
-                                                 {
-                                                   [VCDP_TUNNEL_OUTPUT_NEXT_DROP] = "error-drop",
-                                                   [VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
-                                                 }
+VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {
+  .name = "vcdp-tunnel-output",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_tunnel_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
+  .error_counters = vcdp_tunnel_output_error_counters,
+  .n_next_nodes = VCDP_TUNNEL_OUTPUT_N_NEXT,
+  .next_nodes =
+    {
+      [VCDP_TUNNEL_OUTPUT_NEXT_DROP] = "error-drop",
+      [VCDP_TUNNEL_OUTPUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
+      [VCDP_TUNNEL_OUTPUT_NEXT_ICMP_ERROR] = "vcdp-icmp-error",
+    }
 
 };
 
