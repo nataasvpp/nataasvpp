@@ -76,7 +76,7 @@ vcdp_set_services_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
     err = clib_error_return(0, "missing direction");
     goto done;
   }
-  vcdp_set_services(vcdp, tenant_id, bitmap, direction);
+  err = vcdp_set_services(vcdp, tenant_id, bitmap, direction);
 done:
   unformat_free(line_input);
   return err;

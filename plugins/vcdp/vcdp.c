@@ -179,6 +179,20 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
     return clib_error_return(0, "Can't assign service map: tenant id %d not found", tenant_id);
 
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  int i;
+  bool terminates = false;
+  vec_foreach_index_backwards(i, sm->services) {
+    if (bitmap & sm->services[i]->service_mask[0]) {
+      if (sm->services[i]->is_terminal) {
+        terminates = true;
+      }
+      break;
+    }
+  }
+  if (!terminates) {
+    return clib_error_return(0, "Service chain does not terminate. %U", format_vcdp_bitmap, bitmap);
+  }
   tenant = vcdp_tenant_at_index(vcdp, kv.value);
   tenant->bitmaps[direction] = bitmap;
   return 0;
