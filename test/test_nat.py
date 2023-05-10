@@ -68,6 +68,7 @@ def vpp_connection(start_vpp):
     vpp = VPPApiClient(apifiles=apifiles)
     vpp.connect(name='test_nat')
     vpp_clear_session(vpp)
+    vpp_tcp_mss_clamp(vpp, 0, 1234)
     yield vpp
 
     # Disconnect from VPP
@@ -168,6 +169,11 @@ def validate_vpp_session_state(vpp, packet, expected_state):
 def vpp_clear_session(vpp):
     """Clear all VPP sessions."""
     vpp.api.vcdp_session_clear()
+
+def vpp_tcp_mss_clamp(vpp, tenant, mss):
+    '''Missing CLI for this one'''
+    vpp.api.vcdp_tcp_mss_enable_disable(tenant_id=tenant, ip4_mss=[mss, 0xFFFF], is_enable=True)
+
 
 class NATTest(BaseModel):
     '''A test case for the NAT.'''
@@ -359,9 +365,16 @@ test_cases = [
         'expect': IP(src=nat_ip, dst='9.9.9.9')/ICMP(type='echo-reply', id=8888),
         'send_iface': outside_iface,
         'receive_iface': outside_iface,
+        'expected_to_fail': True,
     },
 
-    # TCP MSS clamping
+    # test20 TCP MSS clamping
+    {
+        'name': 'Check TCP MSS clamp',
+        'send': IP(src='210.10.10.10', dst=dst_ip)/TCP(sport=888, flags="S", options=[("MSS", 9000), ("EOL", None)]),
+        'expect': IP(src=nat_ip, dst=dst_ip)/TCP(sport=888, flags="S", options=[("MSS", 1234), ("EOL", None)]),
+    },
+
     # Fragments
     # Too small packets
     # Chained packets

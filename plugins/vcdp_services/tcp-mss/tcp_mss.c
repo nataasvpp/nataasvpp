@@ -21,10 +21,25 @@ vcdp_tcp_mss_enable_disable(u32 tenant_id, u16 mss4_forward, u16 mss4_reverse, b
     mss4_forward = MSS_CLAMP_UNSET;
     mss4_reverse = MSS_CLAMP_UNSET;
   }
-  vec_validate_init_empty(cm->max_mss4_forward, tenant_idx, MSS_CLAMP_UNSET);
   cm->max_mss4_forward[tenant_idx] = mss4_forward;
-  vec_validate_init_empty(cm->max_mss4_reverse, tenant_idx, MSS_CLAMP_UNSET);
   cm->max_mss4_reverse[tenant_idx] = mss4_reverse;
 
   return rv;
 }
+
+clib_error_t *
+vcdp_tcp_mss_init (vlib_main_t *vm)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_tcp_mss_main_t *cm = &vcdp_tcp_mss_main;
+
+  u32 no_tenants = pool_elts(vcdp->tenants);
+
+  vec_validate_init_empty(cm->max_mss4_forward, no_tenants, MSS_CLAMP_UNSET);
+  vec_validate_init_empty(cm->max_mss4_reverse, no_tenants, MSS_CLAMP_UNSET);
+  return 0;
+}
+
+VLIB_INIT_FUNCTION(vcdp_tcp_mss_init) = {
+  .runs_after = VLIB_INITS("vcdp_init"),
+};

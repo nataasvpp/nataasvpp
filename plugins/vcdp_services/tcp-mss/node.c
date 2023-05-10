@@ -85,7 +85,7 @@ vcdp_tcp_mss_fixup(tcp_header_t *tcp, u16 max_mss, u16 *org_mss)
 
 VCDP_SERVICE_DECLARE(vcdp_tcp_mss);
 always_inline uword
-vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, vlib_dir_t dir)
+vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_mss_main_t *cm = &vcdp_tcp_mss_main;
@@ -117,7 +117,8 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     u8 direction = vcdp_direction_from_flow_index(b[0]->flow_id);
     u16 max_mss4 = direction == VCDP_FLOW_FORWARD ? cm->max_mss4_forward[tenant_idx] : cm->max_mss4_reverse[tenant_idx];
-
+    if (max_mss4 == MSS_CLAMP_UNSET)
+      goto done;
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
     pkts_clamped += clamped;
 
@@ -154,7 +155,7 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
 static uword
 vcdp_tcp_mss_ip4(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  return (vcdp_tcp_mss_inline(vm, node, frame, VLIB_RX));
+  return (vcdp_tcp_mss_inline(vm, node, frame));
 }
 
 VLIB_REGISTER_NODE(vcdp_tcp_mss_ip4_node) = {
