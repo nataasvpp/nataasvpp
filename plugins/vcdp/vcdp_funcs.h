@@ -13,8 +13,11 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   clib_bihash_kv_16_8_t kv = {0};
   kv2.key = session->session_id;
 
-//  vcdp_session_timer_stop(&ptd->wheel, &session->timer);
-  // TODO: consider removing the if. A session must always have two keys.
+  /* Stop timer if running */
+  if (vcdp_session_timer_running(&ptd->wheel, &session->timer)) {
+    vcdp_session_timer_stop(&ptd->wheel, &session->timer);
+  }
+
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
     clib_memcpy_fast(&kv.key, &session->keys[VCDP_SESSION_KEY_PRIMARY], sizeof(kv.key));
     if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 0))

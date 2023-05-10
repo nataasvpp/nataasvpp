@@ -73,4 +73,13 @@ vcdp_session_timer_update_maybe_past(vcdp_tw_t *tw, vcdp_session_timer_t *timer,
     timer->next_expiration = now + ticks * VCDP_TIMER_INTERVAL;
 }
 
+static_always_inline bool
+vcdp_session_timer_running(vcdp_tw_t *tw, vcdp_session_timer_t *timer)
+{
+  if (pool_is_free_index (tw, timer->handle))
+    return false;
+  return true;
+}
+
+
 #endif
