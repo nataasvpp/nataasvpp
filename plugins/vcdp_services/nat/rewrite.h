@@ -21,7 +21,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   u32 ops = rewrite->ops;
   bool checksum_valid = true;
   if (ip4->checksum != ip4_header_checksum(ip4)) {
-    clib_warning("Checksum generation error in PRE NAT");
+    clib_warning("Checksum generation error in PRE NAT %U", format_ip4_header, ip4, 32);
     checksum_valid = false;
   }
 

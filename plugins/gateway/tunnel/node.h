@@ -287,7 +287,7 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
     inner_ip->ttl = ttl;
 
     if (PREDICT_FALSE(ttl <= 0)) {
-      b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
+      b[0]->error = node->errors[VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED];
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
       to_next[0] = VCDP_TUNNEL_OUTPUT_NEXT_ICMP_ERROR;

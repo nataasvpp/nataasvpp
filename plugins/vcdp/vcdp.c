@@ -34,7 +34,7 @@ vcdp_timer_expired(u32 *expired)
   vec_foreach (e, expired) {
     u32 session_idx = e[0] & VCDP_TIMER_SI_MASK;
     if (pool_is_free_index(ptd->sessions, session_idx)) {
-      clib_warning("*** Expired session does not exists %d", session_idx);
+      /* Session has already been deleted */
       continue;
     }
     vec_add1(ptd->expired_sessions, session_idx);

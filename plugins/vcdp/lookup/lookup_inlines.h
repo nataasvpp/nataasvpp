@@ -69,15 +69,6 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
       skey->sport = skey->dport = echo->identifier;
     } else {
 
-
-      // Challenge: How do I find which key to use?
-      // Different depending on which "direction" the packet is coming in from
-      // 1. If the packet is coming from the outside, then the key is the destination address
-      // 2. If the packet is coming from the inside, then the key is the source address
-      // 3. If the packet is coming from the inside, and the destination address is the same as the source address, then the key is the source address
-      // How do I know which direction the packet is coming from?
-
-
       /* Do the same thing for the inner packet */
       ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
       offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));

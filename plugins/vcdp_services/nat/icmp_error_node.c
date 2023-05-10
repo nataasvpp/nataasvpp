@@ -7,23 +7,11 @@
 #include <vcdp/vcdp_funcs.h>
 #include "rewrite.h"
 
-
-#define foreach_vcdp_nat_icmp_error_next                                                                               \
-  _(DROP, "error-drop")                                                                                                \
-  _(IP4_LOOKUP, "ip4-lookup") // TODO: is this right?
-
-typedef enum {
-#define _(n, x) VCDP_NAT_ICMP_ERROR_NEXT_##n,
-  foreach_vcdp_nat_icmp_error_next
-#undef _
-    VCDP_NAT_ICMP_ERROR_N_NEXT
-} vcdp_nat_icmp_error_next_t;
-
-
-
 #define foreach_vcdp_nat_icmp_error                                                                                \
   _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
   _(TRUNCATED, truncated, ERROR, "truncated")                                                                          \
+  _(CHECKSUM, checksum, ERROR, "invalid checksum")                                                                          \
+  _(TOOLONG, toolong, ERROR, "icmp error message too long")                                                                          \
   _(NOT_SUPPORTED, not_supported, ERROR, "not supported inner protocol")
 
 // Error counters
@@ -39,7 +27,6 @@ vlib_error_desc_t vcdp_nat_icmp_error_counters[] = {
   foreach_vcdp_nat_icmp_error
 #undef _
 };
-
 
 typedef struct {
   u32 thread_index;
@@ -66,31 +53,45 @@ format_vcdp_nat_icmp_error_trace(u8 *s, va_list *args)
 VCDP_SERVICE_DECLARE(drop)
 
 static_always_inline void
-nat_icmp_error_process_one(nat_rewrite_data_t *nat_rewrites, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
+nat_icmp_error_process_one(vlib_node_runtime_t * node, nat_rewrite_data_t *nat_rewrites, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
   ip4_header_t *ip = vlib_buffer_get_current(b[0]);
   icmp46_header_t *icmp;
   icmp_echo_header_t *echo;
+
   if (session->session_version != nat_rewrites[0].version) {
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
+  vlib_main_t *vm = vlib_get_main();
 
+  // Drop any ICMP error longer than 576 bytes
+  if (clib_net_to_host_u16(ip->length) > 576 || b[0]->current_length > 576 ||
+    (b[0]->current_length != vlib_buffer_length_in_chain(vm, b[0]))) {
+    b[0]->error = node->errors[VCDP_NAT_ICMP_ERROR_TOOLONG];
+    vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+    clib_warning("ICMP error too long %d %d", clib_net_to_host_u16(ip->length), b[0]->current_length);
+    goto end_of_packet;
+  }
+
+  // TODO: Check if this is chained
   // The flow-id comes from the inner packet
   int dir = vcdp_direction_from_flow_index(b[0]->flow_id);
   icmp = (icmp46_header_t *) ip4_next_header(ip);
   echo = (icmp_echo_header_t *) (icmp + 1);
   ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
+
+  // Validate checksums
+  ip_csum_t sum = ip_incremental_checksum(0, icmp, b[0]->current_length - sizeof(ip4_header_t));
+  sum = ~ip_csum_fold(sum);
+  if (!ip4_header_checksum_is_valid(inner_ip) || (u16)sum != 0) {
+    b[0]->error = node->errors[VCDP_NAT_ICMP_ERROR_CHECKSUM];
+    vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+    goto end_of_packet;
+  }
+
   nat_rewrite_data_t icmp_error_rewrite;
-
   clib_memcpy(&icmp_error_rewrite, &nat_rewrites[dir], sizeof(nat_rewrite_data_t));
-  // TODO: Unhapyp with this. Need to figure out how to do this better
-
-  // Rewriting information for ICMP packet
-  // clib_warning("ICMP rewrite: Session key: %U", format_vcdp_session_key, &session->keys[dir]);
-  // clib_warning("ICMP rewrite: Rewrite data: %U", format_vcdp_nat_rewrite, &nat_rewrites[dir]);
-  // clib_warning("ICMP rewrite: Packet: %U", format_ip4_header, ip, 32);
-
   nat_rewrite_outer(ip, &nat_rewrites[dir]);
   if (dir == VCDP_FLOW_FORWARD) {
     icmp_error_rewrite.ops = NAT_REWRITE_OP_DADDR;
@@ -102,10 +103,8 @@ nat_icmp_error_process_one(nat_rewrite_data_t *nat_rewrites, vcdp_session_t *ses
   nat_rewrite(inner_ip, &icmp_error_rewrite);
 
   // Recalculate ICMP checksum
-  vlib_main_t *vm = vlib_get_main();
-  ip_csum_t sum;
   icmp->checksum = 0;
-  sum = ip_incremental_checksum(0, icmp, vlib_buffer_length_in_chain(vm, b[0]) - ip4_header_bytes(ip));
+  sum = ip_incremental_checksum(0, icmp, b[0]->current_length - ip4_header_bytes(ip));
   icmp->checksum = ~ip_csum_fold (sum);
   ip->checksum = ip4_header_checksum (ip);
 
@@ -150,7 +149,7 @@ vcdp_nat_icmp_error_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
 
     // Call fastpath process on outer and then on inner
-    nat_icmp_error_process_one(nat_rewrites, session, to_next, b);
+    nat_icmp_error_process_one(node, nat_rewrites, session, to_next, b);
 
     n_left -= 1;
     b += 1;
@@ -182,19 +181,12 @@ VLIB_NODE_FN(vcdp_nat_icmp_error_node)
 }
 
 VLIB_REGISTER_NODE(vcdp_nat_icmp_error_node) = {
-    .name = "vcdp-nat-icmp-error",
-    .vector_size = sizeof(u32),
-    .format_trace = format_vcdp_nat_icmp_error_trace,
-    .type = VLIB_NODE_TYPE_INTERNAL,
-
-    .n_errors = ARRAY_LEN(vcdp_nat_icmp_error_counters),
-    .error_counters = vcdp_nat_icmp_error_counters,
-    .n_next_nodes = VCDP_NAT_ICMP_ERROR_N_NEXT,
-    .next_nodes = {
-#define _(n, x) [VCDP_NAT_ICMP_ERROR_NEXT_##n] = x,
-    foreach_vcdp_nat_icmp_error_next
-#undef _
-    }
+  .name = "vcdp-nat-icmp-error",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_nat_icmp_error_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = ARRAY_LEN(vcdp_nat_icmp_error_counters),
+  .error_counters = vcdp_nat_icmp_error_counters,
 };
 
 VCDP_SERVICE_DEFINE(nat_icmp_error) = {

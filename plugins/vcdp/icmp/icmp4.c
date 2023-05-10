@@ -79,7 +79,7 @@ VLIB_NODE_FN(vcdp_icmp_error_node)
      */
     u64 r0 = (u64) ip->dst_address.as_u32 << 32 | ip->src_address.as_u32;
     if (throttle_check(&icmp_throttle, thread_index, r0, seed)) {
-      b[0]->error = VCDP_ICMP_ERROR_THROTTLED;
+      b[0]->error = node->errors[VCDP_ICMP_ERROR_THROTTLED];
       next[0] = VCDP_ICMP_ERROR_NEXT_DROP;
       goto done;
     }
@@ -106,7 +106,7 @@ VLIB_NODE_FN(vcdp_icmp_error_node)
     if (!ip4_sas_by_sw_if_index(sw_if_index, &out_ip->dst_address,
                                 &out_ip->src_address)) { /* interface has no IP4 address - should not happen */
       next[0] = VCDP_ICMP_ERROR_NEXT_DROP;
-      b[0]->error = VCDP_ICMP_ERROR_SAS_FAILED;
+      b[0]->error = node->errors[VCDP_ICMP_ERROR_SAS_FAILED];
       goto done;
     }
 

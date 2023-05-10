@@ -52,19 +52,22 @@ VLIB_NODE_FN(vcdp_drop_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_drop_node) = {.name = "vcdp-drop",
-                                      .vector_size = sizeof(u32),
-                                      .format_trace = format_vcdp_drop_trace,
-                                      .type = VLIB_NODE_TYPE_INTERNAL,
-                                      .n_next_nodes = VCDP_DROP_N_NEXT,
-                                      .next_nodes =
-                                        {
+VLIB_REGISTER_NODE(vcdp_drop_node) = {
+  .name = "vcdp-drop",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_drop_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_next_nodes = VCDP_DROP_N_NEXT,
+  .next_nodes = {
 #define _(n, x) [VCDP_DROP_NEXT_##n] = x,
-                                          foreach_vcdp_drop_next
+  foreach_vcdp_drop_next
 #undef _
-                                        }
-
+  }
 };
 
 VCDP_SERVICE_DEFINE(drop) = {
-  .node_name = "vcdp-drop", .runs_before = VCDP_SERVICES(0), .runs_after = VCDP_SERVICES(0), .is_terminal = 1};
+  .node_name = "vcdp-drop",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 1
+};
