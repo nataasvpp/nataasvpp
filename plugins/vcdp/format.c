@@ -70,12 +70,12 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
     skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
     s = format(s, "  primary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
-               &skey->src, skey->sport, format_ip4_address, &skey->dst, skey->dport);
+               &skey->src, clib_net_to_host_u16(skey->sport), format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
   }
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
     skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
     s = format(s, "  secondary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
-               &skey->src, skey->sport, format_ip4_address, &skey->dst, skey->dport);
+               &skey->src, clib_net_to_host_u16(skey->sport), format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
   }
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format(s, "  expires after: %fs\n", remaining_time);

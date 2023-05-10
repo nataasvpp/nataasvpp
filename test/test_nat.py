@@ -5,7 +5,7 @@ import pytest
 from scapy.all import sendp, sniff
 from scapy.layers.inet import IP, UDP, TCP, ICMP, GRE, IPerror
 from scapy.layers.dhcp import BOOTP, DHCP
-from scapy.all import AsyncSniffer, sendp
+from scapy.all import AsyncSniffer, sendp, Raw
 from scapy.packet import Packet
 from scapy.layers.l2 import Ether
 from pydantic import BaseModel
@@ -382,11 +382,21 @@ test_cases = [
         'expect': None,
     },
 
+    # test 22 Large packet (9K)
+    {
+        'name': 'session created from udp_data with huge packet',
+        'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
+        'expect': IP(src=nat_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
+        'respond': respond_data,
+        'validate_vpp': lambda vpp, packet, expected_state=1: validate_vpp_session_state(vpp, packet, expected_state)
+    },
+
     # Fragments
     # Too small packets
 
     # Chained packets
     # Hairpinning
+    # Multichain ICMP error, check if cleaned up properly
 ]
 
 def validate_packet(received, expected):
