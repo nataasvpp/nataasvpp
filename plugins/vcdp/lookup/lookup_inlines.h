@@ -115,7 +115,6 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
         skey->sport = skey->dport = 0;
         break;
       }
-
       break;
     }
     break;
@@ -125,7 +124,6 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   }
 
   if (offset > b->current_length) {
-    clib_warning("Packet is too short: %d %d", offset, b->current_length);
     sc[0] = VCDP_SERVICE_CHAIN_DROP_NO_KEY;
   }
   skey->context_id = context_id;

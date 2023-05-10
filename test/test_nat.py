@@ -375,8 +375,16 @@ test_cases = [
         'expect': IP(src=nat_ip, dst=dst_ip)/TCP(sport=888, flags="S", options=[("MSS", 1234), ("EOL", None)]),
     },
 
+    # test 21 Truncated packet
+    {
+        'name': 'Truncated packet',
+        'send': IP(src='210.10.10.10', dst=dst_ip, proto=17),
+        'expect': None,
+    },
+
     # Fragments
     # Too small packets
+
     # Chained packets
     # Hairpinning
 ]

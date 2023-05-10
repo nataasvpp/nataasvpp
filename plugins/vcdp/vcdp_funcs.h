@@ -45,6 +45,9 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
 static_always_inline void
 vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, u32 session_index)
 {
+  /* Session may have been removed already */
+  if (pool_is_free_index(ptd->sessions, session_index))
+    return;
   vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
   f64 diff = (session->timer.next_expiration - (ptd->current_time + VCDP_TIMER_INTERVAL)) / VCDP_TIMER_INTERVAL;
   if (diff > (f64) 1.) {
