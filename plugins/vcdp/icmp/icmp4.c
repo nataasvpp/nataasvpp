@@ -90,6 +90,14 @@ VLIB_NODE_FN(vcdp_icmp_error_node)
     vlib_buffer_advance(b[0], -sizeof(ip4_header_t) - sizeof(icmp46_header_t) - 4);
 
     b[0]->current_length = b[0]->current_length > 576 ? 576 : b[0]->current_length;
+
+    // Free any chained buffers, keeping the first one
+    if (b[0]->flags & VLIB_BUFFER_NEXT_PRESENT) {
+      vlib_buffer_free_one(vm, b[0]->next_buffer);
+      b[0]->total_length_not_including_first_buffer = 0;
+      b[0]->flags &= ~VLIB_BUFFER_NEXT_PRESENT;
+    }
+
     ip4_header_t *out_ip = vlib_buffer_get_current(b[0]);
     icmp46_header_t *icmp = (icmp46_header_t *) &out_ip[1];
 

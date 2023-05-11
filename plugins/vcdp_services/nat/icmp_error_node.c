@@ -63,18 +63,14 @@ nat_icmp_error_process_one(vlib_node_runtime_t * node, nat_rewrite_data_t *nat_r
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
-  vlib_main_t *vm = vlib_get_main();
 
   // Drop any ICMP error longer than 576 bytes
-  if (clib_net_to_host_u16(ip->length) > 576 || b[0]->current_length > 576 ||
-    (b[0]->current_length != vlib_buffer_length_in_chain(vm, b[0]))) {
+  if (clib_net_to_host_u16(ip->length) > 576 || b[0]->current_length > 576) {
     b[0]->error = node->errors[VCDP_NAT_ICMP_ERROR_TOOLONG];
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-    clib_warning("ICMP error too long %d %d", clib_net_to_host_u16(ip->length), b[0]->current_length);
     goto end_of_packet;
   }
 
-  // TODO: Check if this is chained
   // The flow-id comes from the inner packet
   int dir = vcdp_direction_from_flow_index(b[0]->flow_id);
   icmp = (icmp46_header_t *) ip4_next_header(ip);

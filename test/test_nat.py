@@ -391,6 +391,16 @@ test_cases = [
         'validate_vpp': lambda vpp, packet, expected_state=1: validate_vpp_session_state(vpp, packet, expected_state)
     },
 
+    # test 23 Large packet ICMP (9K)
+    {
+        'name': 'session created from udp_data with huge packet',
+        'send': IP(src=src_ip, dst=dst_ip, ttl=1) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
+        'expect': IP(src='0.0.0.0', dst=src_ip) / ICMP(type='time-exceeded', code='ttl-zero-during-transit') / IP(src=src_ip, dst=dst_ip, len=8028)/UDP(sport=src_port, dport=dst_port, len=8008) / Raw("x" * 520),
+        'send_iface': inside_iface,
+        'receive_iface': inside_iface,
+
+    },
+
     # Fragments
     # Too small packets
 
