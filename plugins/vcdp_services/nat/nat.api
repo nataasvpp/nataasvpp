@@ -42,3 +42,54 @@ autoreply autoendian define vcdp_nat_bind_set_unset
 
   bool is_set;
 };
+
+counters vcdp_nat_icmp {
+  no_tenant {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no tenant";
+  };
+  truncated {
+    severity error;
+    type counter64;
+    units "packets";
+    description "truncated";
+  };
+  checksum {
+    severity error;
+    type counter64;
+    units "packets";
+    description "invalid checksum";
+  };
+  toolong {
+    severity error;
+    type counter64;
+    units "packets";
+    description "icmp error message too long";
+  };
+  not_supported {
+    severity error;
+    type counter64;
+    units "packets";
+    description "not supported inner protocol";
+  };
+};
+
+counters vcdp_nat_slowpath {
+  no_instance {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no instance";
+  };
+};
+
+counters vcdp_nat_fastpath {
+  drop {
+    severity error;
+    type counter64;
+    units "packets";
+    description "drop";
+  };
+};

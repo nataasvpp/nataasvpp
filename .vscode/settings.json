@@ -19,7 +19,8 @@
         "ip4.h": "c",
         "stats.h": "c",
         "nat_counter.json.h": "c",
-        "node.h": "c"
+        "node.h": "c",
+        "nat.api_enum.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

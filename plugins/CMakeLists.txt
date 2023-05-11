@@ -80,6 +80,9 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-check/tcp_check.api
   gateway/gateway.api
   vcdp_services/tcp-mss/tcp_mss.api
+  vcdp_services/l4-lifecycle/l4_lifecycle.api
+  vcdp_services/tcp-check-lite/tcp_check_lite.api
+  vcdp_services/stats/stats.api
 
   LINK_LIBRARIES
   vcdpcore

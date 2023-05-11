@@ -4,21 +4,7 @@
 #include <vlib/vlib.h>
 #include "stats.h"
 #include <vcdp/service.h>
-
-#define foreach_vcdp_stats_error _(DROP, "drop")
-
-typedef enum {
-#define _(sym, str) VCDP_STATS_ERROR_##sym,
-  foreach_vcdp_stats_error
-#undef _
-    VCDP_STATS_N_ERROR,
-} vcdp_stats_error_t;
-
-static char *vcdp_stats_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_stats_error
-#undef _
-};
+#include <vcdp_services/stats/stats.api_enum.h>
 
 uword
 vcdp_stats_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
@@ -64,13 +50,17 @@ VLIB_NODE_FN(vcdp_stats_node)
      return vcdp_stats_node_inline(vm, node, frame);
 }
 
-VLIB_REGISTER_NODE(vcdp_stats_node) = {.name = "vcdp-stats",
-                                       .vector_size = sizeof(u32),
-                                       .type = VLIB_NODE_TYPE_INTERNAL,
-                                       .n_errors = ARRAY_LEN(vcdp_stats_error_strings),
-                                       .error_strings = vcdp_stats_error_strings};
+VLIB_REGISTER_NODE(vcdp_stats_node) = {
+  .name = "vcdp-stats",
+  .vector_size = sizeof(u32),
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_STATS_N_ERROR,
+  .error_counters = vcdp_stats_error_counters
+};
 
-VCDP_SERVICE_DEFINE(vcdp_stats) = {.node_name = "vcdp-stats",
-                                   .runs_before = VCDP_SERVICES("vcdp-l4-lifecycle"),
-                                   .runs_after = VCDP_SERVICES(0),
-                                   .is_terminal = 0};
+VCDP_SERVICE_DEFINE(vcdp_stats) = {
+  .node_name = "vcdp-stats",
+  .runs_before = VCDP_SERVICES("vcdp-l4-lifecycle"),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 0
+};

@@ -6,21 +6,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "rewrite.h"
-
-#define foreach_vcdp_nat_fastpath_error _(DROP, "drop")
-
-typedef enum {
-#define _(sym, str) VCDP_NAT_FASTPATH_ERROR_##sym,
-  foreach_vcdp_nat_fastpath_error
-#undef _
-    VCDP_NAT_FASTPATH_N_ERROR,
-} vcdp_nat_fastpath_error_t;
-
-static char *vcdp_nat_fastpath_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_nat_fastpath_error
-#undef _
-};
+#include <vcdp_services/nat/nat.api_enum.h>
 
 typedef struct {
   u32 thread_index;
@@ -130,8 +116,8 @@ VLIB_REGISTER_NODE(vcdp_nat_early_rewrite_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_nat_fastpath_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
-  .error_strings = vcdp_nat_fastpath_error_strings,
+  .n_errors = VCDP_NAT_FASTPATH_N_ERROR,
+  .error_counters = vcdp_nat_fastpath_error_counters,
   .sibling_of = "vcdp-lookup-ip4"
 };
 
@@ -140,8 +126,8 @@ VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_nat_fastpath_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_nat_fastpath_error_strings),
-  .error_strings = vcdp_nat_fastpath_error_strings,
+  .n_errors = VCDP_NAT_FASTPATH_N_ERROR,
+  .error_counters = vcdp_nat_fastpath_error_counters,
   .sibling_of = "vcdp-lookup-ip4"
 };
 

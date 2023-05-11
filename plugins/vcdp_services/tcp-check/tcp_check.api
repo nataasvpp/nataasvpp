@@ -38,3 +38,12 @@ define vcdp_tcp_session_details
   vl_api_vcdp_session_key_t primary_key;
   vl_api_vcdp_session_key_t secondary_key;
 };
+
+counters vcdp_tcp_check {
+  drop {
+    severity error;
+    type counter64;
+    units "packets";
+    description "drop";
+  };
+};

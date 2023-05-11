@@ -63,3 +63,39 @@ autoreply autoendian define vcdp_gateway_tunnel_enable_disable
   vl_api_interface_index_t sw_if_index;
   bool is_enable;
 };
+
+counters vcdp_tunnel_input {
+  no_tenant {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no tenant";
+  };
+  truncated {
+    severity error;
+    type counter64;
+    units "packets";
+    description "truncated";
+  };
+  not_supported {
+    severity error;
+    type counter64;
+    units "packets";
+    description "not supported inner protocol";
+  };
+};
+
+counters vcdp_tunnel_output {
+  no_tenant {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no tenant";
+  };
+  time_expired {
+    severity info;
+    type counter64;
+    units "packets";
+    description "ttl expired";
+  };
+};

@@ -13,8 +13,8 @@
 #include "vxlan_packet.h"
 #include <vpp_plugins/geneve/geneve_packet.h>
 #include "tunnel.h"
+#include <gateway/gateway.api_enum.h>
 
-extern vlib_error_desc_t vcdp_tunnel_input_error_counters[];
 static inline u8 *
 format_vcdp_tunnel_trace(u8 *s, va_list *args)
 {
@@ -33,19 +33,6 @@ typedef enum {
   VCDP_TUNNEL_INPUT_NEXT_IP4_LOOKUP,
   VCDP_TUNNEL_INPUT_N_NEXT
 } vcdp_tunnel_input_next_t;
-
-#define foreach_vcdp_tunnel_input_error                                                                                \
-  _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
-  _(TRUNCATED, truncated, ERROR, "truncated")                                                                          \
-  _(NOT_SUPPORTED, not_supported, ERROR, "not supported inner protocol")
-
-// Error counters
-typedef enum {
-#define _(f, n, s, d) VCDP_TUNNEL_INPUT_ERROR_##f,
-  foreach_vcdp_tunnel_input_error
-#undef _
-    VCDP_TUNNEL_INPUT_N_ERROR,
-} vcdp_tunnel_input_error_t;
 
 // Graph node for VXLAN and Geneve tunnel decap
 static inline uword
@@ -208,18 +195,6 @@ typedef enum {
   VCDP_TUNNEL_OUTPUT_NEXT_ICMP_ERROR,
   VCDP_TUNNEL_OUTPUT_N_NEXT
 } vcdp_tunnel_output_next_t;
-
-#define foreach_vcdp_tunnel_output_error                                                                               \
-  _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
-  _(TIME_EXPIRED, time_expired, INFO, "ttl expired")
-
-// Error counters
-typedef enum {
-#define _(f, n, s, d) VCDP_TUNNEL_OUTPUT_ERROR_##f,
-  foreach_vcdp_tunnel_output_error
-#undef _
-    VCDP_TUNNEL_OUTPUT_N_ERROR,
-} vcdp_tunnel_output_error_t;
 
 static void
 vcdp_vxlan_dummy_l2_fixup(vlib_main_t *vm, vlib_buffer_t *b, ip4_header_t *inner_ip)

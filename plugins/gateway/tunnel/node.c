@@ -13,12 +13,6 @@ VLIB_NODE_FN(vcdp_tunnel_input_node)
   return vcdp_tunnel_input_node_inline(vm, node, frame);
 }
 
-vlib_error_desc_t vcdp_tunnel_input_error_counters[] = {
-#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
-  foreach_vcdp_tunnel_input_error
-#undef _
-};
-
 VLIB_REGISTER_NODE(vcdp_tunnel_input_node) = {
   .name = "vcdp-tunnel-input",
   .vector_size = sizeof(u32),
@@ -47,12 +41,6 @@ VLIB_NODE_FN(vcdp_tunnel_output_node)
 {
   return vcdp_tunnel_output_node_inline(vm, node, frame);
 }
-
-vlib_error_desc_t vcdp_tunnel_output_error_counters[] = {
-#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
-  foreach_vcdp_tunnel_output_error
-#undef _
-};
 
 VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {
   .name = "vcdp-tunnel-output",

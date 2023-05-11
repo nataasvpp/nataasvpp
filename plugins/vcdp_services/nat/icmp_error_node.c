@@ -6,27 +6,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "rewrite.h"
-
-#define foreach_vcdp_nat_icmp_error                                                                                \
-  _(NO_TENANT, no_tenant, ERROR, "no tenant")                                                                          \
-  _(TRUNCATED, truncated, ERROR, "truncated")                                                                          \
-  _(CHECKSUM, checksum, ERROR, "invalid checksum")                                                                          \
-  _(TOOLONG, toolong, ERROR, "icmp error message too long")                                                                          \
-  _(NOT_SUPPORTED, not_supported, ERROR, "not supported inner protocol")
-
-// Error counters
-typedef enum {
-#define _(f, n, s, d) VCDP_NAT_ICMP_ERROR_##f,
-  foreach_vcdp_nat_icmp_error
-#undef _
-    VCDP_NAT_ICMP_N_ERROR,
-} vcdp_nat_icmp_input_error_t;
-
-vlib_error_desc_t vcdp_nat_icmp_error_counters[] = {
-#define _(f, n, s, d) {#n, d, VL_COUNTER_SEVERITY_##s},
-  foreach_vcdp_nat_icmp_error
-#undef _
-};
+#include <vcdp_services/nat/nat.api_enum.h>
 
 typedef struct {
   u32 thread_index;
@@ -181,7 +161,7 @@ VLIB_REGISTER_NODE(vcdp_nat_icmp_error_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_nat_icmp_error_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_nat_icmp_error_counters),
+  .n_errors = VCDP_NAT_ICMP_N_ERROR,
   .error_counters = vcdp_nat_icmp_error_counters,
 };
 

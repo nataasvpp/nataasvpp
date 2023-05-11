@@ -4,20 +4,7 @@
 #include <vlib/vlib.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/service.h>
-#define foreach_vcdp_l4_lifecycle_error _(DROP, "drop")
-
-typedef enum {
-#define _(sym, str) VCDP_L4_LIFECYCLE_ERROR_##sym,
-  foreach_vcdp_l4_lifecycle_error
-#undef _
-    VCDP_L4_LIFECYCLE_N_ERROR,
-} vcdp_l4_lifecycle_error_t;
-
-static char *vcdp_l4_lifecycle_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_l4_lifecycle_error
-#undef _
-};
+#include <vcdp_services/l4-lifecycle/l4_lifecycle.api_enum.h>
 
 typedef struct {
   u32 flow_id;
@@ -96,15 +83,14 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_l4_lifecycle_node) = {.name = "vcdp-l4-lifecycle",
-                                              .vector_size = sizeof(u32),
-                                              .format_trace = format_vcdp_l4_lifecycle_trace,
-                                              .type = VLIB_NODE_TYPE_INTERNAL,
-
-                                              .n_errors = ARRAY_LEN(vcdp_l4_lifecycle_error_strings),
-                                              .error_strings = vcdp_l4_lifecycle_error_strings,
-
-                                              .sibling_of = "vcdp-lookup-ip4"
+VLIB_REGISTER_NODE(vcdp_l4_lifecycle_node) = {
+  .name = "vcdp-l4-lifecycle",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_l4_lifecycle_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_L4_LIFECYCLE_N_ERROR,
+  .error_counters = vcdp_l4_lifecycle_error_counters,
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 

@@ -4,20 +4,7 @@
 #include <vlib/vlib.h>
 #include <vcdp_services/tcp-check/tcp_check.h>
 #include <vcdp/service.h>
-#define foreach_vcdp_tcp_check_error _(DROP, "drop")
-
-typedef enum {
-#define _(sym, str) VCDP_TCP_CHECK_ERROR_##sym,
-  foreach_vcdp_tcp_check_error
-#undef _
-    VCDP_TCP_CHECK_N_ERROR,
-} vcdp_tcp_check_error_t;
-
-static char *vcdp_tcp_check_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_tcp_check_error
-#undef _
-};
+#include <vcdp_services/tcp-check/tcp_check.api_enum.h>
 
 typedef struct {
   u32 flow_id;
@@ -233,18 +220,19 @@ VLIB_NODE_FN(vcdp_tcp_check_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_tcp_check_node) = {.name = "vcdp-tcp-check",
-                                           .vector_size = sizeof(u32),
-                                           .format_trace = format_vcdp_tcp_check_trace,
-                                           .type = VLIB_NODE_TYPE_INTERNAL,
-
-                                           .n_errors = ARRAY_LEN(vcdp_tcp_check_error_strings),
-                                           .error_strings = vcdp_tcp_check_error_strings,
-                                           .sibling_of = "vcdp-lookup-ip4"
+VLIB_REGISTER_NODE(vcdp_tcp_check_node) = {
+  .name = "vcdp-tcp-check",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_tcp_check_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_TCP_CHECK_N_ERROR,
+  .error_counters = vcdp_tcp_check_error_counters,
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 
-VCDP_SERVICE_DEFINE(tcp_check) = {.node_name = "vcdp-tcp-check",
-                                  .runs_before = VCDP_SERVICES(0),
-                                  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
-                                  .is_terminal = 0};
+VCDP_SERVICE_DEFINE(tcp_check) = {
+  .node_name = "vcdp-tcp-check",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
+  .is_terminal = 0};

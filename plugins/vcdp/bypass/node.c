@@ -7,21 +7,7 @@
 #include <vnet/ip/ip4.h>
 #include <vnet/fib/ip4_fib.h>
 #include <vnet/dpo/load_balance.h>
-
-#define foreach_vcdp_bypass_error _(BYPASS, "bypass")
-
-typedef enum {
-#define _(sym, str) VCDP_BYPASS_ERROR_##sym,
-  foreach_vcdp_bypass_error
-#undef _
-    VCDP_BYPASS_N_ERROR,
-} vcdp_bypass_error_t;
-
-static char *vcdp_bypass_error_strings[] = {
-#define _(sym, string) string,
-  foreach_vcdp_bypass_error
-#undef _
-};
+#include <vcdp/vcdp.api_enum.h>
 
 typedef enum {
   VCDP_BYPASS_NEXT_DROP,
@@ -119,9 +105,8 @@ VLIB_REGISTER_NODE(vcdp_bypass_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_bypass_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-
-  .n_errors = ARRAY_LEN(vcdp_bypass_error_strings),
-  .error_strings = vcdp_bypass_error_strings,
+  .n_errors = VCDP_BYPASS_N_ERROR,
+  .error_counters = vcdp_bypass_error_counters,
   .n_next_nodes = VCDP_BYPASS_N_NEXT,
   .next_nodes = { "error-drop", "ip4-lookup", "ip4-receive" }
 };

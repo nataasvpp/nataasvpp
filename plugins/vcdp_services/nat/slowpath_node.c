@@ -5,25 +5,9 @@
 #include <vcdp_services/nat/nat.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
+#include <vcdp_services/nat/nat.api_enum.h>
 
 #define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 5 /* retries to allocate a port */
-
-#define foreach_vcdp_nat_slowpath_error                                             \
-  _ (NO_INSTANCE, no_instance, ERROR, "no instance")
-
-typedef enum
-{
-#define _(f, n, s, d) VCDP_NAT_SLOWPATH_##f,
-  foreach_vcdp_nat_slowpath_error
-#undef _
-    VCDP_NAT_SLOWPATH_N_ERROR,
-} vcdp_nat_slowpath_error_t;
-
-static vlib_error_desc_t vcdp_nat_slowpath_error_counters[] = {
-#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
-  foreach_vcdp_nat_slowpath_error
-#undef _
-};
 
 typedef struct {
   u32 flow_id;
@@ -229,7 +213,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
                                 nat_rewrites, session, to_next, b);
     } else {
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-      b[0]->error = node->errors[VCDP_NAT_SLOWPATH_NO_INSTANCE];
+      b[0]->error = node->errors[VCDP_NAT_SLOWPATH_ERROR_NO_INSTANCE];
       vcdp_next(b[0], to_next);
     }
     n_left -= 1;
@@ -254,14 +238,14 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {.name = "vcdp-nat-slowpath",
-                                              .vector_size = sizeof(u32),
-                                              .format_trace = format_vcdp_nat_slowpath_trace,
-                                              .type = VLIB_NODE_TYPE_INTERNAL,
-
-                                              .n_errors = ARRAY_LEN(vcdp_nat_slowpath_error_counters),
-                                              .error_counters = vcdp_nat_slowpath_error_counters,
-                                              .sibling_of = "vcdp-lookup-ip4"
+VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {
+  .name = "vcdp-nat-slowpath",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_nat_slowpath_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_NAT_SLOWPATH_N_ERROR,
+  .error_counters = vcdp_nat_slowpath_error_counters,
+  .sibling_of = "vcdp-lookup-ip4"
 
 };
 

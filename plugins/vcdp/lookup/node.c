@@ -11,47 +11,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
-
-#define foreach_vcdp_lookup_error                                                                                      \
-  _(MISS, miss, ERROR, "flow miss")                                                                                    \
-  _(REMOTE, remote, INFO, "remote flow")                                                                               \
-  _(COLLISION, collision, ERROR, "hash add collision")                                                                 \
-  _(CON_DROP, con_drop, INFO, "handoff drop")                                                                          \
-  _(NO_CREATE_SESSION, no_create_session, INFO, "session not created by policy")                                       \
-  _(FULL_TABLE, full_table, ERROR, "session table is full")                                                            \
-  _(NO_KEY, no_key, ERROR, "not able to create 6-tuple key")
-
-typedef enum
-{
-#define _(f, n, s, d) VCDP_LOOKUP_ERROR_##f,
-  foreach_vcdp_lookup_error
-#undef _
-    VCDP_LOOKUP_N_ERROR,
-} vcdp_lookup_error_t;
-
-static vlib_error_desc_t vcdp_lookup_error_counters[] = {
-#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
-  foreach_vcdp_lookup_error
-#undef _
-};
-
-#define foreach_vcdp_handoff_error \
- _(NOERROR, noerror, INFO, "no error") \
- _(NO_SESSION, nosession, ERROR, "no session")
-
-typedef enum
-{
-#define _(f, n, s, d) VCDP_HANDOFF_ERROR_##f,
-  foreach_vcdp_handoff_error
-#undef _
-    VCDP_HANDOFF_N_ERROR,
-} vcdp_handoff_error_t;
-
-static vlib_error_desc_t vcdp_handoff_error_counters[] = {
-#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
-  foreach_vcdp_handoff_error
-#undef _
-};
+#include <vcdp/vcdp.api_enum.h>
 
 typedef struct
 {
@@ -642,7 +602,7 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_lookup_error_counters),
+  .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
 };
 
@@ -651,7 +611,7 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_nocreate_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_lookup_error_counters),
+  .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
   .sibling_of = "vcdp-lookup-ip4",
 };
@@ -661,7 +621,7 @@ VLIB_REGISTER_NODE(vcdp_handoff_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_handoff_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = ARRAY_LEN(vcdp_handoff_error_counters),
+  .n_errors = VCDP_HANDOFF_N_ERROR,
   .error_counters = vcdp_handoff_error_counters,
   .sibling_of = "vcdp-lookup-ip4",
 };

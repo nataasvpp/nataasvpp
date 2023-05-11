@@ -5,6 +5,7 @@
 #include <vnet/ip/ip.h>
 #include <vnet/ip/ip_sas.h>
 #include <vnet/buffer.h>
+#include <vcdp/vcdp.api_enum.h>
 
 /* This is shamelessly copied from vnet/ip/icmp4.c to avoid having to add custom next node hooks there. */
 
@@ -20,25 +21,6 @@ typedef enum {
 typedef struct {
   u8 packet_data[64];
 } vcdp_icmp_error_trace_t;
-
-#define foreach_vcdp_icmp_error                                                                                        \
-  _(THROTTLED, throttled, INFO, "ICMP error throttled")                                                                \
-  _(SAS_FAILED, sas_failed, ERROR, "No IP4 address on interface")
-
-typedef enum
-{
-#define _(f, n, s, d) VCDP_ICMP_ERROR_##f,
-  foreach_vcdp_icmp_error
-#undef _
-    VCDP_ICMP_N_ERROR,
-} vcdp_icmp_error_t;
-
-static vlib_error_desc_t vcdp_icmp_error_counters[] = {
-#define _(f, n, s, d) { #n, d, VL_COUNTER_SEVERITY_##s },
-  foreach_vcdp_icmp_error
-#undef _
-};
-
 
 static u8 *
 format_vcdp_icmp_error_trace (u8 * s, va_list * va)
