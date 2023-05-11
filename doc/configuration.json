@@ -32,7 +32,8 @@
             "context": 0,
             "forward-services": [
                 "vcdp-l4-lifecycle",
-                "vcdp-nat-output"
+                "vcdp-nat-slowpath",
+                "vcdp-output"
             ],
             "reverse-services": [
                 "vcdp-l4-lifecycle",
@@ -44,7 +45,8 @@
             "context": 0,
             "forward-services": [
                 "vcdp-l4-lifecycle",
-                "vcdp-nat-output"
+                "vcdp-nat-slowpath",
+                "vcdp-output"
             ],
             "reverse-services": [
                 "vcdp-l4-lifecycle",

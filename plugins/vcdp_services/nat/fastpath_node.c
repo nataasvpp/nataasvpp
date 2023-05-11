@@ -148,7 +148,7 @@ VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
 VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-output"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-slowpath"),
   .is_terminal = 1};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {

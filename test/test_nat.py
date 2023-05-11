@@ -382,7 +382,7 @@ test_cases = [
         'expect': None,
     },
 
-    # test 22 Large packet (9K)
+    # test 22 Large packet (9K) (chained)
     {
         'name': 'session created from udp_data with huge packet',
         'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
@@ -391,7 +391,7 @@ test_cases = [
         'validate_vpp': lambda vpp, packet, expected_state=1: validate_vpp_session_state(vpp, packet, expected_state)
     },
 
-    # test 23 Large packet ICMP (9K)
+    # test 23 Large packet ICMP (9K) (chained ICMP error)
     {
         'name': 'session created from udp_data with huge packet',
         'send': IP(src=src_ip, dst=dst_ip, ttl=1) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
@@ -402,11 +402,7 @@ test_cases = [
     },
 
     # Fragments
-    # Too small packets
-
-    # Chained packets
     # Hairpinning
-    # Multichain ICMP error, check if cleaned up properly
 ]
 
 def validate_packet(received, expected):
