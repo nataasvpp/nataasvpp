@@ -7,11 +7,21 @@ include_directories(${CMAKE_BINARY_DIR})
 include(cmake/counter.cmake)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-#
-# Core VCDP library. None of these files can depend on APIs
-#
-add_vpp_library(vcdpcore
+add_vpp_plugin(vcdp
+  VAT_AUTO_TEST OFF
+
   SOURCES
+  vcdp/plugin.c
+  vcdp/cli.c
+  vcdp/api.c
+  vcdp_services/tcp-check/cli.c
+  vcdp_services/tcp-check/api.c
+  vcdp_services/nat/cli.c
+  vcdp_services/nat/api.c
+  gateway/cli.c
+  gateway/api.c
+  vcdp_services/tcp-mss/api.c
+
   vcdp/lookup/node.c
   vcdp/drop/node.c
   vcdp/format.c
@@ -21,14 +31,15 @@ add_vpp_library(vcdpcore
   vcdp/vcdp_counter.json.c
   vcdp/icmp/icmp4.c
 
-
   vcdp_services/tcp-check/node.c
   vcdp_services/tcp-check/tcp_check.c
   vcdp_services/tcp-check/format.c
 
+  vcdp_services/tcp-check-lite/api.c
   vcdp_services/tcp-check-lite/node.c
   vcdp_services/tcp-check-lite/tcp_check_lite.c
 
+  vcdp_services/l4-lifecycle/api.c
   vcdp_services/l4-lifecycle/node.c
 
   vcdp_services/nat/nat.c
@@ -46,32 +57,9 @@ add_vpp_library(vcdpcore
   vcdp_services/tcp-mss/tcp_mss.c
   vcdp_services/tcp-mss/node.c
 
+  vcdp_services/stats/api.c
   vcdp_services/stats/stats.c
   vcdp_services/stats/node.c
-
-  INSTALL_HEADERS
-  vcdp/vcdp.h
-  vcdp/service.h
-  vcdp/vcdp_funcs.h
-  vcdp/vcdp_types_funcs.h
-  vcdp/common.h
-  vcdp/timer.h
-)
-
-add_vpp_plugin(vcdp
-  VAT_AUTO_TEST OFF
-
-  SOURCES
-  vcdp/plugin.c
-  vcdp/cli.c
-  vcdp/api.c
-  vcdp_services/tcp-check/cli.c
-  vcdp_services/tcp-check/api.c
-  vcdp_services/nat/cli.c
-  vcdp_services/nat/api.c
-  gateway/cli.c
-  gateway/api.c
-  vcdp_services/tcp-mss/api.c
 
   API_FILES
   vcdp/vcdp_types.api
@@ -84,10 +72,15 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-check-lite/tcp_check_lite.api
   vcdp_services/stats/stats.api
 
-  LINK_LIBRARIES
-  vcdpcore
-
+  INSTALL_HEADERS
+  vcdp/vcdp.h
+  vcdp/service.h
+  vcdp/vcdp_funcs.h
+  vcdp/vcdp_types_funcs.h
+  vcdp/common.h
+  vcdp/timer.h
 )
+add_dependencies(vcdp_plugin vcdp_plugin_api_headers)
 add_vpp_counters(
   COUNTERS
   vcdp_services/nat/nat_counter.json
