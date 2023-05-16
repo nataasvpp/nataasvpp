@@ -21,6 +21,9 @@ typedef struct
   u32 flow_id;
   u32 error;
   u32 remote_worker;
+  bool hit;
+  u32 session_idx;
+  u32 service_bitmap;
   vcdp_session_ip4_key_t k4;
 } vcdp_lookup_trace_t;
 
@@ -258,6 +261,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   f64 time_now = vlib_time_now(vm);
   u64 __attribute__((aligned(32))) lookup_vals[VLIB_FRAME_SIZE], *lv = lookup_vals;
   int service_chain[VLIB_FRAME_SIZE], *sc = service_chain;
+  bool hits[VLIB_FRAME_SIZE], *hit = hits;
+  u32 session_indices[VLIB_FRAME_SIZE], *si = session_indices;
+  u32 service_bitmaps[VLIB_FRAME_SIZE], *sb = service_bitmaps;
   u16 hit_count = 0;
 
   vlib_get_buffers(vm, from, bufs, n_left);
@@ -339,7 +345,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
           vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
           break;
-        case 3: // collision
+        case 3: // collision, retry
           vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
           continue;
       }
@@ -353,6 +359,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     } else {
       // Hit
       lv[0] = kv.value;
+      hit[0] = true;
       hit_count++;
     }
     // Figure out if this is local or remote thread
@@ -362,7 +369,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       u32 flow_index = lv[0] & (~(u32) 0);
       to_local[n_local] = bi[0];
       session_index = flow_index >> 1;
-
+      si[0] = session_index;
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
@@ -384,6 +391,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         pbmp &= ~VCDP_SERVICE_MASK(l4_lifecycle);
       }
       vcdp_buffer(b[0])->service_bitmap = pbmp;
+      sb[0] = pbmp;
 
       /* The tenant of the buffer is the tenant of the session */
       vcdp_buffer(b[0])->tenant_index = session->tenant_idx;
@@ -411,6 +419,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     lv += 1;
     sc += 1;
     bi += 1;
+    hit += 1;
+    si += 1;
+    sb += 1;
   }
 
   /* handover buffers to remote node */
@@ -431,6 +442,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     b = bufs;
     bi = from;
     h = hashes;
+    si = session_indices;
+    hit = hits;
+    sb = service_bitmaps;
     u32 *in_local = to_local;
     u32 *in_remote = to_remote;
 
@@ -440,6 +454,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         t->sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
         t->flow_id = b[0]->flow_id;
         t->hash = h[0];
+        t->hit = hit[0];
+        t->session_idx = si[0];
+        t->service_bitmap = sb[0];
         if (bi[0] == in_local[0]) {
           t->next_index = local_next_indices[(in_local++) - to_local];
         } else {
@@ -455,6 +472,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         bi++;
         b++;
         h++;
+        hit++;
+        si++;
+        sb++;
       } else
         break;
     }
@@ -544,17 +564,22 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
   vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
   vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
   vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
+  u32 indent = format_get_indent (s);
 
   if (t->error)
-    s = format(s, "vcdp-lookup (error: %u): ", t->error);
+    s = format(s, "error: %u", t->error);
   else if (t->next_index == ~0)
-    s = format(s, "vcdp-lookup (handoff: %u): ", t->remote_worker);
+    s = format(s, "handoff: %u", t->remote_worker);
   else
-    s = format(s, "vcdp-lookup (next index: %u): ", t->next_index);
-
-  s = format(s, "sw_if_index %d, hash 0x%x flow-id %u  key 0x%U",
-             t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
+    if (t->hit)
+      s = format(s, "found session, index: %d", t->session_idx);
+    else
+      s = format(s, "created session, index: %d", t->session_idx);
+  s = format(s, "\n%Unext index: %u, rx ifindex %d, hash 0x%x flow-id %u  key 0x%U",
+             format_white_space, indent, t->next_index, t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
+  s = format(s, "\n%Uservice chain: %U", format_white_space, indent, format_vcdp_bitmap, t->service_bitmap);
   return s;
+
 }
 
 static u8 *
