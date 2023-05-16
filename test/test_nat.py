@@ -77,6 +77,7 @@ def vpp_connection(start_vpp):
 
 # Define the IP addresses and ports of the devices involved
 src_ip = IPv4Address('192.168.1.2')  # IP address of the internal device
+src_ip_broadcast = IPv4Address('192.168.1.255')
 dst_ip = '8.8.8.8'      # IP address of the external device
 nat_ip = '192.168.100.1'  # IP address of the NAT device
 
@@ -399,6 +400,21 @@ test_cases = [
         'send_iface': inside_iface,
         'receive_iface': inside_iface,
 
+    },
+
+    # test 24 Send to broadcast address on same subnet
+    {
+        'name': 'Send to broadcast address on same subnet',
+            # test6: Create a UDP session.
+        'send': IP(src=src_ip, dst=src_ip_broadcast) / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",
+        'expect': None,
+    },
+
+    # test 25 Send to broadcast address all oens
+    {
+        'name': 'Send to broadcast address on same subnet',
+        'send': IP(src=src_ip, dst='255.255.255.255') / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",
+        'expect': None,
     },
 
     # Fragments / MTU
