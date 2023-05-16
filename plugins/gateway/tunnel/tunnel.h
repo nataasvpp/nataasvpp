@@ -75,6 +75,7 @@ typedef struct {
   u16 tenant_index;
   u32 next_index;
   u32 error_index;
+  int lookup_rv;
 } vcdp_tunnel_trace_t;
 
 clib_error_t *vcdp_tunnel_init(vlib_main_t *vm);

@@ -16,7 +16,7 @@ VLIB_NODE_FN(vcdp_tunnel_input_node)
 VLIB_REGISTER_NODE(vcdp_tunnel_input_node) = {
   .name = "vcdp-tunnel-input",
   .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tunnel_trace,
+  .format_trace = format_vcdp_tunnel_decap_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
 
   .n_errors = VCDP_TUNNEL_INPUT_N_ERROR,
@@ -45,7 +45,7 @@ VLIB_NODE_FN(vcdp_tunnel_output_node)
 VLIB_REGISTER_NODE(vcdp_tunnel_output_node) = {
   .name = "vcdp-tunnel-output",
   .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_tunnel_trace,
+  .format_trace = format_vcdp_tunnel_encap_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_TUNNEL_OUTPUT_N_ERROR,
   .error_counters = vcdp_tunnel_output_error_counters,

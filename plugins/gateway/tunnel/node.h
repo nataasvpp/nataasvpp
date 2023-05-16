@@ -16,14 +16,29 @@
 #include <gateway/gateway.api_enum.h>
 
 static inline u8 *
-format_vcdp_tunnel_trace(u8 *s, va_list *args)
+format_vcdp_tunnel_decap_trace(u8 *s, va_list *args)
 {
   CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
   CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
   vcdp_tunnel_trace_t *t = va_arg(*args, vcdp_tunnel_trace_t *);
 
-  s = format(s, "tunnel-%s: tunnel_index %d, tenant %d, next-index: %d error index: %d",
-             t->is_encap ? "encap" : "decap", t->tunnel_index, t->tenant_index, t->next_index, t->error_index);
+  if (t->lookup_rv == 0)
+    s = format(s, "tunnel-decap: tunnel_index %d, tenant %d, next-index: %d error index: %d",
+               t->tunnel_index, t->tenant_index, t->next_index, t->error_index);
+  else
+    s = format(s, "tunnel-decap: not a tunnel rv: %d", t->lookup_rv);
+  return s;
+}
+
+static inline u8 *
+format_vcdp_tunnel_encap_trace(u8 *s, va_list *args)
+{
+  CLIB_UNUSED(vlib_main_t * vm) = va_arg(*args, vlib_main_t *);
+  CLIB_UNUSED(vlib_node_t * node) = va_arg(*args, vlib_node_t *);
+  vcdp_tunnel_trace_t *t = va_arg(*args, vcdp_tunnel_trace_t *);
+
+  s = format(s, "tunnel-encap: tunnel_index %d, tenant %d, next-index: %d error index: %d",
+              t->tunnel_index, t->tenant_index, t->next_index, t->error_index);
   return s;
 }
 
@@ -48,6 +63,8 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
       *tunnel_idx = tunnel_indicies; // Used only for tracing
   u16 tenant_indicies[VLIB_FRAME_SIZE] = {0},
       *tenant_idx = tenant_indicies; // Used only for tracing
+  int lookup_rvs[VLIB_FRAME_SIZE] = {0},
+      *lookup_rv = lookup_rvs; // Used only for tracing
 
   from = vlib_frame_vector_args(frame);
   n_left_from = frame->n_vectors;
@@ -71,6 +88,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     u32 context_id = 0;
     u64 value;
     int rv = vcdp_tunnel_lookup(context_id, ip->dst_address, ip->src_address, ip->protocol, 0, udp->dst_port, &value);
+    lookup_rv[0] = rv;
     if (rv != 0) {
       // Silently ignore lookup failures, might not have been a tunnel packet.
       goto next;
@@ -153,6 +171,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     b += 1;
     tunnel_idx += 1;
     tenant_idx += 1;
+    lookup_rv += 1;
   }
 
   vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
@@ -162,6 +181,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     b = bufs;
     tunnel_idx = tunnel_indicies;
     tenant_idx = tenant_indicies;
+    lookup_rv = lookup_rvs;
     next = nexts;
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
@@ -171,9 +191,11 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
         t->tenant_index = tenant_idx[0];
         t->next_index = next[0];
         t->error_index = b[0]->error;
+        t->lookup_rv = lookup_rv[0];
         b++;
         tunnel_idx++;
         tenant_idx++;
+        lookup_rv++;
         next++;
       } else
         break;
