@@ -4,8 +4,6 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
 
-#include <vppinfra/bihash_16_8.h>
-#include <vppinfra/bihash_template.c>
 #include <vcdp/vcdp.h>
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/service.h>
@@ -16,6 +14,14 @@
 #include <vlibmemory/api.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
+
+#include <vppinfra/bihash_8_8.h>
+#include <vppinfra/bihash_template.h>
+#include <vppinfra/bihash_template.c>
+
+#include <vppinfra/bihash_16_8.h>
+#include <vppinfra/bihash_template.h>
+#include <vppinfra/bihash_template.c>
 
 #define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK(drop)
 
