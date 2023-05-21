@@ -13,6 +13,7 @@
 #include <vlib/stats/stats.h>
 #include <vnet/fib/fib_source.h>
 #include <vnet/fib/fib_table.h>
+#include "vcdp_nat_dpo.h"
 
 nat_main_t nat_main;
 
@@ -71,6 +72,26 @@ vcdp_nat_remove_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
   clib_spinlock_unlock (&nat->counter_lock);
 }
 
+/*
+ * Call this if the pool address isn't already in the FIB
+ */
+static void
+vcdp_nat_dpo_no_entry(ip4_address_t address, u16 nat_idx, bool is_if) {
+    // Create DPO for the pool
+  dpo_id_t dpo_v4 = DPO_INVALID;
+  fib_prefix_t pfx = {
+    .fp_proto = FIB_PROTOCOL_IP4,
+    .fp_len = 32,
+    .fp_addr.ip4.as_u32 = address.as_u32,
+  };
+  fib_source_t fib_src = fib_source_allocate("dpo-vcdp-nat_source", 0x2, FIB_SOURCE_BH_SIMPLE);
+  vcdp_nat_dpo_create(DPO_PROTO_IP4, nat_idx, &dpo_v4, is_if);
+  u32 fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+  fib_flags |= FIB_ENTRY_FLAG_EXCLUSIVE ;
+  fib_table_entry_special_dpo_add(0, &pfx, fib_src, fib_flags, &dpo_v4);
+  dpo_reset(&dpo_v4);
+}
+
 // TODO: Support prefixes as well as a vector of addresses
 int
 vcdp_nat_add(char *nat_id, ip4_address_t *addrs, bool is_if)
@@ -96,8 +117,14 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs, bool is_if)
   nat_idx = instance - nat->instances;
   hash_set_mem(nat->uuid_hash, instance->nat_id, nat_idx);
 
+  // Create DPO for the pool
+  vcdp_nat_dpo_no_entry(addrs[0], nat_idx, is_if);
+
   // Initialise counters. Single dimension.
   vcdp_nat_init_counters_per_instance(instance, nat_idx);
+
+  // Create a FIB entry for the NAT pool addresses.
+  vcdp_nat_dpo_module_init();
 
   return 0;
 }

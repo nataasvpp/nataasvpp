@@ -21,7 +21,9 @@
         "nat_counter.json.h": "c",
         "node.h": "c",
         "nat.api_enum.h": "c",
-        "l4_lifecycle.api_types.h": "c"
+        "l4_lifecycle.api_types.h": "c",
+        "bihash_template.h": "c",
+        "bihash_8_8.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
@@ -32,4 +34,5 @@
         "editor.defaultFormatter": "ms-python.python"
     },
     "python.formatting.provider": "none",
+    "workbench.colorTheme": "Solarized Light",
 }

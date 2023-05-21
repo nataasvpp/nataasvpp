@@ -48,6 +48,7 @@ add_vpp_plugin(vcdp
   vcdp_services/nat/slowpath_node.c
   vcdp_services/nat/icmp_error_node.c
   vcdp_services/nat/nat_counter.json.c
+  vcdp_services/nat/vcdp_nat_dpo.c
 
   gateway/gateway.c
   gateway/interface.c

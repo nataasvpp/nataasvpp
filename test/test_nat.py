@@ -77,7 +77,7 @@ def vpp_connection(start_vpp):
 
 # Define the IP addresses and ports of the devices involved
 src_ip = IPv4Address('192.168.1.2')  # IP address of the internal device
-src_ip_broadcast = IPv4Address('192.168.1.255')
+src_ip_broadcast = '192.168.1.255'
 dst_ip = '8.8.8.8'      # IP address of the external device
 nat_ip = '192.168.100.1'  # IP address of the NAT device
 
@@ -85,7 +85,7 @@ src_port = 12345        # Port number of the internal device
 dst_port = 80           # Port number of the external device
 
 inside_iface = 'tun0'
-outside_iface = 'tun1'
+outside_iface = 'underlay-tun0'
 
 
 def send_and_receive(packet, src_iface, dst_iface, send_count=1):
@@ -95,20 +95,23 @@ def send_and_receive(packet, src_iface, dst_iface, send_count=1):
         packet = Ether()/packet
     s = lambda: sendp(packet, iface=src_iface, verbose=False, count=send_count)
     assert dst_iface
-
+    # count = 2
     if dst_iface == src_iface:
         count = 2
-    received = sniff(iface=dst_iface, started_callback=s, count=count, timeout=2)
+    received = sniff(iface=dst_iface, started_callback=s, count=count, timeout=2, filter='not udp port 4789')
     assert received
-
+    # print('RECEIVED', received, len(received))
     if count == 2:
         return received[1]
     return received
 
 def send_and_verify_drop(packet, src_iface, dst_iface, send_count=1):
     """Send a packet on src_iface and receive the corresponding packet on dst_iface."""
+    if is_ethernet_interface(src_iface):
+        packet = Ether()/packet
+
     s = lambda: sendp(packet, iface=src_iface, verbose=False, count=send_count)
-    received = sniff(iface=dst_iface, started_callback=s, count=send_count, timeout=1)
+    received = sniff(iface=dst_iface, started_callback=s, count=send_count, timeout=1, filter='not udp port 4789')
     assert len(received) == 0
     return
 
@@ -350,7 +353,7 @@ test_cases = [
 
     # test18 Test bypass feature
     {
-        # Random outside packet to test bypass.
+        # Random outside packet to test bypass. NAT address (should fail if not interface pool)
         'name': 'Basic outside bypass',
         'send': IP(src='9.9.9.9', dst=nat_ip, ttl=64)/ICMP(id=8888),
         'expect': IP(src=nat_ip, dst='9.9.9.9')/ICMP(type='echo-reply', id=8888),
@@ -358,7 +361,17 @@ test_cases = [
         'receive_iface': outside_iface,
     },
 
-    # test19 Test static mapping with bypass
+    # test19 Test bypass feature
+    {
+        # Random outside packet to test bypass.
+        'name': 'Basic outside bypass',
+        'send': IP(src='9.9.9.9', dst='1.1.1.1', ttl=64)/ICMP(id=8888),
+        'expect': IP(src='9.9.9.9', dst='1.1.1.1')/ICMP(id=8888),
+        'send_iface': outside_iface,
+        'receive_iface': outside_iface,
+    },
+
+    # test20 Test static mapping with bypass
     # DHCP only works for Ethernet interfaces?
     {
         'name': 'DHCP packet against static binding',
@@ -369,21 +382,21 @@ test_cases = [
         'expected_to_fail': True,
     },
 
-    # test20 TCP MSS clamping
+    # test21 TCP MSS clamping
     {
         'name': 'Check TCP MSS clamp',
         'send': IP(src='210.10.10.10', dst=dst_ip)/TCP(sport=888, flags="S", options=[("MSS", 9000), ("EOL", None)]),
         'expect': IP(src=nat_ip, dst=dst_ip)/TCP(sport=888, flags="S", options=[("MSS", 1234), ("EOL", None)]),
     },
 
-    # test 21 Truncated packet
+    # test 22 Truncated packet
     {
         'name': 'Truncated packet',
         'send': IP(src='210.10.10.10', dst=dst_ip, proto=17),
         'expect': None,
     },
 
-    # test 22 Large packet (9K) (chained)
+    # test 23 Large packet (9K) (chained)
     {
         'name': 'session created from udp_data with huge packet',
         'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
@@ -392,7 +405,7 @@ test_cases = [
         'validate_vpp': lambda vpp, packet, expected_state=1: validate_vpp_session_state(vpp, packet, expected_state)
     },
 
-    # test 23 Large packet ICMP (9K) (chained ICMP error)
+    # test 24 Large packet ICMP (9K) (chained ICMP error)
     {
         'name': 'session created from udp_data with huge packet',
         'send': IP(src=src_ip, dst=dst_ip, ttl=1) / UDP(sport=src_port, dport=dst_port) / Raw("x" * 8000),
@@ -402,15 +415,15 @@ test_cases = [
 
     },
 
-    # test 24 Send to broadcast address on same subnet
+    # test 25 Send to broadcast address on same subnet
     {
         'name': 'Send to broadcast address on same subnet',
-            # test6: Create a UDP session.
+        # test6: Create a UDP session.
         'send': IP(src=src_ip, dst=src_ip_broadcast) / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",
         'expect': None,
     },
 
-    # test 25 Send to broadcast address all oens
+    # test 26 Send to broadcast address all ones
     {
         'name': 'Send to broadcast address on same subnet',
         'send': IP(src=src_ip, dst='255.255.255.255') / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",

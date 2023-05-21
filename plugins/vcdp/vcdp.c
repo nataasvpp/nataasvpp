@@ -84,7 +84,8 @@ vcdp_init(vlib_main_t *vm)
   clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", tenant_buckets, 0);
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 
-  vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_handoff_node.index, 0);
+  /* Handover back to the lookup node, which takes care of setting up ICMP error service chains etc. */
+  vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_lookup_ip4_node.index, 0);
 
   return 0;
 }
