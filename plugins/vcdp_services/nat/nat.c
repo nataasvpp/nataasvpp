@@ -123,9 +123,6 @@ vcdp_nat_add(char *nat_id, ip4_address_t *addrs, bool is_if)
   // Initialise counters. Single dimension.
   vcdp_nat_init_counters_per_instance(instance, nat_idx);
 
-  // Create a FIB entry for the NAT pool addresses.
-  vcdp_nat_dpo_module_init();
-
   return 0;
 }
 
@@ -327,6 +324,10 @@ nat_init(vlib_main_t *vm)
   vec_foreach (ptd, nat->ptd) {
     vec_validate(ptd->flows, 2 * vcdp_cfg_main.no_sessions_per_thread);
   }
+
+  // Create a FIB entry for the NAT pool addresses.
+  vcdp_nat_dpo_module_init();
+
   vcdp_nat_init_counters();
 
   return 0;
