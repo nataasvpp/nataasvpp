@@ -94,7 +94,7 @@ vcdp_nat_dpo_no_entry(ip4_address_t address, u16 nat_idx, bool is_if) {
 
 // TODO: Support prefixes as well as a vector of addresses
 int
-vcdp_nat_add(char *nat_id, ip4_address_t *addrs, bool is_if)
+vcdp_nat_add(char *nat_id, u32 context_id, ip4_address_t *addrs, bool is_if)
 {
   nat_main_t *nat = &nat_main;
   nat_instance_t *instance;
@@ -213,6 +213,18 @@ vcdp_nat_interface_by_sw_if_index(u32 sw_if_index)
   return pool_elt_at_index(nat->if_instances, index);
 }
 
+static u32 context_id_from_sw_if_index(u32 sw_if_index)
+{
+  fib_protocol_t fib_proto = FIB_PROTOCOL_IP4;
+  fib_table_t *fib_table = 0;
+  u32 table_id = 0; // Default to context 0
+  u32 fib_index = fib_table_get_index_for_sw_if_index(fib_proto, sw_if_index);
+  if (fib_index != ~0) {
+    fib_table = fib_table_get(fib_index, fib_proto);
+    table_id = fib_table->ft_table_id;
+  }
+  return table_id;
+}
 void
 vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_index, ip4_address_t *address,
                                        u32 address_length, u32 if_address_index, u32 is_delete)
@@ -223,12 +235,16 @@ vcdp_nat_ip4_add_del_interface_address(ip4_main_t *im, uword opaque, u32 sw_if_i
 
   // If address is deleted and address is used as a NAT pool, delete NAT instance
   // TODO: Handle the cases where a secondary address is added (or a secondary address is deleted)
+
+  // Using the VRF ID as the context ID for an interface NAT pool.
+  u32 context_id = context_id_from_sw_if_index(sw_if_index);
+
   if (!is_delete) {
     // If address is added and address is used as a NAT pool, create NAT instance
     clib_warning("Creating NAT instance %s with address %U", if_instance->nat_id, format_ip4_address, address);
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(if_instance->nat_id, v, true);
+    vcdp_nat_add(if_instance->nat_id, context_id, v, true);
     vec_free(v);
 
     // Check if we have any pending tenant bindings
@@ -298,10 +314,11 @@ vcdp_nat_if_add(char *nat_id, u32 sw_if_index)
 
   // Pick up existing addresses on this interface
   ip4_address_t *address = vcdp_ip4_interface_first_address(&ip4_main, sw_if_index, 0);
+  u32 context_id = context_id_from_sw_if_index(sw_if_index);
   if (address) {
     ip4_address_t *v = 0;
     vec_add1(v, *address);
-    vcdp_nat_add(if_instance->nat_id, v, true);
+    vcdp_nat_add(if_instance->nat_id, context_id, v, true);
     vec_free(v);
   }
 

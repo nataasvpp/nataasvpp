@@ -11,6 +11,7 @@ autoreply autoendian define vcdp_nat_add
   u32 context;
 
   string nat_id[37]; // UUID
+  u32 context_id [default=0];
   u8 n_addr;
   vl_api_ip4_address_t addr[n_addr];
 };

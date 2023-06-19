@@ -76,15 +76,18 @@ vcdp_session_key_swap(vcdp_session_ip4_key_t *key)
 
 static_always_inline int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
+                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *orgkey, u64 *h)
 {
   int rv;
   clib_bihash_kv_16_8_t kv;
   u64 value;
   vcdp_session_t *session;
   u32 session_index;
+
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
 
+  // Ensure we don't change original key
+  vcdp_session_ip4_key_t _k = *orgkey, *key = &_k;
   vcdp_session_key_swap(key);
 
   kv.key[0] = key->as_u64[0];
