@@ -41,6 +41,7 @@ vcdp_timer_expired(u32 *expired)
     u32 session_idx = e[0] & VCDP_TIMER_SI_MASK;
     if (pool_is_free_index(ptd->sessions, session_idx)) {
       /* Session has already been deleted */
+      VCDP_DBG(1, "session %u already deleted", session_idx);
       continue;
     }
     vec_add1(ptd->expired_sessions, session_idx);

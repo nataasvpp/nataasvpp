@@ -220,6 +220,7 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
+    vlib_cli_output(vm, "Expired vector length: %d", vec_len(ptd->expired_sessions));
   }
   vcdp_tenant_t *tenant;
   pool_foreach(tenant, vcdp->tenants) {

@@ -13,7 +13,7 @@ typedef struct {
   u32 handle;
 } vcdp_session_timer_t;
 
-/* Default NAT state protocol timeouts */
+/* Default session state protocol timeouts */
 #define foreach_vcdp_timeout                                                                                           \
   _(EMBRYONIC, 5, "embryonic")                                                                                         \
   _(ESTABLISHED, 240, "established")                                                                                   \
@@ -63,7 +63,8 @@ vcdp_session_timer_update(vcdp_tw_t *tw, vcdp_session_timer_t *timer, f64 now, u
 static_always_inline void
 vcdp_session_timer_update_maybe_past(vcdp_tw_t *tw, vcdp_session_timer_t *timer, u32 session_index, f64 now, u32 ticks)
 {
-    if (tw_timer_handle_is_free_2t_1w_2048sl(tw, timer->handle)) {
+    ASSERT(ticks>0);
+    if (tw_timer_handle_is_free_2t_1w_2048sl(tw, timer->handle) || timer->handle == ~0) {
       // restart timer
       vcdp_session_timer_start(tw, timer, session_index, now, ticks);
     } else {
@@ -80,6 +81,5 @@ vcdp_session_timer_running(vcdp_tw_t *tw, vcdp_session_timer_t *timer)
     return false;
   return true;
 }
-
 
 #endif

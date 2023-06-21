@@ -85,7 +85,8 @@ src_port = 12345        # Port number of the internal device
 dst_port = 80           # Port number of the external device
 
 inside_iface = 'tun0'
-outside_iface = 'underlay-tun0'
+# outside_iface = 'underlay-tun0'
+outside_iface = 'tun1'
 
 
 def send_and_receive(packet, src_iface, dst_iface, send_count=1):
