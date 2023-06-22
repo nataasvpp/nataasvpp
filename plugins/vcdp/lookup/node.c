@@ -618,6 +618,8 @@ format_vcdp_handoff_trace(u8 *s, va_list *args)
  * This is to ensure that the session is removed before any other nodes are run and buffers are in flight using a
  * removed session.
  */
+#define MAX_THREADS 16
+#define VCDP_SESSION_LEAK_EXPIRY 100.0
 VLIB_NODE_FN(vcdp_session_expire_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -640,29 +642,26 @@ VLIB_NODE_FN(vcdp_session_expire_node)
   // Use a cursor here, so we don't have to scan a large table in one go.
   vcdp_session_t *session;
   f64 now = vlib_time_now(vm);
-  if ((now - last_run) < 10)
+  if ((now - last_run) < 1)
     return 0;
   last_run = now;
-  pool_foreach(session, ptd->sessions) {
-      if (session->state != VCDP_SESSION_STATE_STATIC && (session->timer.next_expiration - now) < -100.0) {
-        VCDP_DBG(0, "Session %llx has leaked, removing %.2f", session->session_id, session->timer.next_expiration - now);
-        vcdp_session_remove(vcdp, ptd, session, thread_index, session - ptd->sessions);
-      }
-  }
-#if 0
-  u32 cursor = 0;
-  while (cursor != ~0) {
-    if (pool_is_free_index(ptd->sessions, cursor)) {
-      cursor = pool_next_index(ptd->sessions, cursor);
-      continue;
+  static u32 cursor_ptd[MAX_THREADS];
+  u32 cursor = cursor_ptd[thread_index];
+  if (cursor == ~0)
+    cursor = 0;
+  if (pool_is_free_index(ptd->sessions, cursor))
+    cursor = pool_next_index(ptd->sessions, cursor);
+
+  int i = 0;
+  while (cursor != ~0 && i++ < 256) {
+    session = pool_elt_at_index(ptd->sessions, cursor);
+    if (session->state != VCDP_SESSION_STATE_STATIC &&
+        (session->timer.next_expiration - now) < -VCDP_SESSION_LEAK_EXPIRY) {
+      VCDP_DBG(0, "Session %llx has leaked, removing %.2f", session->session_id, session->timer.next_expiration - now);
+      vcdp_session_remove(vcdp, ptd, session, thread_index, cursor);
     }
-    // vcdp_session_t *session = pool_elt_at_index(ptd->sessions, cursor);
-    // if (vcdp_session_is_expired(session, vlib_time_now(vm))) {
-    //   VCDP_DBG(0, "Session %u has leaked, removing", cursor);
-    //   vcdp_session_remove(vcdp, ptd, session, thread_index, cursor);
-    // }
+    cursor = pool_next_index(ptd->sessions, cursor);
   }
-#endif
   return 0;
 }
 
