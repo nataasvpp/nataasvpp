@@ -431,6 +431,14 @@ test_cases = [
         'expect': None,
     },
 
+    # test27: Create a unidirectional UDP session.
+    {
+        'name': 'unidirectional udp session',
+        'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port+100) / "Test NAT UDP data",
+        'expect': IP(src=nat_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port+100) / "Test NAT UDP data",
+    },
+
+
     # Fragments / MTU
     # Hairpinning
 ]

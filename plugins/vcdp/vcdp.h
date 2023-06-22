@@ -15,7 +15,7 @@
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_8_8.h>
 
-#include <vppinfra/tw_timer_2t_1w_2048sl.h>
+#include <vppinfra/tw_timer_1t_3w_1024sl_ov.h>
 #include <vppinfra/format_table.h>
 
 #include <vcdp/vcdp_counter.json.h>

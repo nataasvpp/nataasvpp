@@ -94,6 +94,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
     tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSED;
     tcp_session->flags[VCDP_FLOW_FORWARD] = 0;
     tcp_session->flags[VCDP_FLOW_REVERSE] = 0;
+    next_timeout = tenant->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
   }
 
   u8 old_flags = tcp_session->flags[dir];

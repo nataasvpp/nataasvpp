@@ -30,15 +30,18 @@ VCDP_SERVICE_DECLARE(drop)
 vcdp_main_t vcdp_main;
 vcdp_cfg_main_t vcdp_cfg_main;
 
+/*
+ * Schedule sessions for garbage collection
+ */
 static void
 vcdp_timer_expired(u32 *expired)
 {
-  u32 *e;
   uword thread_index = vlib_get_thread_index();
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  vec_foreach (e, expired) {
-    u32 session_idx = e[0] & VCDP_TIMER_SI_MASK;
+  int i;
+  for (i = 0; i < vec_len(expired); i++) {
+    u32 session_idx = expired[i];
     if (pool_is_free_index(ptd->sessions, session_idx)) {
       /* Session has already been deleted */
       VCDP_DBG(1, "session %u already deleted", session_idx);
