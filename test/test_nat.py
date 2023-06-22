@@ -250,8 +250,8 @@ test_cases = [
     # test6: Create a UDP session.
     {
         'name': 'session created from udp_data',
-        'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",
-        'expect': IP(src=nat_ip, dst=dst_ip) / UDP(sport=src_port, dport=dst_port) / "Test NAT UDP data",
+        'send': IP(src=src_ip, dst=dst_ip) / UDP(sport=src_port+6, dport=dst_port+6) / "Test NAT UDP data",
+        'expect': IP(src=nat_ip, dst=dst_ip) / UDP(sport=src_port+6, dport=dst_port+6) / "Test NAT UDP data",
         'validate_vpp': lambda vpp, packet, expected_state=0: validate_vpp_session_state(vpp, packet, expected_state)
     },
 

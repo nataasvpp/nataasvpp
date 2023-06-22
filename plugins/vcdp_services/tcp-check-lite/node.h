@@ -77,8 +77,6 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   ip4_header_t *ip4 = (ip4_header_t *) vlib_buffer_get_current(b[0]);
   tcp_header_t *tcp = ip4_next_header(ip4);
 
-  sf[0] = nsf[0] = tcp_session->state;
-
   /* Ignore non first fragments */
   if (ip4_get_fragment_offset(ip4) > 0) {
     vcdp_next(b[0], to_next);
@@ -96,6 +94,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
     tcp_session->flags[VCDP_FLOW_REVERSE] = 0;
     next_timeout = tenant->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
   }
+  sf[0] = nsf[0] = tcp_session->state;
 
   u8 old_flags = tcp_session->flags[dir];
   tcp_session->flags[dir] |= flags;
@@ -127,6 +126,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
     }
     break;
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
+#if 0
     // Allow a transitory session to reopen
     if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) ==
         (TCP_FLAG_ACK)) {
@@ -135,6 +135,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
       next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_ESTABLISHED];
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
     }
+#endif
     break;
     default:
       clib_warning("Unknown state %d", old_state);

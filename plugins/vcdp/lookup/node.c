@@ -625,6 +625,7 @@ VLIB_NODE_FN(vcdp_session_expire_node)
   u32 thread_index = vm->thread_index;
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   u32 session_index;
+  static f64 last_run = 0;
 
   for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
     session_index = vec_pop(ptd->expired_sessions);
@@ -633,6 +634,35 @@ VLIB_NODE_FN(vcdp_session_expire_node)
   }
   if (vec_len(ptd->expired_sessions) > 0)
     VCDP_DBG(2, "Expired sessions after cleanup: %d", vec_len(ptd->expired_sessions));
+
+  // Walk session table and remove leaked sessions if found
+  // This should not be needed. Add an error counter.
+  // Use a cursor here, so we don't have to scan a large table in one go.
+  vcdp_session_t *session;
+  f64 now = vlib_time_now(vm);
+  if ((now - last_run) < 10)
+    return 0;
+  last_run = now;
+  pool_foreach(session, ptd->sessions) {
+      if (session->state != VCDP_SESSION_STATE_STATIC && (session->timer.next_expiration - now) < -100.0) {
+        VCDP_DBG(0, "Session %llx has leaked, removing %.2f", session->session_id, session->timer.next_expiration - now);
+        vcdp_session_remove(vcdp, ptd, session, thread_index, session - ptd->sessions);
+      }
+  }
+#if 0
+  u32 cursor = 0;
+  while (cursor != ~0) {
+    if (pool_is_free_index(ptd->sessions, cursor)) {
+      cursor = pool_next_index(ptd->sessions, cursor);
+      continue;
+    }
+    // vcdp_session_t *session = pool_elt_at_index(ptd->sessions, cursor);
+    // if (vcdp_session_is_expired(session, vlib_time_now(vm))) {
+    //   VCDP_DBG(0, "Session %u has leaked, removing", cursor);
+    //   vcdp_session_remove(vcdp, ptd, session, thread_index, cursor);
+    // }
+  }
+#endif
   return 0;
 }
 
