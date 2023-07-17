@@ -15,11 +15,8 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
 
   /* Stop timer if running */
   VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
-  if (vcdp_session_timer_running(&ptd->wheel, &session->timer)) {
-    VCDP_DBG(2, "Stopping timer for session %u", session_index);
-    vcdp_session_timer_stop(&ptd->wheel, &session->timer);
-  }
-  session->timer.handle = ~0;
+  VCDP_DBG(2, "Stopping timer for session %u", session_index);
+  vcdp_session_timer_stop(&ptd->wheel, &session->timer);
 
   // Is this session on the expiry queue?
   u32 index = vec_search(ptd->expired_sessions, session_index);
