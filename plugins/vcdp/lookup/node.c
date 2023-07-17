@@ -191,9 +191,8 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
     return 2;
 
   pool_get(ptd->sessions, session);
-  session_version_t session_version = session->session_version;
+  session_version_t session_version = session->session_version + 1;
   clib_memset(session, 0, sizeof(*session));
-  session->session_version = session_version;
   session_idx = session - ptd->sessions;
 
     // Is this session on the expiry queue?
@@ -220,7 +219,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   session->type = VCDP_SESSION_TYPE_IP4;
   session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
 
-  session->session_version += 1;
+  session->session_version = session_version;
   session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
   ptd->session_id_ctr += 2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
@@ -237,7 +236,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], k, sizeof(session->keys[0]));
   session->proto = proto;
-
+  session->timer.handle = VCDP_TIMER_HANDLE_INVALID;
   vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
