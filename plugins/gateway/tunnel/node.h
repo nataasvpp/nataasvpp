@@ -156,7 +156,7 @@ vcdp_tunnel_input_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_f
     }
 
     /* Store context_id as flow_id (to simplify the future lookup) */
-    b[0]->flow_id = tenant->context_id;
+    vcdp_buffer(b[0])->context_id = tenant->context_id;
 
     vlib_buffer_advance(b[0], bytes_to_inner_ip);
     vcdp_buffer(b[0])->tenant_index = *tenant_idx;

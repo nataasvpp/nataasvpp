@@ -14,8 +14,18 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   kv2.key = session->session_id;
 
   /* Stop timer if running */
+  VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
   if (vcdp_session_timer_running(&ptd->wheel, &session->timer)) {
+    VCDP_DBG(2, "Stopping timer for session %u", session_index);
     vcdp_session_timer_stop(&ptd->wheel, &session->timer);
+  }
+  session->timer.handle = ~0;
+
+  // Is this session on the expiry queue?
+  u32 index = vec_search(ptd->expired_sessions, session_index);
+  if (index != ~0) {
+    VCDP_DBG(1, "WARNING: Found session to be removed on expired vector %u", session_index);
+    vec_del1(ptd->expired_sessions, index);
   }
 
   if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
@@ -52,14 +62,19 @@ vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32
   f64 diff = (session->timer.next_expiration - (ptd->current_time + VCDP_TIMER_INTERVAL)) / VCDP_TIMER_INTERVAL;
   if (diff > (f64) 1.) {
     /* Rearm the timer accordingly */
-    if (tw_timer_handle_is_free_2t_1w_2048sl(&ptd->wheel, session->timer.handle)) {
-      vcdp_session_timer_start(&ptd->wheel, &session->timer, session_index, ptd->current_time, diff);
-    } else {
-      vcdp_timer_update_internal(&ptd->wheel, session->timer.handle, diff);
-    }
+    VCDP_DBG(2, "Rearming timer for session %u Now: %.2f Ticks: %.2f %llx", session_index,
+             ptd->current_time, diff, session->session_id);
+    vcdp_session_timer_update_maybe_past(&ptd->wheel, &session->timer, session_index, ptd->current_time, diff);
   } else {
+    VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
     vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
   }
+}
+
+static_always_inline bool
+vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
+{
+  return (session->state != VCDP_SESSION_STATE_STATIC && session->timer.next_expiration - time_now < 1);
 }
 
 static void
@@ -76,15 +91,18 @@ vcdp_session_key_swap(vcdp_session_ip4_key_t *key)
 
 static_always_inline int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
+                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *orgkey, u64 *h)
 {
   int rv;
   clib_bihash_kv_16_8_t kv;
   u64 value;
   vcdp_session_t *session;
   u32 session_index;
+
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
 
+  // Ensure we don't change original key
+  vcdp_session_ip4_key_t _k = *orgkey, *key = &_k;
   vcdp_session_key_swap(key);
 
   kv.key[0] = key->as_u64[0];

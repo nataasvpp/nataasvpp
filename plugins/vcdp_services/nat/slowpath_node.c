@@ -85,7 +85,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   if (PREDICT_FALSE(pool->num > NAT_ALLOC_POOL_ARRAY_SZ))
     ASSERT(0);
 #endif
-//  new_key.context_id = tenant->reverse_context;
+
+  new_key.context_id = instance->context_id;
 
   /* Allocate a new source */
   ip4_old_src_addr = *ip4_key_src_addr;
@@ -93,7 +94,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   ip4_new_src_addr = instance->addresses[src_addr_index].as_u32;
   *ip4_key_src_addr = ip4_new_src_addr;
 
-  pseudo_flow_index = (session_index << 1) | 0x1; // TODO: Always 1, since this is always the return flow
+  pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
 
   /* Allocate a new port */
   ip4_key_src_port = &new_key.sport;
@@ -103,7 +104,6 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   /* First try with original src port */
   ip4_new_port = ip4_old_port;
 
-  // TODO: The secondary key should be added by create session and modified by the NAT node?????
   while ((++n_retries) < VCDP_NAT_MAX_PORT_ALLOC_RETRIES &&
          vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
     /* Use h to try a different port */

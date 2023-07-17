@@ -15,12 +15,21 @@
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_8_8.h>
 
-#include <vppinfra/tw_timer_2t_1w_2048sl.h>
+#include <vppinfra/tw_timer_1t_3w_1024sl_ov.h>
 #include <vppinfra/format_table.h>
 
-#include <vcdp/timer.h>
 #include <vcdp/vcdp_counter.json.h>
 
+#define VCDP_DEBUG  0
+#if VCDP_DEBUG > 0
+#define VCDP_DBG(_lvl, _fmt, _args...)   \
+  if (_lvl <= VCDP_DEBUG)                \
+    clib_warning (_fmt, ##_args)
+#else
+#define VCDP_DBG(_lvl, _fmt, _args...)
+#endif
+
+#include <vcdp/timer.h>
 
 // TODO: Make this configurable on startup
 #define VCDP_SESSION_ID_TOTAL_BITS    64

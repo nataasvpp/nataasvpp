@@ -14,6 +14,7 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
   u8 *nat_id = 0;
   u32 tenant_id = ~0;
   u32 sw_if_index = ~0;
+  u32 context_id = 0;
   int rv;
 
   if (!unformat_user(input, unformat_line_input, line_input))
@@ -23,6 +24,8 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
     if (unformat(line_input, "id %s", &nat_id))
       ;
     if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+    else if (unformat(line_input, "context %d", &context_id))
       ;
     else if (unformat(line_input, "%U", unformat_ip4_address, &tmp))
       vec_add1(addr, tmp);
@@ -45,7 +48,7 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
   } else if (sw_if_index != ~0) {
     rv = vcdp_nat_if_add((char *)nat_id, sw_if_index);
   } else {
-    rv = vcdp_nat_add((char *)nat_id, addr, false);
+    rv = vcdp_nat_add((char *)nat_id, context_id, addr, false);
   }
   if (rv != 0) {
     err = clib_error_return (0, "NAT instance command failed");

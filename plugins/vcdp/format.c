@@ -33,8 +33,11 @@ u8 *
 format_vcdp_session_key(u8 *s, va_list *args)
 {
   vcdp_session_ip4_key_t *k = va_arg(*args, vcdp_session_ip4_key_t *);
-  s = format(s, "%d: %U:%d %U %U:%d", k->context_id, format_ip4_address, &k->src, clib_net_to_host_u16(k->sport), format_ip_protocol,
-             k->proto, format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
+  // Copy out the bitfields.
+  u32 context_id = k->context_id;
+  int proto = k->proto;
+  s = format(s, "%d: %U:%d %U %U:%d", context_id, format_ip4_address, &k->src, clib_net_to_host_u16(k->sport),
+             format_ip_protocol, proto, format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
   return s;
 }
 
@@ -67,18 +70,14 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
   s = format(s, "  thread index: %d\n", thread_index);
   s = format(s, "  session index: %d\n", session_index);
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4) {
-    skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
-    s = format(s, "  primary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
-               &skey->src, clib_net_to_host_u16(skey->sport), format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
-  }
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4) {
-    skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-    s = format(s, "  secondary key: %U\t%U:%u\t-> %U:%u\n", format_ip_protocol, skey->proto, format_ip4_address,
-               &skey->src, clib_net_to_host_u16(skey->sport), format_ip4_address, &skey->dst, clib_net_to_host_u16(skey->dport));
-  }
+  skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+  s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);
+  skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+  s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   s = format(s, "  expires after: %fs\n", remaining_time);
+  s = format(s, "  timer state: %s\n",
+             vcdp_session_timer_running(&ptd->wheel, &session->timer) ? "running" : "stopped");
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
   s = format(s, "  reverse service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_REVERSE]);
   s = format(s, "  counters:\n");
