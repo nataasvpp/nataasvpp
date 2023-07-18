@@ -130,13 +130,14 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
   vcdp_tenant_t *tenant;
-  u32 thread_index;
+  u32 thread_index = ~0;
   u32 tenant_id = ~0;
   f64 now = vlib_time_now(vm);
   clib_bihash_kv_8_8_t kv = {0};
   u32 session_index;
   u64 session_id;
   bool session_id_set = false;
+  u32 session_idx = ~0;
 
   if (unformat_user(input, unformat_line_input, line_input)) {
     while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
@@ -144,6 +145,10 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         ;
       else if (unformat(line_input, "0x%X", sizeof(session_id), &session_id)) {
         session_id_set = true;
+      } else if (unformat(line_input, "%u", &session_idx)) {
+        ;
+      } else if (unformat(line_input, "thread %u", &thread_index)) {
+        ;
       } else {
         err = unformat_parse_error(line_input);
         break;
@@ -155,6 +160,17 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   if (err)
     return err;
 
+  if (session_idx != ~0) {
+    if (thread_index == ~0 || thread_index >= vec_len(vcdp->per_thread_data))
+      return clib_error_return(0, "Thread index not set");
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_idx);
+    if (session)
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_idx, now);
+    else
+      err = clib_error_return(0, "Session index %u not found", session_idx);
+    return err;
+  }
   if (session_id_set) {
     kv.key = session_id;
     if (!clib_bihash_search_inline_8_8(&vcdp->session_index_by_id, &kv)) {
@@ -300,7 +316,7 @@ VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {
 
 VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
   .path = "show vcdp session",
-  .short_help = "show vcdp session [tenant <tenant-id>] [0x<session-id>]",
+  .short_help = "show vcdp session [session index] [thread <n>] [tenant <tenant-id>] [0x<session-id>]",
   .function = vcdp_show_sessions_command_fn,
 };
 

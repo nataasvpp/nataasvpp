@@ -18,7 +18,7 @@ typedef enum {
 } vcdp_bypass_next_t;
 
 typedef struct {
-  u32 flow_id;
+  u32 next_index;
 } vcdp_bypass_trace_t;
 
 static u8 *
@@ -28,8 +28,7 @@ format_vcdp_bypass_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_bypass_trace_t *t = va_arg(*args, vcdp_bypass_trace_t *);
 
-  s = format(s, "vcdp-bypass: flow-id %u (session %u, %s)", t->flow_id, t->flow_id >> 1,
-             t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format(s, "vcdp-bypass: next-index %u", t->next_index);
   return s;
 }
 
@@ -91,7 +90,7 @@ VLIB_NODE_FN(vcdp_bypass_node)
     for (i = 0; i < n_left; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
         vcdp_bypass_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
-        t->flow_id = b[0]->flow_id;
+        t->next_index = nexts[i];
         b++;
       } else
         break;
