@@ -382,7 +382,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       session = vcdp_session_at_index(ptd, session_index);
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        clib_warning("Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
+        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
                      session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;

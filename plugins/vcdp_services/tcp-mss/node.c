@@ -119,6 +119,18 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     u16 max_mss4 = direction == VCDP_FLOW_FORWARD ? cm->max_mss4_forward[tenant_idx] : cm->max_mss4_reverse[tenant_idx];
     if (max_mss4 == MSS_CLAMP_UNSET)
       goto done;
+
+    // TROUBLESHOOTING: output extra data if session receives SYN against established session
+    session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    session = vcdp_session_at_index(ptd, session_idx);
+    if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
+      f64 now = vlib_time_now(vm);
+      clib_warning("SYN received against established session %U", format_vcdp_session_detail, session_idx, session,
+                   now);
+      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    }
+
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
     pkts_clamped += clamped;
 
@@ -132,12 +144,12 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     }
   done:
     // If session is established remove ourselves from service chain
-    session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
-    if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
-      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-    }
+    // session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    // session = vcdp_session_at_index(ptd, session_idx);
+    // if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
+    //   session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    //   session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    // }
 
     vcdp_next(b[0], next);
 
