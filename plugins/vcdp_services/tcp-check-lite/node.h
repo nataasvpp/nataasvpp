@@ -126,7 +126,9 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
     }
     break;
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
+    clib_warning("CLOSING state not implemented");
 #if 0
+
     // Allow a transitory session to reopen
     if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) ==
         (TCP_FLAG_ACK)) {

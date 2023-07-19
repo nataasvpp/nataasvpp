@@ -127,8 +127,8 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
       f64 now = vlib_time_now(vm);
       clib_warning("SYN received against established session %U", format_vcdp_session_detail, session_idx, session,
                    now);
-      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+      // session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+      // session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
     }
 
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
