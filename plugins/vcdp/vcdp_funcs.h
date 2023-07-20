@@ -68,6 +68,26 @@ vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32
   }
 }
 
+/*
+ * An existing TCP session is being reused for a new flow with the same 6-tuple.
+ * Reset counters.
+ */
+static_always_inline void
+vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session)
+{
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
+                                session->tenant_idx, 1);
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index,
+                                session->tenant_idx, 1);
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], thread_index,
+                                session->tenant_idx, 1);
+
+  session->bytes[VCDP_FLOW_FORWARD] = 0;
+  session->bytes[VCDP_FLOW_REVERSE] = 0;
+  session->pkts[VCDP_FLOW_FORWARD] = 0;
+  session->pkts[VCDP_FLOW_REVERSE] = 0;
+}
+
 static_always_inline bool
 vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
 {

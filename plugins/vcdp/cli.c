@@ -247,7 +247,8 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
 
     counter_t created = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], idx);
     counter_t removed = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], idx);
-    vlib_cli_output(vm, "Tenant: %d created %ld expired %ld", idx, created, removed);
+    counter_t reused = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], idx);
+    vlib_cli_output(vm, "Tenant: %d created %ld expired %ld reused %ld", idx, created, removed, reused);
   }
 
   return 0;

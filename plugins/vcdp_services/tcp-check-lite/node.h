@@ -14,6 +14,7 @@
 #include <vlib/vlib.h>
 #include <vcdp_services/tcp-check-lite/tcp_check_lite.h>
 #include <vcdp/service.h>
+#include <vcdp/vcdp_funcs.h>
 
 typedef struct {
   u32 flow_id;
@@ -126,21 +127,23 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
     }
     break;
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
-    clib_warning("CLOSING state not implemented");
-#if 0
-
-    // Allow a transitory session to reopen
-    if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) ==
-        (TCP_FLAG_ACK)) {
-      // nat44_ed_session_reopen(thread_index, ses);
-      tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_ESTABLISHED;
-      next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_ESTABLISHED];
-      session->state = VCDP_SESSION_STATE_ESTABLISHED;
+    // If we see a SYN, we reopen session. It will have the same session id.
+    // Otherwise we will just forward against the session until it expires.
+    if (tcp_session->flags[dir] & TCP_FLAG_SYN) {
+      VCDP_DBG(2, "Reopening session %u", session_index);
+      vcdp_main_t *vcdp = &vcdp_main;
+      u32 thread_index = vlib_get_thread_index();
+      vcdp_session_reopen(vcdp, thread_index, session);
+      next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_TRANSITORY];
+      session->state = VCDP_SESSION_STATE_FSOL;
+      tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSED;
+      tcp_session->flags[VCDP_FLOW_FORWARD] = 0;
+      tcp_session->flags[VCDP_FLOW_REVERSE] = 0;
     }
-#endif
     break;
+
     default:
-      clib_warning("Unknown state %d", old_state);
+      VCDP_DBG(0, "Unknown state %d", old_state);
   }
 
 out:
