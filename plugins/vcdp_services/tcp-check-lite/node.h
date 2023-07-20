@@ -71,9 +71,9 @@ vcdp_tcp_state_to_timeout (vcdp_tcp_check_lite_tcp_state_t state)
 
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
-update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_session_state_t *tcp_session,
-                     vcdp_session_t *session, u32 session_index, f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf,
-                     u32 *nsf)
+update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tw_t *tw, vcdp_tenant_t *tenant,
+                     vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
+                     f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
   ip4_header_t *ip4 = (ip4_header_t *) vlib_buffer_get_current(b[0]);
   tcp_header_t *tcp = ip4_next_header(ip4);
@@ -81,13 +81,12 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   /* Ignore non first fragments */
   if (ip4_get_fragment_offset(ip4) > 0) {
     vcdp_next(b[0], to_next);
-    clib_warning("Fragment ignored");
+    VCDP_DBG(0, "Fragment ignored");
     return;
   }
-  /* Note: We don't care about SYNs */
-  u8 flags = tcp->flags & (TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
+  /* Note: We don't care about SYNs apart from reopening sessions */
+  u8 flags = tcp->flags & (TCP_FLAG_SYN | TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
   u32 next_timeout = tenant->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
-
   if (PREDICT_FALSE(tcp_session->version != session->session_version)) {
     tcp_session->version = session->session_version;
     tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSED;
@@ -109,7 +108,7 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   switch (old_state) {
   case VCDP_TCP_CHECK_LITE_STATE_CLOSED:
     // ESTABLISHED when ACKs are seen from both sides
-    if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) == TCP_FLAG_ACK) {
+    if ((tcp_session->flags[VCDP_FLOW_FORWARD] & tcp_session->flags[VCDP_FLOW_REVERSE]) & TCP_FLAG_ACK) {
       tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_ESTABLISHED;
       next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_ESTABLISHED];
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
@@ -129,12 +128,11 @@ update_state_one_pkt(vcdp_tw_t *tw, vcdp_tenant_t *tenant, vcdp_tcp_check_lite_s
   case VCDP_TCP_CHECK_LITE_STATE_CLOSING:
     // If we see a SYN, we reopen session. It will have the same session id.
     // Otherwise we will just forward against the session until it expires.
-    if (tcp_session->flags[dir] & TCP_FLAG_SYN) {
-      VCDP_DBG(2, "Reopening session %u", session_index);
-      vcdp_main_t *vcdp = &vcdp_main;
+    if (tcp_session->flags[VCDP_FLOW_FORWARD] & TCP_FLAG_SYN) {
+      VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
       u32 thread_index = vlib_get_thread_index();
       vcdp_session_reopen(vcdp, thread_index, session);
-      next_timeout = tenant->timeouts[VCDP_TIMEOUT_TCP_TRANSITORY];
+      next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];
       session->state = VCDP_SESSION_STATE_FSOL;
       tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSED;
       tcp_session->flags[VCDP_FLOW_FORWARD] = 0;
@@ -181,7 +179,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
     session = vcdp_session_at_index(ptd, session_idx);
     tcp_session = vec_elt_at_index(tptd->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
-    update_state_one_pkt(tw, tenant, tcp_session, session, session_idx, current_time, vcdp_direction_from_flow_index(b[0]->flow_id),
+    update_state_one_pkt(vcdp, ptd, tw, tenant, tcp_session, session, session_idx, current_time, vcdp_direction_from_flow_index(b[0]->flow_id),
                          to_next, b, sf, nsf);
     n_left -= 1;
     b += 1;
