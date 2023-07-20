@@ -189,6 +189,7 @@ class TestVCDPSession(VppTestCase):
 
 
         print(self.vapi.cli("show vcdp session"))
+        print(self.vapi.cli("show vcdp summary"))
         # print(self.vapi.cli('show vcdp tcp session-table'))
         print(self.vapi.cli('show vcdp tenant'))
 

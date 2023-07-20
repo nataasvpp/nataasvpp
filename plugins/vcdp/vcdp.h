@@ -20,7 +20,7 @@
 
 #include <vcdp/vcdp_counter.json.h>
 
-#define VCDP_DEBUG  10
+#define VCDP_DEBUG  0
 #if VCDP_DEBUG > 0
 #define VCDP_DBG(_lvl, _fmt, _args...)   \
   if (_lvl <= VCDP_DEBUG)                \
