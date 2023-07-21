@@ -20,7 +20,8 @@
 		"symlink_prefix": "/vcdp/tenants",
 		"counter": [
 			"created",
-			"removed"
+			"removed",
+			"reused"
 		]
 	}
 ]

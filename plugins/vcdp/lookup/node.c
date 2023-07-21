@@ -96,7 +96,7 @@ vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol,
       u32 thread_index = vcdp_thread_index_from_lookup(kv.value);
       /* known flow which belongs to this thread */
       u32 flow_index = kv.value & (~(u32) 0);
-      u32 session_index = flow_index >> 1;
+      u32 session_index = vcdp_session_from_flow_index(flow_index);
       vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
       return pool_elt_at_index(ptd->sessions, session_index);
   }
@@ -191,9 +191,8 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
     return 2;
 
   pool_get(ptd->sessions, session);
-  session_version_t session_version = session->session_version;
+  session_version_t session_version = session->session_version + 1;
   clib_memset(session, 0, sizeof(*session));
-  session->session_version = session_version;
   session_idx = session - ptd->sessions;
 
     // Is this session on the expiry queue?
@@ -220,7 +219,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   session->type = VCDP_SESSION_TYPE_IP4;
   session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
 
-  session->session_version += 1;
+  session->session_version = session_version;
   session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
   ptd->session_id_ctr += 2; /* two at a time, because last bit is reserved for direction */
   session->session_id = session_id;
@@ -237,7 +236,7 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
 
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], k, sizeof(session->keys[0]));
   session->proto = proto;
-
+  session->timer.handle = VCDP_TIMER_HANDLE_INVALID;
   vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, time_now,
                            tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
 
@@ -360,6 +359,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         to_local[n_local] = bi[0];
         n_local++;
         current_next++;
+        b[0]->flow_id = ~0; // No session
         goto next;
       }
     } else {
@@ -375,14 +375,14 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       /* known flow which belongs to this thread */
       u32 flow_index = lv[0] & (~(u32) 0);
       to_local[n_local] = bi[0];
-      session_index = flow_index >> 1;
+      session_index = vcdp_session_from_flow_index(flow_index);
       si[0] = session_index;
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        clib_warning("Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
+        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
                      session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
@@ -524,7 +524,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
 
   while (n_left) {
     u32 flow_index = b[0]->flow_id;
-    u32 session_index = flow_index >> 1;
+    u32 session_index = vcdp_session_from_flow_index(flow_index);
     vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
     if (!session) {
       // Session has been deleted underneath us
@@ -618,8 +618,6 @@ format_vcdp_handoff_trace(u8 *s, va_list *args)
  * This is to ensure that the session is removed before any other nodes are run and buffers are in flight using a
  * removed session.
  */
-#define MAX_THREADS 16
-#define VCDP_SESSION_LEAK_EXPIRY 100.0
 VLIB_NODE_FN(vcdp_session_expire_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -627,7 +625,6 @@ VLIB_NODE_FN(vcdp_session_expire_node)
   u32 thread_index = vm->thread_index;
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   u32 session_index;
-  static f64 last_run = 0;
 
   for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
     session_index = vec_pop(ptd->expired_sessions);
@@ -636,6 +633,12 @@ VLIB_NODE_FN(vcdp_session_expire_node)
   }
   if (vec_len(ptd->expired_sessions) > 0)
     VCDP_DBG(2, "Expired sessions after cleanup: %d", vec_len(ptd->expired_sessions));
+
+#ifdef VCDP_SESSION_TABLE_SCANNER
+#define MAX_THREADS 16
+#define VCDP_SESSION_LEAK_EXPIRY 100.0
+
+  static f64 last_run = 0;
 
   // Walk session table and remove leaked sessions if found
   // This should not be needed. Add an error counter.
@@ -662,6 +665,7 @@ VLIB_NODE_FN(vcdp_session_expire_node)
     }
     cursor = pool_next_index(ptd->sessions, cursor);
   }
+#endif
   return 0;
 }
 

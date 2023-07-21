@@ -98,7 +98,7 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
         if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
           skey->sport = skey->dport = echo->identifier;
         } else {
-          clib_warning("Failed dealing with ICMP error");
+          VCDP_DBG(3, "Failed dealing with ICMP error");
           sc[0] = VCDP_SERVICE_CHAIN_DROP;
         }
         break;

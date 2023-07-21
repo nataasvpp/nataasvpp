@@ -46,6 +46,9 @@ vcdp_timer_expired(u32 *expired)
       /* Session has already been deleted */
       VCDP_DBG(1, "session %u already deleted", session_idx);
       continue;
+    } else {
+      vcdp_session_t *session = pool_elt_at_index(ptd->sessions, session_idx);
+      session->timer.handle = VCDP_TIMER_HANDLE_INVALID;
     }
     vec_add1(ptd->expired_sessions, session_idx);
   }

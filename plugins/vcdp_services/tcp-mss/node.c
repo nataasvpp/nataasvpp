@@ -87,18 +87,12 @@ VCDP_SERVICE_DECLARE(vcdp_tcp_mss);
 always_inline uword
 vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_mss_main_t *cm = &vcdp_tcp_mss_main;
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u16 nexts[VLIB_FRAME_SIZE], *next;
   u32 n_left, *from;
   u32 pkts_clamped = 0;
   u16 org_mss4 = 0;
-  u32 session_idx;
-  vcdp_session_t *session;
-
-  u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   from = vlib_frame_vector_args(frame);
   n_left = frame->n_vectors;
@@ -119,6 +113,7 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     u16 max_mss4 = direction == VCDP_FLOW_FORWARD ? cm->max_mss4_forward[tenant_idx] : cm->max_mss4_reverse[tenant_idx];
     if (max_mss4 == MSS_CLAMP_UNSET)
       goto done;
+
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
     pkts_clamped += clamped;
 
@@ -131,13 +126,15 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
       t->clamped = clamped;
     }
   done:
+    // NB: We don't need to do this anymore, because it will break reopened sessions.
+    //
     // If session is established remove ourselves from service chain
-    session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
-    if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
-      session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-      session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-    }
+    // session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    // session = vcdp_session_at_index(ptd, session_idx);
+    // if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
+    //   session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    //   session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
+    // }
 
     vcdp_next(b[0], next);
 

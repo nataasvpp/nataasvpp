@@ -15,11 +15,8 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
 
   /* Stop timer if running */
   VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
-  if (vcdp_session_timer_running(&ptd->wheel, &session->timer)) {
-    VCDP_DBG(2, "Stopping timer for session %u", session_index);
-    vcdp_session_timer_stop(&ptd->wheel, &session->timer);
-  }
-  session->timer.handle = ~0;
+  VCDP_DBG(2, "Stopping timer for session %u", session_index);
+  vcdp_session_timer_stop(&ptd->wheel, &session->timer);
 
   // Is this session on the expiry queue?
   u32 index = vec_search(ptd->expired_sessions, session_index);
@@ -69,6 +66,26 @@ vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32
     VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
     vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
   }
+}
+
+/*
+ * An existing TCP session is being reused for a new flow with the same 6-tuple.
+ * Reset counters.
+ */
+static_always_inline void
+vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session)
+{
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
+                                session->tenant_idx, 1);
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index,
+                                session->tenant_idx, 1);
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], thread_index,
+                                session->tenant_idx, 1);
+
+  session->bytes[VCDP_FLOW_FORWARD] = 0;
+  session->bytes[VCDP_FLOW_REVERSE] = 0;
+  session->pkts[VCDP_FLOW_FORWARD] = 0;
+  session->pkts[VCDP_FLOW_REVERSE] = 0;
 }
 
 static_always_inline bool
