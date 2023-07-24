@@ -129,7 +129,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tw_t *
     // If we see a SYN, we reopen session. It will have the same session id.
     // Otherwise we will just forward against the session until it expires.
     if (tcp_session->flags[VCDP_FLOW_FORWARD] & TCP_FLAG_SYN) {
-      VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
+      VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session, 0);
       u32 thread_index = vlib_get_thread_index();
       vcdp_session_reopen(vcdp, thread_index, session);
       next_timeout = tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC];

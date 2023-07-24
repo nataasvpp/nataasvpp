@@ -94,6 +94,13 @@ typedef struct {
 extern nat_main_t nat_main;
 
 format_function_t format_vcdp_nat_rewrite;
+format_function_t format_vcdp_nat_session;
+
+/* Definitions from nat.api */
+#include <vcdp_services/nat/nat.api_types.h>
+typedef vl_api_vcdp_match_tuple_t vcdp_match_tuple_t;
+typedef vl_api_vcdp_rewrite_tuple_t vcdp_rewrite_tuple_t;
+typedef vl_api_vcdp_mask_tuple_t vcdp_mask_tuple_t;
 
 int vcdp_nat_add(char *natid, u32 context_id, ip4_address_t *addr, bool is_if);
 int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);

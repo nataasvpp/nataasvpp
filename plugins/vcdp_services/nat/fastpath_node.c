@@ -135,10 +135,14 @@ VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-slowpath"),
-  .is_terminal = 1};
+  .is_terminal = 1,
+  .format_session = format_vcdp_nat_session,
+};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
-  .is_terminal = 0};
+  .is_terminal = 0,
+  .format_session = format_vcdp_nat_session,
+};

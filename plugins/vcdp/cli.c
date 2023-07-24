@@ -138,6 +138,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   u64 session_id;
   bool session_id_set = false;
   u32 session_idx = ~0;
+  u8 *s = 0;
+  bool verbose = false;
 
   if (unformat_user(input, unformat_line_input, line_input)) {
     while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
@@ -149,6 +151,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         ;
       } else if (unformat(line_input, "thread %u", &thread_index)) {
         ;
+      } else if (unformat(line_input, "verbose")) {
+        verbose = true;
       } else {
         err = unformat_parse_error(line_input);
         break;
@@ -166,7 +170,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_idx);
     if (session)
-      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_idx, now);
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session, now);
     else
       err = clib_error_return(0, "Session index %u not found", session_idx);
     return err;
@@ -177,7 +181,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       thread_index = vcdp_thread_index_from_lookup(kv.value);
       session_index = vcdp_session_index_from_lookup(kv.value);
       ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_index, now);
+      session = vcdp_session_at_index_check(ptd, session_index);
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session, now);
     } else {
       err = clib_error_return(0, "Session id 0x%llx not found", session_id);
     }
@@ -201,16 +206,27 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       //   continue;
       u64 session_net = clib_host_to_net_u64(session->session_id);
       vcdp_session_ip4_key_t *k1, *k2;
-      vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
-                      tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                      format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
+      s = format(0, "0x%U %6d %6d %4U %5U %10U", format_hex_bytes, &session_net, sizeof(session_net), tenant->tenant_id,
+                 session - ptd->sessions, format_vcdp_session_type, session->type, format_ip_protocol, session->proto,
+                 format_vcdp_session_state, session->state);
+      if (session->state != VCDP_SESSION_STATE_STATIC)
+        s = format(s, "%6f", remaining_time);
+      else
+        s = format(s, "     -");
 
       k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
-      k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
-                      clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
-      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
-                      clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
+      s = format(s, "\n%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
+                 clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
+      if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
+        k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY]; // TODO: Check validity
+        s = format(s, "\n%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
+                   clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
+      }
+      if (verbose)
+        s = format(s, "%U", format_vcdp_session_detail, ptd, session, now);
+
+      vlib_cli_output(vm, "%v", s);
+      vec_reset_length(s);
     }
   }
   return err;

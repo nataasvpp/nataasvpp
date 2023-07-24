@@ -246,12 +246,12 @@ VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {
   .n_errors = VCDP_NAT_SLOWPATH_N_ERROR,
   .error_counters = vcdp_nat_slowpath_error_counters,
   .sibling_of = "vcdp-lookup-ip4"
-
 };
 
 VCDP_SERVICE_DEFINE(nat_output) = {
   .node_name = "vcdp-nat-slowpath",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
-  .is_terminal = 0
+  .is_terminal = 0,
+  .format_session = format_vcdp_nat_session,
 };

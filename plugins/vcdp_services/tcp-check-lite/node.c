@@ -28,4 +28,6 @@ VCDP_SERVICE_DEFINE(tcp_check_lite) = {
   .node_name = "vcdp-tcp-check-lite",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
-  .is_terminal = 0};
+  .is_terminal = 0,
+  .format_session = format_vcdp_tcp_lite_service_session,
+};

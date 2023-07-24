@@ -32,9 +32,6 @@ typedef struct {
 
 extern vcdp_tcp_check_lite_main_t vcdp_tcp_lite;
 
-format_function_t format_vcdp_tcp_check_lite_session_flags;
-u32 vcdp_table_format_insert_tcp_check_lite_session(table_t *t, u32 n, vcdp_main_t *vcdp, u32 session_index,
-                                                    vcdp_session_t *session,
-                                                    vcdp_tcp_check_lite_session_state_t *tcp_session);
+format_function_t format_vcdp_tcp_lite_service_session;
 
 #endif

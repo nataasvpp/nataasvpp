@@ -327,6 +327,28 @@ vcdp_nat_if_add(char *nat_id, u32 sw_if_index)
   return 0;
 }
 
+int
+vcdp_nat_portforwarding_add(u32 tenant_id, char *nat_id, vcdp_match_tuple_t *match, vcdp_rewrite_tuple_t *rewrite)
+{
+  nat_instance_t *instance;
+  u16 nat_idx;
+  instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
+  if (instance) return -1; // exists already
+
+  // Special "tenant" to hold the template service chain
+  // Install template 3-tuple session and service chain (create)
+  ip_address_t src, dst;
+  ip_address_set(&src, &match->src, AF_IP4);
+  ip_address_set(&dst, &match->dst, AF_IP4);
+
+  // Flag to indicate that this is a 3-tuple session
+  vcdp_create_session_v4_2(tenant_id, &src, match->sport, match->proto, &dst, match->dport);
+
+  // How to create the NAT rewrite?
+  // Matching NAT session with VCDP session to contain the rewrite?
+  return 0;
+}
+
 static clib_error_t *
 nat_init(vlib_main_t *vm)
 {

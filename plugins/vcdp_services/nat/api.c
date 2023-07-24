@@ -60,6 +60,17 @@ vl_api_vcdp_nat_bind_set_unset_t_handler(vl_api_vcdp_nat_bind_set_unset_t *mp)
   REPLY_MACRO_END(VL_API_VCDP_NAT_BIND_SET_UNSET_REPLY);
 }
 
+int vcdp_nat_portforwarding_add(u32 tenant_id, char *nat_id, vcdp_match_tuple_t *match, vcdp_rewrite_tuple_t *rewrite);
+
+static void
+vl_api_vcdp_nat_portforwarding_add_t_handler(vl_api_vcdp_nat_portforwarding_add_t *mp)
+{
+  nat_main_t *nat = &nat_main;
+  vl_api_vcdp_nat_portforwarding_add_reply_t *rmp;
+  int rv = vcdp_nat_portforwarding_add(mp->tenant_id, (char *)mp->nat_id, &mp->match, &mp->rewrite);
+  REPLY_MACRO_END(VL_API_VCDP_NAT_PORTFORWARDING_ADD_REPLY);
+}
+
 #include <vcdp_services/nat/nat.api.c>
 static clib_error_t *
 vcdp_nat_api_hookup(vlib_main_t *vm)

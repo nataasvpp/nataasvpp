@@ -44,6 +44,49 @@ autoreply autoendian define vcdp_nat_bind_set_unset
   bool is_set;
 };
 
+enum vcdp_mask_tuple
+{
+    VCDP_TUPLE_SA = 0x1,
+    VCDP_TUPLE_DA = 0x2,
+    VCDP_TUPLE_SPORT = 0x4,
+    VCDP_TUPLE_DPORT = 0x8,
+    VCDP_TUPLE_PROTO = 0x10,
+};
+
+typedef vcdp_match_tuple
+{
+    vl_api_ip4_address_t src;
+    vl_api_ip4_address_t dst;
+    vl_api_ip_proto_t proto;
+    u16 sport;
+    u16 dport;
+    vl_api_vcdp_mask_tuple_t mask;
+};
+
+typedef vcdp_rewrite_tuple
+{
+    vl_api_ip4_address_t src;
+    vl_api_ip4_address_t dst;
+    u16 sport;
+    u16 dport;
+    vl_api_vcdp_mask_tuple_t mask;
+};
+
+/*
+ * Installs a 3-tuple template session that maps outside port to inside
+ * host and post.
+ */
+autoreply autoendian define vcdp_nat_portforwarding_add
+{
+  u32 client_index;
+  u32 context;
+
+  u32 tenant_id;
+  string nat_id[37];
+  vl_api_vcdp_match_tuple_t match;
+  vl_api_vcdp_rewrite_tuple_t rewrite;
+};
+
 counters vcdp_nat_icmp {
   no_tenant {
     severity error;

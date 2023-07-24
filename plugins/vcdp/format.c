@@ -54,12 +54,25 @@ format_vcdp_bitmap(u8 *s, va_list *args)
 }
 
 u8 *
+format_vcdp_service_session(u8 *s, va_list *args)
+{
+  u32 bmp = va_arg(*args, u32);
+  u32 thread_index = va_arg(*args, u32);
+  u32 session_index = va_arg(*args, u32);
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  int i;
+  for (i = 0; i < vec_len(sm->services); i++)
+    if (bmp & sm->services[i]->service_mask[0] && sm->services[i]->format_session)
+      s = format(s, "%s: %U", sm->services[i]->node_name, sm->services[i]->format_session, thread_index, session_index);
+  return s;
+}
+
+u8 *
 format_vcdp_session_detail(u8 *s, va_list *args)
 {
   vcdp_per_thread_data_t *ptd = va_arg(*args, vcdp_per_thread_data_t *);
-  u32 session_index = va_arg(*args, u32);
+  vcdp_session_t *session = va_arg(*args, vcdp_session_t *);
   f64 now = va_arg(*args, f64);
-  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
 
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
@@ -69,15 +82,20 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   /* TODO: deal with secondary keys */
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
   s = format(s, "  thread index: %d\n", thread_index);
-  s = format(s, "  session index: %d\n", session_index);
+  s = format(s, "  session index: %d\n", session - ptd->sessions);
   skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
   s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);
-  skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-  s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
+  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)) {
+    skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+    s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
+    s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
+  }
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
-  s = format(s, "  expires after: %fs\n", remaining_time);
-  s = format(s, "  timer state: %s\n",
-             vcdp_session_timer_running(&ptd->wheel, &session->timer) ? "running" : "stopped");
+  if (session->state != VCDP_SESSION_STATE_STATIC) {
+    s = format(s, "  expires after: %fs\n", remaining_time);
+    s = format(s, "  timer state: %s\n",
+               vcdp_session_timer_running(&ptd->wheel, &session->timer) ? "running" : "stopped");
+  }
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
   s = format(s, "  reverse service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_REVERSE]);
   s = format(s, "  counters:\n");
@@ -87,13 +105,28 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   s = format(s, "    reverse flow:\n");
   s = format(s, "      bytes: %llu\n", session->bytes[VCDP_FLOW_REVERSE]);
   s = format(s, "      packets: %llu\n", session->pkts[VCDP_FLOW_REVERSE]);
+
+  s = format(s, "%U", format_vcdp_service_session, session->bitmaps[VCDP_FLOW_FORWARD], thread_index,
+             session - ptd->sessions);
   return s;
 }
+
+#if 0
+u8 *
+format_vcdp_session_detail_index(u8 *s, va_list *args)
+{
+  vcdp_per_thread_data_t *ptd = va_arg(*args, vcdp_per_thread_data_t *);
+  u32 session_index = va_arg(*args, u32);
+  f64 now = va_arg(*args, f64);
+  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
+
+  return format(s, "%U", format_vcdp_session_detail, ptd, session, now);
+}
+#endif
 
 u8 *
 format_vcdp_tenant(u8 *s, va_list *args)
 {
-
   u32 indent = format_get_indent(s);
   __clib_unused vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
   u32 tenant_idx = va_arg(*args, u32);
