@@ -90,6 +90,7 @@ class TestVCDPSession(VppTestCase):
         cls.mss = mss
         cls.nat_id = nat_id
         cls.tenant = tenant
+        cls.pool = pool
 
     @classmethod
     def tearDownClass(cls):
@@ -102,6 +103,9 @@ class TestVCDPSession(VppTestCase):
 
     def validate(self, rx, expected, msg=None):
         '''Validate received and expected packets'''
+        if rx != expected.__class__(expected):
+            log_error_packet(msg, rx)
+            log_error_packet(msg, expected)
         self.assertEqual(rx, expected.__class__(expected), msg=msg)
 
     def validate_bytes(self, rx, expected):
@@ -199,3 +203,24 @@ class TestVCDPSession(VppTestCase):
         print('NAT statistics', self.statistics[f"/vcdp/nats/{self.nat_id}/rx-octets-and-pkts"], self.statistics[f"/vcdp/nats/{self.nat_id}/tx-octets-and-pkts"])
 
         print('Tenant session statistics', self.statistics["/vcdp/tenant/created-sessions"], self.statistics["/vcdp/tenant/removed-sessions"])
+
+    def test_tcp_checksum(self):
+        '''Test TCP checksum'''
+
+        # Send 64K packets, spinning through all possible checksums
+        pkts = []
+        for i in range(0, 0xFFFF):
+            pkt = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/TCP(sport=i, dport=80, flags='S'))
+            pkts.append(pkt)
+
+        rx = self.send_and_expect(self.pg0, pkts, self.pg1, trace=False)
+
+        for p in rx:
+            modified = p.copy()
+            modified[TCP].chksum = None
+            modified[IP].src = self.pool
+            self.validate(p[1], modified[1])
+
+
+        print('VALIDATE TCP CHECKSUM in REPLY packet')
+        print(self.vapi.cli("show vcdp summary"))
