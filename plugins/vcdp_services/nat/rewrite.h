@@ -45,6 +45,8 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     tcp_sum = ip_csum_sub_even(tcp_sum, rewrite->l4_csum_delta);
     tcp_sum = ip_csum_fold(tcp_sum);
     tcp->checksum = tcp_sum;
+    if (tcp->checksum == 0xffff)
+      tcp->checksum = 0;
 
     if (ops & NAT_REWRITE_OP_SPORT)
       tcp->src_port = rewrite->rewrite.sport;
@@ -58,6 +60,8 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     udp_sum = ip_csum_sub_even(udp_sum, rewrite->l4_csum_delta);
     udp_sum = ip_csum_fold(udp_sum);
     udp->checksum = udp_sum;
+    if (udp->checksum == 0xffff)
+      udp->checksum = 0;
 
     if (ops & NAT_REWRITE_OP_SPORT)
       udp->src_port = rewrite->rewrite.sport;
