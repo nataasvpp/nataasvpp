@@ -19,11 +19,14 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   icmp46_header_t *icmp;
   u16 *icmp_id;
   u32 ops = rewrite->ops;
+
+#if VCDP_DEBUG > 0
   bool checksum_valid = true;
   if (ip4->checksum != ip4_header_checksum(ip4)) {
     clib_warning("Checksum generation error in PRE NAT %U", format_ip4_header, ip4, 32);
     checksum_valid = false;
   }
+#endif
 
   ip_sum = ip4->checksum;
   ip_sum = ip_csum_sub_even(ip_sum, rewrite->l3_csum_delta);
@@ -85,9 +88,11 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     // b[0]->error = node->errors[UNSUPPORTED_PROTOCOL]
     // goto end_of_packet;
   }
+#if VCDP_DEBUG > 0
   if (checksum_valid && (ip4->checksum != ip4_header_checksum(ip4))) {
     clib_warning("Checksum generation error in NAT %U", format_ip4_header, ip4, sizeof(*ip4));
   }
+#endif
 }
 
 static inline void
