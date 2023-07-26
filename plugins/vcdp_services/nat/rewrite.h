@@ -79,6 +79,8 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
       icmp_sum = ip_csum_sub_even(icmp_sum, rewrite->l4_csum_delta);
       icmp_sum = ip_csum_fold(icmp_sum);
       icmp->checksum = icmp_sum;
+      if (icmp->checksum == 0xffff)
+        icmp->checksum = 0;
       if (ops & NAT_REWRITE_OP_ICMP_ID)
         *icmp_id = rewrite->rewrite.icmp_id;
     }
