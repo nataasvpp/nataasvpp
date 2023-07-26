@@ -7,7 +7,7 @@
 #include <vcdp/vcdp_funcs.h>
 #include <vcdp_services/nat/nat.api_enum.h>
 
-#define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 5 /* retries to allocate a port */
+#define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 32 /* retries to allocate a port */
 
 typedef struct {
   u32 flow_id;
