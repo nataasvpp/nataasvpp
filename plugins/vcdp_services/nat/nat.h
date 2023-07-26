@@ -89,6 +89,8 @@ typedef struct {
   /* Interface pool */
   nat_if_instance_t *if_instances;
   u32 *interface_by_sw_if_index;
+
+  u32 port_retries;
 } nat_main_t;
 
 extern nat_main_t nat_main;
@@ -100,5 +102,6 @@ int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);
 int vcdp_nat_remove(char *nat_id);
 int vcdp_nat_bind_set_unset(u32 tenant_id, char *nat_id, bool is_set);
 nat_instance_t *vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx);
+void vcdp_nat_set_port_retries(u32 port_retries);
 
 #endif

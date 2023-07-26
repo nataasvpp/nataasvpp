@@ -14,6 +14,7 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
   u8 *nat_id = 0;
   u32 tenant_id = ~0;
   u32 sw_if_index = ~0;
+  u32 port_retries = ~0;
   u32 context_id = 0;
   int rv;
 
@@ -31,6 +32,8 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
       vec_add1(addr, tmp);
     else if (unformat(line_input, "interface %U", unformat_vnet_sw_interface, vnet_get_main(), &sw_if_index))
       ;
+    else if (unformat(line_input, "port-retries %d", &port_retries))
+      ;
     else
       {
         err = unformat_parse_error(line_input);
@@ -47,6 +50,9 @@ vcdp_nat_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comma
     rv = vcdp_nat_bind_set_unset(tenant_id, (char *)nat_id, true);
   } else if (sw_if_index != ~0) {
     rv = vcdp_nat_if_add((char *)nat_id, sw_if_index);
+  } else if (port_retries != ~0) {
+    vcdp_nat_set_port_retries(port_retries);
+    rv = 0;
   } else {
     rv = vcdp_nat_add((char *)nat_id, context_id, addr, false);
   }
@@ -62,7 +68,8 @@ done:
 
 VLIB_CLI_COMMAND(vcdp_nat_add_command, static) = {
   .path = "set vcdp nat",
-  .short_help = "[un]set vcdp nat id <id> {<ip-addr>+ | tenant <tenand-id> | interface <interface>}",
+  .short_help = "[un]set vcdp nat id <id> {<ip-addr>+ | tenant <tenand-id> | interface <interface>}"
+    "[port-retries <port-retries>]",
   .function = vcdp_nat_add_command_fn,
 };
 
