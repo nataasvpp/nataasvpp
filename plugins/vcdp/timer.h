@@ -19,7 +19,7 @@ typedef struct {
 #define foreach_vcdp_timeout                                                                                           \
   _(EMBRYONIC, 5, "embryonic")                                                                                         \
   _(ESTABLISHED, 240, "established")                                                                                   \
-  _(TCP_TRANSITORY, 240, "tcp-transitory")                                                                          \
+  _(TCP_TRANSITORY, 60, "tcp-transitory")                                                                          \
   _(TCP_ESTABLISHED, 7440, "tcp-established")                                                                          \
   _(SECURITY, 30, "security") // TODO: Needed?
 
