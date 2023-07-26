@@ -253,6 +253,21 @@ VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(l4_lifecycle)
 
+static void
+vcdp_expire_sessions(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index)
+{
+  u32 session_index;
+
+  for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
+    session_index = vec_pop(ptd->expired_sessions);
+    VCDP_DBG(2, "Timer fired for session %u", session_index);
+    vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
+  }
+  if (vec_len(ptd->expired_sessions) > 0)
+    VCDP_DBG(2, "Expired sessions after cleanup: %d", vec_len(ptd->expired_sessions));
+
+}
+
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool no_create)
 {
@@ -282,6 +297,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   b = bufs;
   ptd->current_time = time_now;
   vcdp_expire_timers(&ptd->wheel, time_now);
+  vcdp_expire_sessions(vcdp, ptd, thread_index);
 
   // Calculate key and hash
   while (n_left) {
@@ -618,21 +634,15 @@ format_vcdp_handoff_trace(u8 *s, va_list *args)
  * This is to ensure that the session is removed before any other nodes are run and buffers are in flight using a
  * removed session.
  */
+#if 0
 VLIB_NODE_FN(vcdp_session_expire_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  u32 session_index;
 
-  for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
-    session_index = vec_pop(ptd->expired_sessions);
-    VCDP_DBG(2, "Timer fired for session %u", session_index);
-    vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
-  }
-  if (vec_len(ptd->expired_sessions) > 0)
-    VCDP_DBG(2, "Expired sessions after cleanup: %d", vec_len(ptd->expired_sessions));
+  vcdp_expire_sessions(vcdp, ptd, thread_index);
 
 #ifdef VCDP_SESSION_TABLE_SCANNER
 #define MAX_THREADS 16
@@ -668,13 +678,14 @@ VLIB_NODE_FN(vcdp_session_expire_node)
 #endif
   return 0;
 }
-
+#endif
+#if 0
 VLIB_REGISTER_NODE (vcdp_session_expire_node) =
 {
   .type = VLIB_NODE_TYPE_PRE_INPUT,
   .name = "vcdp-session-expire",
 };
-
+#endif
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .name = "vcdp-lookup-ip4",
   .vector_size = sizeof(u32),
