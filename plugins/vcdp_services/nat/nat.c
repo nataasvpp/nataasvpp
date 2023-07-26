@@ -333,7 +333,7 @@ vcdp_nat_set_port_retries(u32 port_retries)
   nat_main_t *nat = &nat_main;
   nat->port_retries = port_retries;
 }
-#define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 5 /* retries to allocate a port */
+#define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 32 /* retries to allocate a port */
 
 static clib_error_t *
 nat_init(vlib_main_t *vm)
