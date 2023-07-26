@@ -238,6 +238,70 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   return frame->n_vectors;
 }
 
+/*
+ * vcdp_nat_create_node
+ * This node is used to create a NAT session from a port-forwarding template.
+ */
+VLIB_NODE_FN(vcdp_nat_create_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+
+  vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
+  // vcdp_main_t *vcdp = &vcdp_main;
+  // ip4_main_t *im = &ip4_main;
+  // nat_main_t *nat = &nat_main;
+  u32 thread_index = vlib_get_thread_index();
+  // vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  // nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
+  // vcdp_session_t *session;
+  nat_instance_t *instance;
+  // u32 session_idx;
+  u32 tenant_idx;
+  u16 nat_idx;
+  // nat_rewrite_data_t *nat_rewrites; /* rewrite data in both directions */
+  u32 *from = vlib_frame_vector_args(frame);
+  u32 n_left = frame->n_vectors;
+  u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
+
+  vlib_get_buffers(vm, from, bufs, n_left);
+  while (n_left > 0) {
+    clib_warning("VCDP NAT CREATE FROM TEMPLATE");
+    // session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
+    // session = vcdp_session_at_index(ptd, session_idx);
+    tenant_idx = vcdp_buffer(b[0])->tenant_index;
+    // nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
+    instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
+    if (instance) {
+      ;
+      // nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
+      //                           nat_rewrites, session, to_next, b);
+    } else {
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[VCDP_NAT_SLOWPATH_ERROR_NO_INSTANCE];
+      vcdp_next(b[0], to_next);
+    }
+    n_left -= 1;
+    b += 1;
+    to_next += 1;
+  }
+  vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
+  if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
+    int i;
+    b = bufs;
+    n_left = frame->n_vectors;
+    for (i = 0; i < n_left; i++) {
+      if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
+        vcdp_nat_slowpath_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        t->flow_id = b[0]->flow_id;
+        t->thread_index = thread_index;
+        b++;
+      } else
+        break;
+    }
+  }
+  return frame->n_vectors;
+}
+
 VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {
   .name = "vcdp-nat-slowpath",
   .vector_size = sizeof(u32),
@@ -250,6 +314,24 @@ VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {
 
 VCDP_SERVICE_DEFINE(nat_output) = {
   .node_name = "vcdp-nat-slowpath",
+  .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
+  .is_terminal = 0,
+  .format_session = format_vcdp_nat_session,
+};
+
+VLIB_REGISTER_NODE(vcdp_nat_create_node) = {
+  .name = "vcdp-nat-create",
+  .vector_size = sizeof(u32),
+  // .format_trace = format_vcdp_nat_create_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  // .n_errors = VCDP_NAT_CREATE_N_ERROR,
+  // .error_counters = vcdp_nat_create_error_counters,
+  .sibling_of = "vcdp-lookup-ip4"
+};
+
+VCDP_SERVICE_DEFINE(nat_create_session) = {
+  .node_name = "vcdp-nat-create",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0,

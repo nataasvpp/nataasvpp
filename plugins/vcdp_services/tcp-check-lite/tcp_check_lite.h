@@ -14,7 +14,6 @@ typedef enum {
   VCDP_TCP_CHECK_LITE_STATE_CLOSING,
 } vcdp_tcp_check_lite_tcp_state_t;
 
-
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cacheline0);
   u8 flags[VCDP_FLOW_F_B_N];

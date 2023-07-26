@@ -333,7 +333,8 @@ vcdp_nat_portforwarding_add(u32 tenant_id, char *nat_id, vcdp_match_tuple_t *mat
   nat_instance_t *instance;
   u16 nat_idx;
   instance = vcdp_nat_lookup_by_uuid(nat_id, &nat_idx);
-  if (instance) return -1; // exists already
+  if (!instance) return -1;
+  if (!match || !rewrite) return -2;
 
   // Special "tenant" to hold the template service chain
   // Install template 3-tuple session and service chain (create)

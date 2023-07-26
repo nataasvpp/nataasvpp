@@ -30,8 +30,8 @@ format_vcdp_tcp_lite_session(u8 *s, va_list *args)
 u8 *
 format_vcdp_tcp_lite_service_session(u8 *s, va_list *args)
 {
-  u32 session_index = va_arg(*args, u32);
   u32 thread_index = va_arg(*args, u32);
+  u32 session_index = va_arg(*args, u32);
 
   vcdp_tcp_check_lite_main_t *vtcm = &vcdp_tcp_lite;
   vcdp_tcp_check_lite_session_state_t *tcp_session;

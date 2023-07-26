@@ -154,19 +154,6 @@ vcdp_tcp_mss_ip4(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame
 {
   return (vcdp_tcp_mss_inline(vm, node, frame));
 }
-u8 *
-format_vcdp_mss_service_session(u8 *s, va_list *args)
-{
-  nat_main_t *nat = &nat_main;
-  u32 session_index = va_arg(*args, u32);
-  u32 thread_index = va_arg(*args, u32);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
-  nat_rewrite_data_t *nat_rewrite = vec_elt_at_index(nptd->flows, session_index);
-
-  s = format(s, "\n  Forward: %U", format_vcdp_nat_rewrite, nat_rewrite[0]);
-  s = format(s, "\n  Reverse: %U", format_vcdp_nat_rewrite, nat_rewrite[1]);
-  return s;
-}
 
 VLIB_REGISTER_NODE(vcdp_tcp_mss_ip4_node) = {
   .function = vcdp_tcp_mss_ip4,

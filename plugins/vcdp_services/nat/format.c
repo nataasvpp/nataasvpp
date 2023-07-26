@@ -69,8 +69,8 @@ u8 *
 format_vcdp_nat_session(u8 *s, va_list *args)
 {
   nat_main_t *nat = &nat_main;
-  u32 session_index = va_arg(*args, u32);
   u32 thread_index = va_arg(*args, u32);
+  u32 session_index = va_arg(*args, u32);
   nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   nat_rewrite_data_t *nat_rewrite = vec_elt_at_index(nptd->flows, session_index);
 
