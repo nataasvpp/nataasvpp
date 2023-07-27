@@ -73,7 +73,6 @@ VLIB_NODE_FN(vcdp_bypass_node)
       next[0] = VCDP_BYPASS_NEXT_RECEIVE;
      }    
 
-    b[0]->error = 0;
     next += 1;
     n_left -= 1;
     b += 1;
