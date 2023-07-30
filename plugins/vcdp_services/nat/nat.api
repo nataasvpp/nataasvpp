@@ -84,6 +84,12 @@ counters vcdp_nat_slowpath {
     units "packets";
     description "no instance";
   };
+  port_alloc_failure {
+    severity error;
+    type counter64;
+    units "packets";
+    description "port allocation failure";
+  };
 };
 
 counters vcdp_nat_fastpath {

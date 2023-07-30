@@ -37,7 +37,8 @@ VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_output)
 
 static_always_inline void
-nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
+nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
+                          vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
                           u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
@@ -118,6 +119,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vcdp_per_thread_data_t *vptd, /*u32
   if (n_retries == nm->port_retries) {
     /* Port allocation failure */
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+    b[0]->error = node->errors[VCDP_NAT_SLOWPATH_ERROR_PORT_ALLOC_FAILURE];
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     goto end_of_packet;
   }
@@ -207,7 +209,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
     if (instance) {
-      nat_slow_path_process_one(vcdp, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
+      nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
                                 nat_rewrites, session, to_next, b);
     } else {
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
