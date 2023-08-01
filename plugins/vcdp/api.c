@@ -29,32 +29,56 @@ vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp)
   REPLY_MACRO_END(VL_API_VCDP_TENANT_ADD_DEL_REPLY);
 }
 
+static int
+vcdp_api_services_to_bitmap(vl_api_vcdp_service_name_t *services, int n_services, u32 *bitmap)
+{
+  u32 idx = 0;
+  for (int i = 0; i < n_services; i++) {
+    char *cstring = (char *) services[i].data;
+    unformat_input_t tmp;
+    unformat_init_string(&tmp, cstring, strnlen(cstring, sizeof(services[0].data)));
+    int rv = unformat_user(&tmp, unformat_vcdp_service, &idx);
+    unformat_free(&tmp);
+    if (!rv)
+      return -1;
+    *bitmap |= (1 << idx);
+  }
+  return 0;
+}
+
 static void
 vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
-  u32 idx = 0;
   vcdp_session_direction_t dir = vcdp_api_direction(mp->dir);
-  int rv;
-  for (uword i = 0; i < mp->n_services; i++) {
-    char *cstring = (char *) mp->services[i].data;
-    unformat_input_t tmp;
-    unformat_init_string(&tmp, cstring, strnlen(cstring, sizeof(mp->services[0].data)));
-    rv = unformat_user(&tmp, unformat_vcdp_service, &idx);
-    unformat_free(&tmp);
-    if (!rv) {
-      rv = -1;
-      goto fail;
-    }
-    bitmap |= (1 << idx);
-  }
+  int rv = vcdp_api_services_to_bitmap(mp->services, mp->n_services, &bitmap);
+  if (rv)
+    goto fail;
+
   clib_error_t *err = vcdp_set_services(vcdp, tenant_id, bitmap, dir);
   vl_api_vcdp_set_services_reply_t *rmp;
   rv = err ? -1 : 0;
 fail:
   REPLY_MACRO_END(VL_API_VCDP_SET_SERVICES_REPLY);
+}
+
+static void
+vl_api_vcdp_set_services_defaults_t_handler(vl_api_vcdp_set_services_defaults_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 bitmap = 0;
+  vl_api_vcdp_set_services_defaults_reply_t *rmp;
+  vcdp_session_direction_t dir = vcdp_api_direction(mp->dir);
+  int rv = vcdp_api_services_to_bitmap(mp->services, mp->n_services, &bitmap);
+  if (rv)
+    goto fail;
+
+  rv = vcdp_set_services_defaults(bitmap, dir);
+
+fail:
+  REPLY_MACRO_END(VL_API_VCDP_SET_SERVICES_DEFAULTS_REPLY);
 }
 
 static void
@@ -68,6 +92,19 @@ vl_api_vcdp_set_timeout_t_handler(vl_api_vcdp_set_timeout_t *mp)
   vl_api_vcdp_set_timeout_reply_t *rmp;
   int rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_SET_TIMEOUT_REPLY);
+}
+
+static void
+vl_api_vcdp_set_timeout_defaults_t_handler(vl_api_vcdp_set_timeout_defaults_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vl_api_vcdp_set_timeout_defaults_reply_t *rmp;
+  u32 timeouts[VCDP_N_TIMEOUT] = {mp->timeout_embryonic, mp->timeout_established, mp->timeout_tcp_transitory,
+                                  mp->timeout_tcp_established, mp->timeout_security};
+
+  int rv = vcdp_set_timeout_defaults(timeouts);
+
+  REPLY_MACRO_END(VL_API_VCDP_SET_TIMEOUT_DEFAULTS_REPLY);
 }
 
 static vl_api_vcdp_session_state_t

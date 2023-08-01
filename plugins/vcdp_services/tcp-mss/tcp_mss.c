@@ -27,6 +27,15 @@ vcdp_tcp_mss_enable_disable(u32 tenant_id, u16 mss4_forward, u16 mss4_reverse, b
   return rv;
 }
 
+void
+vcdp_tcp_mss_defaults(u16 mss4_forward, u16 mss4_reverse)
+{
+  vcdp_tcp_mss_main_t *cm = &vcdp_tcp_mss_main;
+
+  cm->default_mss[VCDP_FLOW_FORWARD] = mss4_forward;
+  cm->default_mss[VCDP_FLOW_REVERSE] = mss4_reverse;
+}
+
 clib_error_t *
 vcdp_tcp_mss_init (vlib_main_t *vm)
 {
@@ -35,6 +44,10 @@ vcdp_tcp_mss_init (vlib_main_t *vm)
   u32 no_tenants = vcdp_cfg_main.no_tenants;
   vec_validate_init_empty(cm->max_mss4_forward, no_tenants, MSS_CLAMP_UNSET);
   vec_validate_init_empty(cm->max_mss4_reverse, no_tenants, MSS_CLAMP_UNSET);
+
+  cm->default_mss[VCDP_FLOW_FORWARD] = MSS_CLAMP_UNSET;
+  cm->default_mss[VCDP_FLOW_REVERSE] = MSS_CLAMP_UNSET;
+
   return 0;
 }
 

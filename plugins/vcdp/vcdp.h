@@ -154,6 +154,10 @@ typedef struct {
   u16 msg_id_base;
 
   u32 icmp_error_node_index;
+
+  /* Defaults */
+  u32 default_timeout[VCDP_N_TIMEOUT];
+  u32 default_services[VCDP_FLOW_F_B_N];
 } vcdp_main_t;
 
 typedef struct {
@@ -269,7 +273,9 @@ vcdp_session_n_keys(vcdp_session_t *session)
 
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
+int vcdp_set_services_defaults(u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
+int vcdp_set_timeout_defaults(u32 timeouts[]);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);

@@ -111,9 +111,13 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     u8 direction = vcdp_direction_from_flow_index(b[0]->flow_id);
     u16 max_mss4 = direction == VCDP_FLOW_FORWARD ? cm->max_mss4_forward[tenant_idx] : cm->max_mss4_reverse[tenant_idx];
-    if (max_mss4 == MSS_CLAMP_UNSET)
-      goto done;
-
+    if (max_mss4 == MSS_CLAMP_UNSET) {
+      if (cm->default_mss[direction] == MSS_CLAMP_UNSET) {
+        goto done;
+      } else {
+        max_mss4 = cm->default_mss[direction];
+      }
+    }
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
     pkts_clamped += clamped;
 

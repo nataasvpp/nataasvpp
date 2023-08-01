@@ -11,3 +11,10 @@ autoreply autoendian define vcdp_tcp_mss_enable_disable {
   u16 ip4_mss[2];
   bool is_enable;
 };
+
+autoreply autoendian define vcdp_tcp_mss_defaults {
+  u32 client_index;
+  u32 context;
+
+  u16 ip4_mss[2];
+};

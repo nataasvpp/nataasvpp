@@ -94,15 +94,22 @@ vcdp_init(vlib_main_t *vm)
   /* Handover back to the lookup node, which takes care of setting up ICMP error service chains etc. */
   vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_lookup_ip4_node.index, 0);
 
+  /* Initialise default timeouts */
+#define _(x, y, z) vcdp->default_timeout[VCDP_TIMEOUT_##x] = y;
+  foreach_vcdp_timeout
+#undef _
+
+  vcdp->default_services[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
+  vcdp->default_services[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
+
   return 0;
 }
 
 static void
 vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
 {
-#define _(x, y, z) tenant->timeouts[VCDP_TIMEOUT_##x] = y;
-  foreach_vcdp_timeout
-#undef _
+  vcdp_main_t *vcdp = &vcdp_main;
+  clib_memcpy(tenant->timeouts, vcdp->default_timeout, sizeof(tenant->timeouts));
 }
 
 static u32 **simple_dir_entry_indices = 0;
@@ -152,8 +159,8 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenan
     if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
       pool_get(vcdp->tenants, tenant);
       tenant_idx = tenant - vcdp->tenants;
-      tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
-      tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
+      tenant->bitmaps[VCDP_FLOW_FORWARD] = vcdp->default_services[VCDP_FLOW_FORWARD];
+      tenant->bitmaps[VCDP_FLOW_REVERSE] = vcdp->default_services[VCDP_FLOW_REVERSE];
       tenant->tenant_id = tenant_id;
       tenant->context_id = context_id;
       tenant->flags = flags;
@@ -212,6 +219,29 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   return 0;
 }
 
+int
+vcdp_set_services_defaults(u32 bitmap, vcdp_session_direction_t direction)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  int i;
+  bool terminates = false;
+  vec_foreach_index_backwards(i, sm->services) {
+    if (bitmap & sm->services[i]->service_mask[0]) {
+      if (sm->services[i]->is_terminal) {
+        terminates = true;
+      }
+      break;
+    }
+  }
+  if (!terminates) {
+    return -1;
+  }
+
+  vcdp->default_services[direction] = bitmap;
+  return 0;
+}
+
 clib_error_t *
 vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val)
 {
@@ -221,6 +251,14 @@ vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_
     return clib_error_return(0, "Can't configure timeout: tenant id %d not found", tenant_id);
   tenant = vcdp_tenant_at_index(vcdp, kv.value);
   tenant->timeouts[timeout_idx] = timeout_val;
+  return 0;
+}
+
+int
+vcdp_set_timeout_defaults(u32 timeouts[])
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  clib_memcpy(vcdp->default_timeout, timeouts, sizeof(vcdp->default_timeout));
   return 0;
 }
 

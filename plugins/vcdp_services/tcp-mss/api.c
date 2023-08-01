@@ -24,6 +24,18 @@ vl_api_vcdp_tcp_mss_enable_disable_t_handler (vl_api_vcdp_tcp_mss_enable_disable
   REPLY_MACRO_END (VL_API_VCDP_TCP_MSS_ENABLE_DISABLE_REPLY);
 }
 
+static void
+vl_api_vcdp_tcp_mss_defaults_t_handler (vl_api_vcdp_tcp_mss_defaults_t *mp)
+{
+  vcdp_tcp_mss_main_t *cm = &vcdp_tcp_mss_main;
+  vl_api_vcdp_tcp_mss_defaults_reply_t *rmp;
+  int rv = 0;
+
+  vcdp_tcp_mss_defaults(mp->ip4_mss[0], mp->ip4_mss[1]);
+
+  REPLY_MACRO_END (VL_API_VCDP_TCP_MSS_DEFAULTS_REPLY);
+}
+
 /* API definitions */
 #include <vnet/format_fns.h>
 #include <vcdp_services/tcp-mss/tcp_mss.api.c>

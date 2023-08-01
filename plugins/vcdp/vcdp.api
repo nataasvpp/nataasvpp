@@ -30,6 +30,16 @@ autoreply autoendian define vcdp_set_services
   vl_api_vcdp_service_name_t services[n_services];
 };
 
+autoreply autoendian define vcdp_set_services_defaults
+{
+  u32 client_index;
+  u32 context;
+
+  vl_api_vcdp_session_direction_t dir;
+  u8 n_services;
+  vl_api_vcdp_service_name_t services[n_services];
+};
+
 autoreply autoendian define vcdp_session_add
 {
   u32 client_index;
@@ -103,6 +113,17 @@ autoreply define vcdp_set_timeout
   u32 tenant_id;
   u32 timeout_id;
   u32 timeout_value;
+};
+
+autoreply autoendian define vcdp_set_timeout_defaults
+{
+  u32 client_index;
+  u32 context;
+  u32 timeout_embryonic;
+  u32 timeout_established;
+  u32 timeout_tcp_transitory;
+  u32 timeout_tcp_established;
+  u32 timeout_security;
 };
 
 autoendian autoreply define vcdp_session_clear
