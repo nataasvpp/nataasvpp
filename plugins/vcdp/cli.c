@@ -14,7 +14,6 @@ vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = ~0;
   u32 context_id = ~0;
-  vcdp_tenant_flags_t flags = 0;
 
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
@@ -23,8 +22,6 @@ vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
       ;
     else if (unformat(line_input, "context %d", &context_id))
       ;
-    else if (unformat(line_input, "no-create"))
-      flags |= VCDP_TENANT_FLAG_NO_CREATE;
     else {
       err = unformat_parse_error(line_input);
       goto done;
@@ -36,7 +33,7 @@ vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
   }
   if (context_id == ~0)
     context_id = tenant_id;
-  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, flags, true);
+  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, true);
 done:
   unformat_free(line_input);
   return err;
@@ -63,6 +60,8 @@ vcdp_set_services_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
       direction = VCDP_FLOW_FORWARD;
     else if (unformat(line_input, "reverse"))
       direction = VCDP_FLOW_REVERSE;
+    else if (unformat(line_input, "miss"))
+      direction = VCDP_FLOW_MISS;
     else {
       err = unformat_parse_error(line_input);
       goto done;
@@ -73,7 +72,7 @@ vcdp_set_services_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
     goto done;
   }
   if (direction == (u8) ~0) {
-    err = clib_error_return(0, "missing direction");
+    err = clib_error_return(0, "missing service-chain name");
     goto done;
   }
   err = vcdp_set_services(vcdp, tenant_id, bitmap, direction);
@@ -311,7 +310,7 @@ VLIB_CLI_COMMAND(vcdp_tenant_add_del_command, static) = {
 VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {
   .path = "set vcdp services",
   .short_help = "set vcdp services tenant <tenant-id>"
-                " [SERVICE_NAME]+ <forward|reverse>",
+                " [SERVICE_NAME]+ <forward|reverse|miss>",
   .function = vcdp_set_services_command_fn,
 };
 

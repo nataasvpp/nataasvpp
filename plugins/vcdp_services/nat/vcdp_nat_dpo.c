@@ -64,7 +64,7 @@ const static dpo_vft_t vcdp_nat_dpo_vft = {
 };
 
 const static char *const vcdp_nat_ip4_nodes[] = {
-  "vcdp-lookup-ip4-nocreate",
+  "vcdp-lookup-ip4", // TODO: Ensure nocreate?
   NULL,
 };
 

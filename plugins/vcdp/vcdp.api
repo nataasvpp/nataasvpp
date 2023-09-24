@@ -15,7 +15,6 @@ autoreply autoendian define vcdp_tenant_add_del
 
   u32 tenant_id;
   u32 context_id [default=0xffffffff]; // TODO: Should it be here?
-  vl_api_vcdp_tenant_flags_t flags;  
   bool is_add;
 };
 
@@ -61,7 +60,7 @@ autoendian define vcdp_session_lookup_reply
   u32 context;
   i32 retval;
   u32 client_index;
-  
+
   u64 session_id;
   u32 thread_index;
   u32 tenant_id;

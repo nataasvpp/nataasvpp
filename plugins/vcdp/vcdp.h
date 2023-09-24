@@ -67,7 +67,8 @@ typedef u16 session_version_t;
 typedef enum {
    VCDP_FLOW_FORWARD = 0,
    VCDP_FLOW_REVERSE = 1,
-   VCDP_FLOW_F_B_N = 2
+   VCDP_FLOW_MISS = 2,
+   VCDP_FLOW_F_B_N = 3
 } vcdp_session_direction_t;
 
 enum { VCDP_SESSION_KEY_PRIMARY, VCDP_SESSION_KEY_SECONDARY, VCDP_SESSION_N_KEY };
@@ -121,16 +122,11 @@ typedef struct {
   u32 *expired_sessions;
 } vcdp_per_thread_data_t;
 
-typedef enum {
-  VCDP_TENANT_FLAG_NO_CREATE = 1 << 0,
-} vcdp_tenant_flags_t;
-
 typedef struct {
   u32 tenant_id;
   u32 context_id;
   u32 bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
-  vcdp_tenant_flags_t flags;
 } vcdp_tenant_t;
 
 typedef struct {
@@ -267,7 +263,7 @@ vcdp_session_n_keys(vcdp_session_t *session)
     return 1;
 }
 
-clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, vcdp_tenant_flags_t flags, u8 is_add);
+clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, bool is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 

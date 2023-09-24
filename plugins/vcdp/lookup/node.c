@@ -187,8 +187,6 @@ vcdp_create_session_v4(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tena
   if (pool_elts(ptd->sessions) >= vcdp_cfg_main.no_sessions_per_thread) {
     return 1;
   }
-  if (tenant->flags & VCDP_TENANT_FLAG_NO_CREATE)
-    return 2;
 
   pool_get(ptd->sessions, session);
   session_version_t session_version = session->session_version + 1;
@@ -254,7 +252,7 @@ VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(l4_lifecycle)
 
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool no_create)
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -321,47 +319,18 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       goto next;
     }
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
-      // We can refuse to create session:
-      // - Session table is full
-      // - Tenant has no-create flag
-      // - Can't find key
-      if (no_create || sc[0] > VCDP_SERVICE_CHAIN_TCP) {
-        // Not creating sessions for drop or icmp errors
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-        b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_KEY];
-        vcdp_next(b[0], current_next);
-        to_local[n_local] = bi[0];
-        n_local++;
-        current_next++;
-        goto next;
-      }
-
-      // Miss
+      // Miss-chain
       u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
       vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+      vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_MISS];
+      sb[0] = tenant->bitmaps[VCDP_FLOW_MISS]; // for tracing
+      vcdp_next(b[0], current_next);
+      to_local[n_local] = bi[0];
+      n_local++;
+      current_next++;
+      b[0]->flow_id = ~0; // No session
+      goto next;
 
-      int rv = vcdp_create_session_v4(vcdp, ptd, tenant, tenant_idx, thread_index, time_now, k4, vcdp_buffer(b[0])->rx_id, lv, sc[0]);
-      switch (rv) {
-        case 1: // full
-          b[0]->error = node->errors[VCDP_LOOKUP_ERROR_FULL_TABLE];
-          vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-          break;
-        case 2: // no-create (bypass)
-          b[0]->error = node->errors[VCDP_LOOKUP_ERROR_NO_CREATE_SESSION];
-          vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_FORWARD];
-          break;
-        case 3: // collision, retry
-          vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_COLLISION, 1);
-          continue;
-      }
-      if (rv > 0) {
-        vcdp_next(b[0], current_next);
-        to_local[n_local] = bi[0];
-        n_local++;
-        current_next++;
-        b[0]->flow_id = ~0; // No session
-        goto next;
-      }
     } else {
       // Hit
       lv[0] = kv.value;
@@ -490,15 +459,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false);
-}
-
-/*
- * This node is used to lookup a session without creating one if it doesn't exist.
- */
-VLIB_NODE_FN(vcdp_lookup_ip4_nocreate_node)(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
-{
-   return vcdp_lookup_inline(vm, node, frame, true);
+   return vcdp_lookup_inline(vm, node, frame);
 }
 
 /*
@@ -682,16 +643,6 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
-};
-
-VLIB_REGISTER_NODE(vcdp_lookup_ip4_nocreate_node) = {
-  .name = "vcdp-lookup-ip4-nocreate",
-  .vector_size = sizeof(u32),
-  .format_trace = format_vcdp_lookup_trace,
-  .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_errors = VCDP_LOOKUP_N_ERROR,
-  .error_counters = vcdp_lookup_error_counters,
-  .sibling_of = "vcdp-lookup-ip4",
 };
 
 VLIB_REGISTER_NODE(vcdp_handoff_node) = {
