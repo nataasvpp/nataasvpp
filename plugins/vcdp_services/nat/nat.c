@@ -169,7 +169,7 @@ vcdp_nat_bind_set_unset (u32 tenant_id, char *nat_id, bool is_set)
 {
   nat_main_t *nat = &nat_main;
   u16 tenant_idx, nat_idx;
-  
+
   if (!nat_id) return -1;
 
   vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
@@ -333,6 +333,88 @@ vcdp_nat_set_port_retries(u32 port_retries)
   nat_main_t *nat = &nat_main;
   nat->port_retries = port_retries;
 }
+
+/* Ports are big endian */
+static int
+vcdp_nat_port_forwarding_session_add(u32 tenant_idx, nat_3tuple_ip4_key_t *key, ip4_address_t *inside, u16 iport)
+{
+  nat_main_t *nat = &nat_main;
+  // Create session data in pool
+  nat_port_forwarding_session_t *session;
+  pool_get(nat->port_forwarding_sessions, session);
+
+  session->addr.as_u32 = inside->as_u32;
+  session->port = iport;
+  session->fib_index = 0; // TODO: Get from tenant
+  session->ops = NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB;
+  session->nat_idx = 0; // TODO: Needed?
+  session->tenant_idx = tenant_idx;
+
+  // Register key in hash
+  clib_bihash_kv_16_8_t kv = {
+    .key[0] = key->as_u64[0],
+    .key[1] = key->as_u64[1],
+    .value = session - nat->port_forwarding_sessions
+  };
+
+  if (clib_bihash_add_del_16_8(&nat->port_forwarding, &kv, 2)) {
+    /* already exists */
+    clib_warning("session already exists");
+    pool_put(nat->port_forwarding_sessions, session);
+    return -1;
+  }
+
+  /* Reserve port in NAT pool (if outside address is pool (or part of pool))*/
+  clib_warning("NOT YET IMPLEMENTED. Reserving %U:%d from NAT pool", format_ip4_address, &key->addr, ntohs(key->port));
+  return 0;
+}
+
+static int
+vcdp_nat_port_forwarding_session_del(u32 tenant_idx, nat_3tuple_ip4_key_t *key)
+{
+  nat_main_t *nat = &nat_main;
+  clib_bihash_kv_16_8_t kv = {
+    .key[0] = key->as_u64[0],
+    .key[1] = key->as_u64[1],
+  };
+
+  if (clib_bihash_search_inline_16_8(&nat->port_forwarding, &kv)) {
+    return -1;
+  }
+
+  // Delete from hash
+  clib_bihash_add_del_16_8(&nat->port_forwarding, &kv, 0);
+
+  // Delete from pool
+  pool_put_index(nat->port_forwarding_sessions, kv.value);
+
+  return 0;
+}
+
+int
+vcdp_nat_port_forwarding(char *nat_id, u32 tenant_id, ip4_address_t *outside, u16 oport, u8 proto, ip4_address_t *inside, u16 iport,
+                         bool is_add)
+{
+  int rv = 0;
+  u32 context_id = 0;
+
+  nat_3tuple_ip4_key_t  key = {
+    .context_id = context_id,
+    .addr = outside->as_u32,
+    .port = htons(oport),
+    .proto = proto,
+  };
+
+  u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
+
+  if (is_add) {
+    rv = vcdp_nat_port_forwarding_session_add(tenant_idx, &key, inside, htons(iport));
+  } else {
+    rv = vcdp_nat_port_forwarding_session_del(tenant_idx, &key);
+  }
+  return rv;
+}
+
 #define VCDP_NAT_MAX_PORT_ALLOC_RETRIES 32 /* retries to allocate a port */
 
 static clib_error_t *
@@ -357,6 +439,8 @@ nat_init(vlib_main_t *vm)
 
   nat->port_retries = VCDP_NAT_MAX_PORT_ALLOC_RETRIES;
 
+  /* Port forwarding 3-tuple hash */
+  clib_bihash_init_16_8(&nat->port_forwarding, "vcdp nat port forwarding", 256, 0);
   return 0;
 }
 VLIB_INIT_FUNCTION(nat_init);

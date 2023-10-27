@@ -23,6 +23,7 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-mss/api.c
 
   vcdp/lookup/node.c
+  vcdp/lookup/create.c
   vcdp/drop/node.c
   vcdp/format.c
   vcdp/vcdp.c
@@ -30,6 +31,7 @@ add_vpp_plugin(vcdp
   vcdp/bypass/node.c
   vcdp/vcdp_counter.json.c
   vcdp/icmp/icmp4.c
+  vcdp/icmp/node.c
 
   vcdp_services/tcp-check/node.c
   vcdp_services/tcp-check/tcp_check.c

@@ -68,7 +68,7 @@ done:
 
 VLIB_CLI_COMMAND(vcdp_nat_add_command, static) = {
   .path = "set vcdp nat",
-  .short_help = "[un]set vcdp nat id <id> {<ip-addr>+ | tenant <tenand-id> | interface <interface>}"
+  .short_help = "[un]set vcdp nat id <id> {<ip-addr>+ | tenant <tenant-id> | interface <interface>}"
     "[port-retries <port-retries>]",
   .function = vcdp_nat_add_command_fn,
 };
@@ -96,4 +96,59 @@ VLIB_CLI_COMMAND(show_vcdp_nats_command, static) = {
   .path = "show vcdp nats",
   .short_help = "show vcdp nats",
   .function = vcdp_nat_show_command_fn,
+};
+
+/*
+ *
+ */
+static clib_error_t *
+vcdp_nat_port_forwarding_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  unformat_input_t line_input_, *line_input = &line_input_;
+
+  clib_error_t *err = 0;
+  u8 *nat_id = 0;
+  int rv;
+  u32 dport, sport;
+  u32 tenant_id = ~0;
+  ip4_address_t src, dst;
+  u8 proto;
+
+
+  if (!unformat_user(input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "id %s", &nat_id))
+      ;
+    else if (unformat(line_input, "tenant %u", &tenant_id))
+      ;
+    else if (unformat(line_input, "%U:%d %U %U:%d", unformat_ip4_address, &src, &sport,
+                 unformat_ip_protocol, &proto, unformat_ip4_address, &dst, &dport))
+      ;
+    else      {
+        err = unformat_parse_error(line_input);
+        goto done;
+      }
+  }
+
+  if (tenant_id == ~0 || nat_id == 0) {
+    err = clib_error_return (0, "NAT instance command failed");
+    goto done;
+  }
+
+  rv = vcdp_nat_port_forwarding((char *)nat_id, tenant_id, &src, sport, proto, &dst, dport, true);
+  if (rv != 0) {
+    err = clib_error_return (0, "NAT instance command failed");
+  }
+
+done:
+  unformat_free(line_input);
+  return err;
+}
+
+VLIB_CLI_COMMAND(vcdp_nat_port_forwarding_command, static) = {
+  .path = "set vcdp nat port-forwarding",
+  .short_help = "set vcdp nat port-forwarding id <id> tenant <n> src:sport proto dst:dport",
+  .function = vcdp_nat_port_forwarding_command_fn,
 };

@@ -60,6 +60,20 @@ vl_api_vcdp_nat_bind_set_unset_t_handler(vl_api_vcdp_nat_bind_set_unset_t *mp)
   REPLY_MACRO_END(VL_API_VCDP_NAT_BIND_SET_UNSET_REPLY);
 }
 
+static void
+vl_api_vcdp_nat_portforwarding_add_del_t_handler(vl_api_vcdp_nat_portforwarding_add_del_t *mp)
+{
+  nat_main_t *nat = &nat_main;
+  vl_api_vcdp_nat_portforwarding_add_del_reply_t *rmp;
+  ip4_address_t rewrite_addr, match_addr;
+  ip4_address_decode(mp->rewrite.addr, &rewrite_addr);
+  ip4_address_decode(mp->match.addr, &match_addr);
+  int rv = vcdp_nat_port_forwarding((char *) mp->nat_id, mp->tenant_id, &match_addr, mp->match.port, mp->match.protocol,
+                                    &rewrite_addr, mp->rewrite.port, mp->is_add);
+
+  REPLY_MACRO_END(VL_API_VCDP_NAT_PORTFORWARDING_ADD_DEL_REPLY);
+}
+
 #include <vcdp_services/nat/nat.api.c>
 static clib_error_t *
 vcdp_nat_api_hookup(vlib_main_t *vm)

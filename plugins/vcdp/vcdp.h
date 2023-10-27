@@ -85,10 +85,10 @@ enum {
 
 typedef union {
   struct {
+    u8 proto : 8;
+    u32 context_id : 24;
     u32 src, dst;
     u16 sport, dport;
-    u32 context_id : 24;
-    u8 proto : 8;
   };
   u64 as_u64[2];
 } __clib_packed vcdp_session_ip4_key_t;
@@ -158,6 +158,14 @@ typedef struct {
   u32 no_nat_instances;
   u32 no_tunnels;
 } vcdp_cfg_main_t;
+
+typedef enum {
+  VCDP_SERVICE_CHAIN_DEFAULT = 0,
+  VCDP_SERVICE_CHAIN_TCP,
+  VCDP_SERVICE_CHAIN_ICMP_ERROR,
+  VCDP_SERVICE_CHAIN_DROP,
+  VCDP_SERVICE_CHAIN_DROP_NO_KEY,
+} vcdp_service_chain_selector_t;
 
 extern vcdp_main_t vcdp_main;
 extern vcdp_cfg_main_t vcdp_cfg_main;
@@ -271,7 +279,9 @@ u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
-int vcdp_create_session_v4_2(u32 context, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
+vcdp_session_t *vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary,
+                                       vcdp_session_ip4_key_t *secondary, vcdp_service_chain_selector_t sc,
+                                       bool is_static);
 vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
 void vcdp_session_clear(void);
 

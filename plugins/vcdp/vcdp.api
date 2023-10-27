@@ -4,10 +4,6 @@ option version = "0.0.1";
 import "vnet/ip/ip_types.api";
 import "plugins/vcdp/vcdp_types.api";
 
-enumflag vcdp_tenant_flags {
-  NO_CREATE = 0x1,
-};
-
 autoreply autoendian define vcdp_tenant_add_del
 {
   u32 client_index;
@@ -147,29 +143,11 @@ counters vcdp_lookup {
     units "packets";
     description "remote flow";
   };
-  collision {
-    severity error;
-    type counter64;
-    units "packets";
-    description "hash add collision";
-  };
   con_drop {
     severity info;
     type counter64;
     units "packets";
     description "handoff drop";
-  };
-  no_create_session {
-    severity info;
-    type counter64;
-    units "packets";
-    description "session not created by policy";
-  };
-  full_table {
-    severity error;
-    type counter64;
-    units "packets";
-    description "session table is full";
   };
   no_key {
     severity info;
@@ -191,5 +169,20 @@ counters vcdp_handoff {
     type counter64;
     units "packets";
     description "no session";
+  };
+};
+
+counters vcdp_create {
+  full_table {
+    severity error;
+    type counter64;
+    units "packets";
+    description "session table is full";
+  };
+  no_key {
+    severity info;
+    type counter64;
+    units "packets";
+    description "not able to create 6-tuple key";
   };
 };

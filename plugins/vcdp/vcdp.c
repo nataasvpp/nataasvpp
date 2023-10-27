@@ -154,6 +154,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, bool is_ad
       tenant_idx = tenant - vcdp->tenants;
       tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
       tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
+      tenant->bitmaps[VCDP_FLOW_MISS] = VCDP_DEFAULT_BITMAP;
       tenant->tenant_id = tenant_id;
       tenant->context_id = context_id;
       vcdp_tenant_init_timeouts(tenant);

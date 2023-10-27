@@ -74,6 +74,33 @@ typedef struct {
   nat_rewrite_data_t *flows; /* by flow_index */
 } nat_per_thread_data_t;
 
+/*
+ * 3-tuple session key
+ */
+typedef union {
+  struct {
+    u8 proto : 8;
+    u32 context_id : 24;
+    u32 addr;
+    u16 port;
+  };
+  u64 as_u64[2];
+} __clib_packed nat_3tuple_ip4_key_t;
+STATIC_ASSERT_SIZEOF(nat_3tuple_ip4_key_t, 16);
+
+/*
+ * Port-forwarding rewrite template
+ */
+typedef struct {
+  CLIB_CACHE_LINE_ALIGN_MARK(cache0);
+  ip4_address_t addr;
+  u16 port;
+  u32 fib_index;
+  nat_rewrite_op_t ops;
+  u16 nat_idx; // index into nat_main.instances
+  u16 tenant_idx;
+} nat_port_forwarding_session_t;
+
 typedef struct {
   nat_instance_t *instances;        /* vec */
   uword *uuid_hash;
@@ -91,6 +118,9 @@ typedef struct {
   u32 *interface_by_sw_if_index;
 
   u32 port_retries;
+
+  clib_bihash_16_8_t port_forwarding;
+  nat_port_forwarding_session_t *port_forwarding_sessions;
 } nat_main_t;
 
 extern nat_main_t nat_main;
@@ -103,5 +133,7 @@ int vcdp_nat_remove(char *nat_id);
 int vcdp_nat_bind_set_unset(u32 tenant_id, char *nat_id, bool is_set);
 nat_instance_t *vcdp_nat_instance_by_tenant_idx(u16 tenant_idx, u16 *nat_idx);
 void vcdp_nat_set_port_retries(u32 port_retries);
+int vcdp_nat_port_forwarding(char *nat_id, u32 tenant_id, ip4_address_t *src, u16 sport, u8 proto, ip4_address_t *dst,
+                             u16 dport, bool is_add);
 
 #endif

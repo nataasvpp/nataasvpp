@@ -9,18 +9,6 @@
 #include <vcdp/vcdp_types.api_enum.h>
 #include <vnet/ip/ip_types_api.h>
 
-static_always_inline vcdp_session_direction_t
-vcdp_api_direction(vl_api_vcdp_session_direction_t dir)
-{
-  switch (dir) {
-  case VCDP_API_FORWARD:
-    return VCDP_FLOW_FORWARD;
-  case VCDP_API_REVERSE:
-    return VCDP_API_REVERSE;
-  }
-  return VCDP_FLOW_FORWARD;
-}
-
 static_always_inline vl_api_vcdp_session_type_t
 vcdp_session_type_encode(vcdp_session_type_t x)
 {

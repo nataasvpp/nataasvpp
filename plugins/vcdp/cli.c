@@ -135,7 +135,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   clib_bihash_kv_8_8_t kv = {0};
   u32 session_index;
   u64 session_id;
-  bool session_id_set = false;
+  bool session_id_set = false, detail = false;
   u32 session_idx = ~0;
 
   if (unformat_user(input, unformat_line_input, line_input)) {
@@ -148,6 +148,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         ;
       } else if (unformat(line_input, "thread %u", &thread_index)) {
         ;
+      } else if (unformat(line_input, "detail")) {
+        detail = true;
       } else {
         err = unformat_parse_error(line_input);
         break;
@@ -200,16 +202,20 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       //   continue;
       u64 session_net = clib_host_to_net_u64(session->session_id);
       vcdp_session_ip4_key_t *k1, *k2;
-      vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
-                      tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                      format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
+      if (detail) {
+        vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
+      } else {
+        vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
+                        tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                        format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
 
-      k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
-      k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
-                      clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
-      vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
-                      clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
+        k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
+        k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
+        vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
+                        clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
+        vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
+                        clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
+      }
     }
   }
   return err;
@@ -316,7 +322,7 @@ VLIB_CLI_COMMAND(vcdp_set_services_command, static) = {
 
 VLIB_CLI_COMMAND(show_vcdp_sessions_command, static) = {
   .path = "show vcdp session",
-  .short_help = "show vcdp session [session index] [thread <n>] [tenant <tenant-id>] [0x<session-id>]",
+  .short_help = "show vcdp session [session index] [thread <n>] [tenant <tenant-id>] [0x<session-id>] [detail]",
   .function = vcdp_show_sessions_command_fn,
 };
 
@@ -414,10 +420,19 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     goto done;
   }
 
-  int rv =
-    vcdp_create_session_v4_2(tenant_id, &src, clib_host_to_net_u16(sport), proto, &dst, clib_host_to_net_u16(dport));
-  if (rv)
-    error = clib_error_return(0, "Creating static session failed %d", rv);
+  vcdp_session_ip4_key_t k = {
+    .context_id = 0,
+    .src = src.ip.ip4.as_u32,
+    .dst = dst.ip.ip4.as_u32,
+    .sport = clib_host_to_net_u16(sport),
+    .dport = clib_host_to_net_u16(dport),
+    .proto = proto,
+  };
+
+  u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
+  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, VCDP_SERVICE_CHAIN_DEFAULT, true);
+  if (!session)
+    error = clib_error_return(0, "Creating static session failed");
 
 done:
   unformat_free(line_input);

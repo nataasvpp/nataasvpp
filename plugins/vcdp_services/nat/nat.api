@@ -44,6 +44,32 @@ autoreply autoendian define vcdp_nat_bind_set_unset
   bool is_set;
 };
 
+typedef vcdp_nat_match_tuple
+{
+  vl_api_ip4_address_t addr;
+  u16 port;
+  u8 protocol;
+};
+
+typedef vcdp_nat_rewrite_tuple
+{
+  vl_api_ip4_address_t addr;
+  u16 port;
+};
+
+autoreply autoendian define vcdp_nat_portforwarding_add_del
+{
+  u32 client_index;
+  u32 context;
+
+  u32 tenant_id;
+  string nat_id[37];
+
+  vl_api_vcdp_nat_match_tuple_t match;
+  vl_api_vcdp_nat_rewrite_tuple_t rewrite;
+  bool is_add [default=true];
+};
+
 counters vcdp_nat_icmp {
   no_tenant {
     severity error;
@@ -93,6 +119,15 @@ counters vcdp_nat_slowpath {
 };
 
 counters vcdp_nat_fastpath {
+  drop {
+    severity error;
+    type counter64;
+    units "packets";
+    description "drop";
+  };
+};
+
+counters vcdp_nat_port_forwarding {
   drop {
     severity error;
     type counter64;

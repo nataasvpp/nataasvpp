@@ -94,6 +94,7 @@ vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
   return (session->state != VCDP_SESSION_STATE_STATIC && session->timer.next_expiration - time_now < 1);
 }
 
+#if 0
 static void
 vcdp_session_key_swap(vcdp_session_ip4_key_t *key)
 {
@@ -105,10 +106,11 @@ vcdp_session_key_swap(vcdp_session_ip4_key_t *key)
   key->dst = key->src;
   key->src = tmp2;
 }
+#endif
 
 static_always_inline int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *orgkey, u64 *h)
+                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
 {
   int rv;
   clib_bihash_kv_16_8_t kv;
@@ -118,10 +120,12 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
 
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
 
+#if 0
   // Ensure we don't change original key
+  // TODO: Should not be needed!!!
   vcdp_session_ip4_key_t _k = *orgkey, *key = &_k;
   vcdp_session_key_swap(key);
-
+#endif
   kv.key[0] = key->as_u64[0];
   kv.key[1] = key->as_u64[1];
   kv.value = value;
@@ -135,6 +139,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
   return rv;
 }
 
+// TODO: Does not need to be inline. Only used for init. Move.
 static_always_inline u32
 vcdp_calc_bihash_buckets (u32 n_elts)
 {

@@ -36,7 +36,6 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
   u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
   u32 idx = 0;
-  vcdp_session_direction_t dir = vcdp_api_direction(mp->dir);
   int rv;
   for (uword i = 0; i < mp->n_services; i++) {
     char *cstring = (char *) mp->services[i].data;
@@ -50,7 +49,7 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
     }
     bitmap |= (1 << idx);
   }
-  clib_error_t *err = vcdp_set_services(vcdp, tenant_id, bitmap, dir);
+  clib_error_t *err = vcdp_set_services(vcdp, tenant_id, bitmap, mp->dir);
   vl_api_vcdp_set_services_reply_t *rmp;
   rv = err ? -1 : 0;
 fail:
@@ -90,12 +89,23 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vl_api_vcdp_session_add_reply_t *rmp;
-
+  int rv = 0;
   ip_address_t src, dst;
   ip_address_decode2(&mp->src, &src);
   ip_address_decode2(&mp->dst, &dst);
 
-  int rv = vcdp_create_session_v4_2(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->protocol, &dst, clib_host_to_net_u16(mp->dport));
+  vcdp_session_ip4_key_t k = {
+    .context_id = 0,
+    .src = src.ip.ip4.as_u32,
+    .dst = dst.ip.ip4.as_u32,
+    .sport = clib_host_to_net_u16(mp->sport),
+    .dport = clib_host_to_net_u16(mp->dport),
+    .proto = mp->protocol,
+  };
+  u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
+  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, VCDP_SERVICE_CHAIN_DEFAULT, true);
+  if (!session)
+    rv = -1;
 
   REPLY_MACRO_END(VL_API_VCDP_SESSION_ADD_REPLY);
 }

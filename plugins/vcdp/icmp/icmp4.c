@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
+
 #include <vlib/vlib.h>
 #include <vnet/util/throttle.h>
 #include <vnet/ip/ip.h>
@@ -8,7 +9,7 @@
 #include <vcdp/vcdp.api_enum.h>
 
 /* This is shamelessly copied from vnet/ip/icmp4.c to avoid having to add custom next node hooks there. */
-
+/* This node is used to generate ICMP error messages */
 /** ICMP throttling */
 static throttle_t icmp_throttle;
 

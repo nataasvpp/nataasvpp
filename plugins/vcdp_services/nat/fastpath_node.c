@@ -133,12 +133,14 @@ VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
 
 VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
+  .icmp_error = VCDP_SERVICES("vcdp-icmp-error-fwd"),
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-slowpath"),
   .is_terminal = 1};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
+  .icmp_error = VCDP_SERVICES("vcdp-icmp-error-fwd"),
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0};

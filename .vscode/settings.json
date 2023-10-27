@@ -23,7 +23,10 @@
         "nat.api_enum.h": "c",
         "l4_lifecycle.api_types.h": "c",
         "bihash_template.h": "c",
-        "bihash_8_8.h": "c"
+        "bihash_8_8.h": "c",
+        "feature.h": "c",
+        "vcdp.api_enum.h": "c",
+        "lookup_inlines.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

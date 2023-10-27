@@ -104,6 +104,8 @@ format_vcdp_tenant(u8 *s, va_list *args)
   s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_FORWARD]);
   s = format(s, "%Ureverse service chain:\n", format_white_space, indent);
   s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_REVERSE]);
+  s = format(s, "%Umiss service chain:\n", format_white_space, indent);
+  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_MISS]);
   return s;
 }
 
