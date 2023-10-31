@@ -91,6 +91,9 @@ VCDP_SERVICE_DECLARE(nat_late_rewrite)
 VCDP_SERVICE_DECLARE(nat_early_rewrite)
 VCDP_SERVICE_DECLARE(nat_output)
 
+/*
+ * Only do SNAT
+ */
 static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
                           vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
@@ -98,7 +101,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
   vcdp_session_ip4_key_t new_key = {
-    .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
+    // .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
     .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].sport,
     .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto,
     .src = session->keys[VCDP_SESSION_KEY_PRIMARY].dst,
@@ -108,25 +111,11 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   u32 fib_index = 0;
   u8 proto = session->proto;
   u8 n_retries = 0;
-  // u32 *ip4_key_src_addr = &new_key.src;
-  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].dst;
-  // u16 *ip4_key_src_port;
-  // u16 *ip4_key_dst_port;
-  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].dport;
+  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].src;
+  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].sport;
 
-  // u32 src_addr_index;
   u64 h;
   u32 pseudo_flow_index;
-  // u32 old_fib_index;
-
-#if 0
-  if (PREDICT_FALSE(!(tenant->flags & NAT_TENANT_FLAG_SNAT))) {
-    vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-    goto end_of_packet;
-  }
-
-  pool = pool_elt_at_index(nm->alloc_pool, tenant->out_alloc_pool_idx);
-#endif
 
   if (PREDICT_FALSE(session->session_version == nat_session->version)) {
     /* NAT State is already created, certainly a packet in flight. Refresh
@@ -135,15 +124,8 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     goto end_of_packet;
   }
 
-#if 0
-  /* TODO: handle case with many addresses in pool (slowpath) */
-  if (PREDICT_FALSE(pool->num > NAT_ALLOC_POOL_ARRAY_SZ))
-    ASSERT(0);
-#endif
-
-
   /* Allocate a new source */
-  new_key.src = instance->addresses[new_key.src % vec_len(instance->addresses)].as_u32;
+  new_key.dst = instance->addresses[new_key.src % vec_len(instance->addresses)].as_u32;
 
   pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
 
@@ -154,7 +136,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     u64 reduced = h2;
     reduced *= 64512ULL;
     reduced >>= 32;
-    new_key.sport = clib_host_to_net_u16(1024 + reduced);
+    new_key.dport = clib_host_to_net_u16(1024 + reduced);
     if (PREDICT_FALSE(proto == IP_PROTOCOL_ICMP))
       new_key.dport = new_key.sport;
   }
@@ -166,6 +148,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     goto end_of_packet;
   }
+
   if (n_retries > 1)
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_RETRIES], thread_index, nat_idx, n_retries-1);
 
@@ -173,21 +156,21 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   switch (proto) {
   case IP_PROTOCOL_UDP:
   case IP_PROTOCOL_TCP:
-    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
-                 ip4_old_port, new_key.sport, fib_index, session->session_version, &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
-                 ip4_old_port, new_key.sport, fib_index, session->session_version, &nat_session[1]);
+    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[0]);
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, new_key.dst, ip4_old_src_addr,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[1]);
     break;
   case IP_PROTOCOL_ICMP:
-    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
-                 ip4_old_port, new_key.sport, fib_index, session->session_version, &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
-                 ip4_old_port, new_key.sport, fib_index, session->session_version, &nat_session[1]);
+    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[0]);
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, new_key.dst, ip4_old_src_addr,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[1]);
     break;
   default:
-    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
+    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst,
                  0, 0, fib_index, session->session_version, &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.src,
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst,
                  0, 0, fib_index, session->session_version, &nat_session[1]);
   }
 
@@ -198,7 +181,6 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_early_rewrite);
 
   nat_session[0].nat_idx = nat_session[1].nat_idx = nat_idx;
-
 end_of_packet:
   vcdp_next(b[0], to_next);
   return;
@@ -294,7 +276,7 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   vcdp_session_ip4_key_t k4;
   u64 h;
   vcdp_session_ip4_key_t reverse_k4;
-  vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, &k4, &h, &sc, false);
+  vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, &k4, &h, &sc);
 
   reverse_k4.dst = k4.src;
   reverse_k4.dport = k4.sport;
@@ -352,7 +334,6 @@ vcdp_nat_lookup_3tuple(ip4_header_t *ip, u32 context_id, clib_bihash_kv_16_8_t *
   nat_calc_key_v4_3tuple(ip, context_id, &k4, &h);
   kv->key[0] = k4.as_u64[0];
   kv->key[1] = k4.as_u64[1];
-  clib_warning("Looking up: %U:%d", format_ip4_address, &k4.addr, clib_host_to_net_u16(k4.port));
   return clib_bihash_search_inline_with_hash_16_8(&nat->port_forwarding, h, kv);
 }
 

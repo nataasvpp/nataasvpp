@@ -92,6 +92,12 @@ again:
   for (uword i = 0; i < vec_len(services); i++) {
     vcdp_service_registration_t *reg_i = vec_elt_at_index(services, i)[0];
     vlib_node_t *node_i = vlib_get_node_by_name(vm, (u8 *) reg_i->node_name);
+    if (reg_i->icmp_error) {
+      uword *p = hash_get_mem(sm->service_index_by_name, reg_i->icmp_error);
+      if (!p)
+        clib_panic("ICMP error service %s not found", reg_i->icmp_error);
+      reg_i->icmp_error_mask = sm->services[p[0]]->service_mask[0];
+    }
     if (node_i == 0)
       continue;
     if (reg_i->is_terminal)

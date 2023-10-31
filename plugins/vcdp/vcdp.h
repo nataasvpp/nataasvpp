@@ -138,6 +138,7 @@ typedef struct {
   clib_bihash_16_8_t table4;
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
+  u32 frame_queue_icmp_index;
   u64 session_id_ctr_mask;
   vlib_simple_counter_main_t tenant_simple_ctr[VCDP_TENANT_COUNTER_N_SIMPLE];
   vlib_combined_counter_main_t tenant_combined_ctr[VCDP_TENANT_COUNTER_N_COMBINED];
@@ -149,7 +150,6 @@ typedef struct {
   vcdp_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
 
-  u32 icmp_error_node_index;
 } vcdp_main_t;
 
 typedef struct {
@@ -172,6 +172,7 @@ extern vcdp_cfg_main_t vcdp_cfg_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
 extern vlib_node_registration_t vcdp_input_node;
+extern vlib_node_registration_t vcdp_icmp_fwd_ip4_node;
 
 format_function_t format_vcdp_session;
 format_function_t format_vcdp_session_detail;

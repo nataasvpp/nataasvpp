@@ -93,6 +93,7 @@ vcdp_init(vlib_main_t *vm)
 
   /* Handover back to the lookup node, which takes care of setting up ICMP error service chains etc. */
   vcdp->frame_queue_index = vlib_frame_queue_main_init (vcdp_lookup_ip4_node.index, 0);
+  vcdp->frame_queue_icmp_index = vlib_frame_queue_main_init (vcdp_icmp_fwd_ip4_node.index, 0);
 
   return 0;
 }

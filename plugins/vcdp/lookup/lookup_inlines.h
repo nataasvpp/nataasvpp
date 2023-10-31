@@ -26,8 +26,9 @@ vcdp_header_offset(void *start, void *end, int header_size)
 }
 
 static inline void
-vcdp_calc_key_v4(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
+  ip4_header_t *ip = vlib_buffer_get_current(b);
   udp_header_t *udp = (udp_header_t *) (ip+1);
   skey->proto = ip->protocol;
   skey->context_id = context_id;
@@ -35,6 +36,13 @@ vcdp_calc_key_v4(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t *skey,
   skey->dst = ip->dst_address.as_u32;
   skey->sport = udp->src_port;
   skey->dport = udp->dst_port;
+
+  /* TODO: Consider moving this to the ICMP forwarding node */
+  if (ip->protocol == IP_PROTOCOL_ICMP) {
+    icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
+    icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
+    skey->sport = skey->dport = echo->identifier;
+  }
 
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
@@ -70,7 +78,7 @@ vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t
 }
 
 static inline void
-vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h, int *sc, bool three_tuple)
+vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h, int *sc)
 {
   ip4_header_t *ip = vlib_buffer_get_current(b);
   int offset = 0;
@@ -156,13 +164,6 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
   }
   skey->context_id = context_id;
 
-  // TODO: Need a better place to put this.
-  if (three_tuple) {
-    clib_warning("Hitting 3-tuple");
-    skey->sport = 0;
-    skey->src = 0;
-  }
-
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
@@ -179,6 +180,7 @@ vcdp_calc_key_v4_icmp(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
 
   /* Do the same thing for the inner packet */
   ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
+
   offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
 
   // Swap lookup key for ICMP error

@@ -13,11 +13,6 @@
 #include "lookup_inlines.h"
 #include <vcdp/vcdp.api_enum.h>
 
-typedef enum {
-  VCDP_LOOKUP_NEXT_ICMP_ERROR,
-  VCDP_LOOKUP_N_NEXT,
-} vcdp_lookup_next_t;
-
 typedef struct
 {
   u32 next_index;
@@ -107,7 +102,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   kv.value = value;
   if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
     /* already exists */
-    clib_warning("session already exists");
+    VCDP_DBG(0, "session already exists");
     pool_put(ptd->sessions, session);
     return 0;
   }
@@ -140,7 +135,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
     if (clib_bihash_add_del_16_8(&vcdp->table4, &kv, 2)) {
       // XXXX: Also delete previous key from hash
       /* already exists */
-      clib_warning("session already exists");
+      VCDP_DBG(0, "session already exists");
       pool_put(ptd->sessions, session);
       return 0;
     }
@@ -175,6 +170,7 @@ icmp_is_error(ip4_header_t *ip)
   return false;
 }
 
+VCDP_SERVICE_DECLARE(icmp_error_fwd)
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
@@ -204,7 +200,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-    vcdp_calc_key_v4(vlib_buffer_get_current(b[0]), vcdp_buffer(b[0])->context_id, k4, h);
+    vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
     h += 1;
     k4 += 1;
     b += 1;
@@ -223,22 +219,19 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     b[0]->error = 0;
     clib_bihash_kv_16_8_t kv;
     clib_memcpy_fast(&kv, k4, 16);
-    clib_warning("Looking up: %U", format_vcdp_session_key, k4);
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
-
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
       if (icmp_is_error(vlib_buffer_get_current(b[0]))) {
-        *current_next = VCDP_LOOKUP_NEXT_ICMP_ERROR;
+        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
         vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_MISS];
-        clib_warning("Setting miss chain: %U", format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_MISS]);
         sb[0] = tenant->bitmaps[VCDP_FLOW_MISS]; // for tracing
-        vcdp_next(b[0], current_next);
       }
+      vcdp_next(b[0], current_next);
       to_local[n_local] = bi[0];
       n_local++;
       current_next++;
@@ -540,10 +533,6 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .next_nodes = {
-    [VCDP_LOOKUP_NEXT_ICMP_ERROR] = "vcdp-icmp_fwd-ip4",
-  },
-  .n_next_nodes = VCDP_LOOKUP_N_NEXT,
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
 };

@@ -37,7 +37,6 @@ nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *sessio
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
-
   nat_rewrite(vlib_buffer_get_current(b[0]), nat_session);
   vnet_buffer(b[0])->sw_if_index[VLIB_TX] = nat_session->rewrite.fib_index;
 
@@ -133,14 +132,14 @@ VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
 
 VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
-  .icmp_error = VCDP_SERVICES("vcdp-icmp-error-fwd"),
+  .icmp_error = "vcdp-nat-icmp-error",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-slowpath"),
   .is_terminal = 1};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
-  .icmp_error = VCDP_SERVICES("vcdp-icmp-error-fwd"),
+  .icmp_error = "vcdp-nat-icmp-error",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0};

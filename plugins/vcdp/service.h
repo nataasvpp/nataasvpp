@@ -9,7 +9,8 @@
 typedef struct _vcdp_service_registration_t {
   struct _vcdp_service_registration_t *next;
   const char *node_name;
-  char **icmp_error;
+  char *icmp_error;
+  u32 icmp_error_mask;
   char **runs_before;
   char **runs_after;
   u8 *index_in_bitmap;

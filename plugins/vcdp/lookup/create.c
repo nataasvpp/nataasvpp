@@ -91,8 +91,8 @@ VLIB_NODE_FN(vcdp_create_node)
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
-    vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, k4, h, sc, false);
-    clib_warning("Creating session for: %U", format_vcdp_session_key, k4);
+    vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, k4, h, sc);
+    VCDP_DBG(0, "Creating session for: %U", format_vcdp_session_key, k4);
 
     if (sc[0] == VCDP_SERVICE_CHAIN_DROP_NO_KEY) {
       b[0]->error = node->errors[VCDP_CREATE_ERROR_NO_KEY];
@@ -105,7 +105,7 @@ VLIB_NODE_FN(vcdp_create_node)
       next[0] = VCDP_CREATE_NEXT_LOOKUP;
       session->rx_id = vcdp_buffer(b[0])->rx_id;
     } else {
-      b[0]->error = node->errors[VCDP_CREATE_ERROR_FULL_TABLE];
+      b[0]->error = node->errors[VCDP_CREATE_ERROR_FULL_TABLE]; // TODO: Other causes too, like session exists.
       next[0] = VCDP_CREATE_NEXT_DROP;
     }
 next:
