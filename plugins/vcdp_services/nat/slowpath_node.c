@@ -9,6 +9,12 @@
 
 #include <vcdp_services/nat/nat.api_enum.h>
 
+enum vcdp_create_next_e {
+  VCDP_NAT_SLOWPATH_NEXT_LOOKUP,
+  VCDP_NAT_SLOWPATH_NEXT_DROP,
+  VCDP_NAT_SLOWPATH_N_NEXT
+};
+
 typedef struct {
   u32 flow_id;
   u32 thread_index;
@@ -87,10 +93,6 @@ nat_rewrites(u32 instructions, u32 oldaddr, u32 newaddr, u16 oldport, u16 newpor
   nat_session->l4_csum_delta = l4_sum_delta;
 }
 
-VCDP_SERVICE_DECLARE(nat_late_rewrite)
-VCDP_SERVICE_DECLARE(nat_early_rewrite)
-VCDP_SERVICE_DECLARE(nat_output)
-
 /*
  * Only do SNAT
  */
@@ -98,7 +100,7 @@ static_always_inline void
 nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
                           vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
                           u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
-                          nat_rewrite_data_t *nat_session, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
+                          nat_rewrite_data_t *nat_session, vcdp_session_t *session, u32 *error, vlib_buffer_t **b)
 {
   vcdp_session_ip4_key_t new_key = {
     // .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
@@ -143,8 +145,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
 
   if (n_retries == nm->port_retries) {
     /* Port allocation failure */
-    vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-    b[0]->error = node->errors[VCDP_NAT_SLOWPATH_ERROR_PORT_ALLOC_FAILURE];
+    *error = VCDP_NAT_SLOWPATH_ERROR_PORT_ALLOC_FAILURE;
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     goto end_of_packet;
   }
@@ -174,15 +175,10 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
                  0, 0, fib_index, session->session_version, &nat_session[1]);
   }
 
-  vcdp_buffer(b[0])->service_bitmap |= VCDP_SERVICE_MASK(nat_late_rewrite);
-  session->bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(nat_output);
-  session->bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(nat_output);
-  session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_late_rewrite);
-  session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_early_rewrite);
+  vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
 
   nat_session[0].nat_idx = nat_session[1].nat_idx = nat_idx;
 end_of_packet:
-  vcdp_next(b[0], to_next);
   return;
 }
 
@@ -192,12 +188,10 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   vcdp_main_t *vcdp = &vcdp_main;
-  // ip4_main_t *im = &ip4_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
-  vcdp_session_t *session;
   nat_instance_t *instance;
   u32 session_idx;
   u32 tenant_idx;
@@ -208,20 +202,45 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
 
   vlib_get_buffers(vm, from, bufs, n_left);
+
   while (n_left > 0) {
-    session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
+    vcdp_session_ip4_key_t k4;
+    u64 h;
+    int sc;
+    u32 error = 0;
     tenant_idx = vcdp_buffer(b[0])->tenant_index;
-    nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
-    if (instance) {
-      nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
-                                nat_rewrites, session, to_next, b);
-    } else {
-      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-      b[0]->error = node->errors[VCDP_NAT_SLOWPATH_ERROR_NO_INSTANCE];
-      vcdp_next(b[0], to_next);
+    if (!instance) {
+      error = VCDP_NAT_SLOWPATH_ERROR_NO_INSTANCE;
+      goto next;
     }
+    vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, &k4, &h, &sc);
+
+    if (sc == VCDP_SERVICE_CHAIN_DROP_NO_KEY) {
+      error = VCDP_NAT_SLOWPATH_ERROR_NO_KEY;
+      goto next;
+    }
+
+    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k4, 0, sc, false);
+    if (!session) {
+      error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
+      goto next;
+    }
+
+    VCDP_DBG(3, "Creating session for: %U", format_vcdp_session_key, k4);
+    session_idx = session - ptd->sessions;
+    nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
+    nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
+                              nat_rewrites, session, &error, b);
+
+  next:
+    if (error) {
+      to_next[0] = VCDP_NAT_SLOWPATH_NEXT_DROP;
+      b[0]->error = node->errors[error];
+    } else {
+      to_next[0] = VCDP_NAT_SLOWPATH_NEXT_LOOKUP;
+    }
+
     n_left -= 1;
     b += 1;
     to_next += 1;
@@ -251,16 +270,16 @@ VLIB_REGISTER_NODE(vcdp_nat_slowpath_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_NAT_SLOWPATH_N_ERROR,
   .error_counters = vcdp_nat_slowpath_error_counters,
-  .sibling_of = "vcdp-lookup-ip4"
-
 };
 
 VCDP_SERVICE_DEFINE(nat_output) = {
   .node_name = "vcdp-nat-slowpath",
-  .runs_before = VCDP_SERVICES("vcdp-tunnel-output", "vcdp-nat-late-rewrite"),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
-  .is_terminal = 0
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 1
 };
+
+VCDP_SERVICE_DECLARE(nat_early_rewrite)
 
 /*
  * nat_port_forwarding_process_one
@@ -304,7 +323,8 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
               k4.dport, reverse_k4.sport, fib_index, full_session->session_version, &nat_rewrite[0]);
   nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, reverse_k4.src, k4.dst,
                reverse_k4.sport, k4.dport, fib_index, full_session->session_version, &nat_rewrite[1]);
-                 vcdp_buffer(b[0])->service_bitmap |= VCDP_SERVICE_MASK(nat_late_rewrite);
+
+  vcdp_buffer(b[0])->service_bitmap |= VCDP_SERVICE_MASK(nat_early_rewrite);
 
   b[0]->flow_id = full_session - ptd->sessions;
   vcdp_buffer(b[0])->service_bitmap = full_session->bitmaps[VCDP_FLOW_FORWARD];

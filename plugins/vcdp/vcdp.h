@@ -272,7 +272,7 @@ vcdp_session_n_keys(vcdp_session_t *session)
     return 1;
 }
 
-clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, bool is_add);
+clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
 

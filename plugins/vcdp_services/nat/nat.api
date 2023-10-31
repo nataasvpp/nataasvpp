@@ -116,6 +116,18 @@ counters vcdp_nat_slowpath {
     units "packets";
     description "port allocation failure";
   };
+  session {
+    severity error;
+    type counter64;
+    units "packets";
+    description "session creation failure";
+  };
+  no_key {
+    severity error;
+    type counter64;
+    units "packets";
+    description "lookup key calculation failure";
+  };
 };
 
 counters vcdp_nat_fastpath {

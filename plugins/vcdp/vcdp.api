@@ -10,7 +10,8 @@ autoreply autoendian define vcdp_tenant_add_del
   u32 context;
 
   u32 tenant_id;
-  u32 context_id [default=0xffffffff]; // TODO: Should it be here?
+  u32 context_id [default=0xffffffff];
+  u32 default_tenant_id [default=0xffffffff]; /* Pick up services from here */
   bool is_add;
 };
 

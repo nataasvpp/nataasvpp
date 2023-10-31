@@ -138,7 +138,7 @@ vcdp_tenant_remove_counters_per_instance(vcdp_main_t *vcdp, u16 tenant_idx)
 }
 
 clib_error_t *
-vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, bool is_add)
+vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add)
 {
   clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
   clib_error_t *err = 0;
@@ -153,9 +153,21 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, bool is_ad
     if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv)) {
       pool_get(vcdp->tenants, tenant);
       tenant_idx = tenant - vcdp->tenants;
-      tenant->bitmaps[VCDP_FLOW_FORWARD] = VCDP_DEFAULT_BITMAP;
-      tenant->bitmaps[VCDP_FLOW_REVERSE] = VCDP_DEFAULT_BITMAP;
-      tenant->bitmaps[VCDP_FLOW_MISS] = VCDP_DEFAULT_BITMAP;
+      u32 forward_bitmap = VCDP_DEFAULT_BITMAP;
+      u32 reverse_bitmap = VCDP_DEFAULT_BITMAP;
+      u32 miss_bitmap = VCDP_DEFAULT_BITMAP;
+      if (default_tenant_id != ~0) {
+        u16 default_tenant_idx;
+        vcdp_tenant_t *default_tenant = vcdp_tenant_get_by_id(default_tenant_id, &default_tenant_idx);
+        if (default_tenant) {
+          forward_bitmap = default_tenant->bitmaps[VCDP_FLOW_FORWARD];
+          reverse_bitmap = default_tenant->bitmaps[VCDP_FLOW_REVERSE];
+          miss_bitmap = default_tenant->bitmaps[VCDP_FLOW_MISS];
+        }
+      }
+      tenant->bitmaps[VCDP_FLOW_FORWARD] = forward_bitmap;
+      tenant->bitmaps[VCDP_FLOW_REVERSE] = reverse_bitmap;
+      tenant->bitmaps[VCDP_FLOW_MISS] = miss_bitmap;
       tenant->tenant_id = tenant_id;
       tenant->context_id = context_id;
       vcdp_tenant_init_timeouts(tenant);

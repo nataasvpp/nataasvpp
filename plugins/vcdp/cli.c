@@ -33,7 +33,7 @@ vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_co
   }
   if (context_id == ~0)
     context_id = tenant_id;
-  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, true);
+  err = vcdp_tenant_add_del(vcdp, tenant_id, context_id, ~0, true);
 done:
   unformat_free(line_input);
   return err;
