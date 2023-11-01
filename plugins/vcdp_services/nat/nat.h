@@ -126,6 +126,7 @@ typedef struct {
 extern nat_main_t nat_main;
 
 format_function_t format_vcdp_nat_rewrite;
+u8 *format_vcdp_nat_service(u8 *s, u32 thread_index, u32 session_index);
 
 int vcdp_nat_add(char *natid, u32 context_id, ip4_address_t *addr, bool is_if);
 int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);

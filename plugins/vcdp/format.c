@@ -92,7 +92,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   vcdp_service_main_t *sm = &vcdp_service_main;
   int i;
   vec_foreach_index(i, sm->services) {
-    if ((session->bitmaps[VCDP_FLOW_FORWARD] | session->bitmaps[VCDP_FLOW_REVERSE]) &
+    if ((session->bitmaps[VCDP_FLOW_FORWARD] /*| session->bitmaps[VCDP_FLOW_REVERSE]*/) &
         sm->services[i]->service_mask[0]) {
       if (sm->services[i]->format_service)
         s = sm->services[i]->format_service(s, thread_index, session_index);

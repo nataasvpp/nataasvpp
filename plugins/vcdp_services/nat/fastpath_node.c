@@ -117,7 +117,6 @@ VLIB_REGISTER_NODE(vcdp_nat_early_rewrite_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_NAT_FASTPATH_N_ERROR,
   .error_counters = vcdp_nat_fastpath_error_counters,
-  .sibling_of = "vcdp-lookup-ip4"
 };
 
 VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
@@ -127,19 +126,22 @@ VLIB_REGISTER_NODE(vcdp_nat_late_rewrite_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_NAT_FASTPATH_N_ERROR,
   .error_counters = vcdp_nat_fastpath_error_counters,
-  .sibling_of = "vcdp-lookup-ip4"
 };
 
 VCDP_SERVICE_DEFINE(nat_late_rewrite) = {
   .node_name = "vcdp-nat-late-rewrite",
   .icmp_error = "vcdp-nat-icmp-error",
   .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check", "vcdp-nat-slowpath"),
-  .is_terminal = 1};
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
+  .is_terminal = 0,
+  .format_service = format_vcdp_nat_service,
+};
 
 VCDP_SERVICE_DEFINE(nat_early_rewrite) = {
   .node_name = "vcdp-nat-early-rewrite",
   .icmp_error = "vcdp-nat-icmp-error",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
-  .is_terminal = 0};
+  .is_terminal = 0,
+  .format_service = format_vcdp_nat_service,
+};

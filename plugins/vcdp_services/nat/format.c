@@ -62,3 +62,14 @@ format_vcdp_nat_rewrite(u8 *s, va_list *args)
     // if (s && s[vec_len (s) - 1] == ',') vec_resize (s, vec_len (s) - 1);
     return s;
 }
+
+u8 *
+format_vcdp_nat_service(u8 *s, u32 thread_index, u32 session_index)
+{
+  nat_main_t *nat = &nat_main;
+  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
+  nat_rewrite_data_t *nat_rewrite = vec_elt_at_index(nptd->flows, session_index << 1);
+  s = format(s, "nat forward: %U\n", format_vcdp_nat_rewrite, nat_rewrite[0]);
+  s = format(s, "    reverse: %U\n", format_vcdp_nat_rewrite, nat_rewrite[1]);
+  return s;
+}
