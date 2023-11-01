@@ -6,6 +6,7 @@
 #include <vlib/vlib.h>
 #include <vcdp/common.h>
 
+typedef u8* (*format_service_fn)(u8 *s, u32 thread_index, u32 session_index);
 typedef struct _vcdp_service_registration_t {
   struct _vcdp_service_registration_t *next;
   const char *node_name;
@@ -17,6 +18,7 @@ typedef struct _vcdp_service_registration_t {
   u32 *service_mask;
   u8 is_terminal;
   u8 is_tcp_specific;
+  format_service_fn format_service;
 } vcdp_service_registration_t;
 
 typedef struct {

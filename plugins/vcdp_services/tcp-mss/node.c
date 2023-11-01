@@ -169,5 +169,5 @@ VCDP_SERVICE_DEFINE(vcdp_tcp_mss) = {
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-tcp-check"),
   .is_terminal = 0,
-  .is_tcp_specific = 1
+  .is_tcp_specific = 1,
 };

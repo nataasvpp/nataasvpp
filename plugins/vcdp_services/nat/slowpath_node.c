@@ -213,14 +213,14 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       error = VCDP_NAT_SLOWPATH_ERROR_NO_KEY;
       goto next;
     }
-
-    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k4, 0, false);
+    u32 flow_index = ~0;
+    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k4, 0, false, &flow_index);
     if (!session) {
       error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
       goto next;
     }
 
-    VCDP_DBG(3, "Creating session for: %U", format_vcdp_session_key, k4);
+    VCDP_DBG(3, "Creating session for: %U", format_vcdp_session_key, &k4);
     session_idx = session - ptd->sessions;
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
@@ -231,6 +231,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       b[0]->error = node->errors[error];
     }
+    b[0]->flow_id = flow_index;
     vcdp_next(b[0], to_next);
     n_left -= 1;
     b += 1;
@@ -297,7 +298,8 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   reverse_k4.sport = nat_session->port;
   reverse_k4.context_id = 0;
 
-  vcdp_session_t *full_session = vcdp_create_session_v4(tenant_idx, &k4, &reverse_k4, false);
+  u32 flow_index = ~0;
+  vcdp_session_t *full_session = vcdp_create_session_v4(tenant_idx, &k4, &reverse_k4, false, &flow_index);
   if (!full_session)
     goto error;
 
@@ -313,7 +315,7 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, reverse_k4.src, k4.dst,
                reverse_k4.sport, k4.dport, fib_index, full_session->session_version, &nat_rewrite[1]);
 
-  b[0]->flow_id = full_session - ptd->sessions;
+  b[0]->flow_id = flow_index;
   vcdp_buffer(b[0])->service_bitmap = full_session->bitmaps[VCDP_FLOW_FORWARD];
   vcdp_buffer(b[0])->tenant_index = full_session->tenant_idx;
   vcdp_next(b[0], to_next);

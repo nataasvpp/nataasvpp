@@ -88,6 +88,17 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   s = format(s, "    reverse flow:\n");
   s = format(s, "      bytes: %llu\n", session->bytes[VCDP_FLOW_REVERSE]);
   s = format(s, "      packets: %llu\n", session->pkts[VCDP_FLOW_REVERSE]);
+
+  vcdp_service_main_t *sm = &vcdp_service_main;
+  int i;
+  vec_foreach_index(i, sm->services) {
+    if ((session->bitmaps[VCDP_FLOW_FORWARD] | session->bitmaps[VCDP_FLOW_REVERSE]) &
+        sm->services[i]->service_mask[0]) {
+      if (sm->services[i]->format_service)
+        s = sm->services[i]->format_service(s, thread_index, session_index);
+    }
+  }
+
   return s;
 }
 
@@ -103,8 +114,16 @@ format_vcdp_tenant(u8 *s, va_list *args)
   s = format(s, "%Ucontext: %d\n", format_white_space, indent, tenant->context_id);
   s = format(s, "%Uforward service chain:\n", format_white_space, indent);
   s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_FORWARD]);
+  if (tenant->bitmaps[VCDP_FLOW_FORWARD] != tenant->tcp_bitmaps[VCDP_FLOW_FORWARD]) {
+    s = format(s, "%Uforward tcp service chain:\n", format_white_space, indent);
+    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_FLOW_FORWARD]);
+  }
   s = format(s, "%Ureverse service chain:\n", format_white_space, indent);
   s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_REVERSE]);
+  if (tenant->bitmaps[VCDP_FLOW_REVERSE] != tenant->tcp_bitmaps[VCDP_FLOW_REVERSE]) {
+    s = format(s, "%Ureverse tcp service chain:\n", format_white_space, indent);
+    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_FLOW_REVERSE]);
+  }
   s = format(s, "%Umiss service chain:\n", format_white_space, indent);
   s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_MISS]);
   return s;

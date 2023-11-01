@@ -20,7 +20,7 @@ void vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps);
 
 vcdp_session_t *
 vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_session_ip4_key_t *secondary,
-                       bool is_static)
+                       bool is_static, u32 *flow_index)
 {
   clib_bihash_kv_16_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
@@ -34,7 +34,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   u32 session_idx = session - ptd->sessions;
   u32 pseudo_flow_idx = (session_idx << 1);
   u64 value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
-
+  *flow_index = pseudo_flow_idx;
   if (!tenant) return 0;
 
   kv.key[0] = primary->as_u64[0];
@@ -56,6 +56,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   session->session_id = session_id;
   session->tenant_idx = tenant_idx;
   session->rx_id = ~0; // TODO: Set rx_ID into sessions!!!!
+  session->proto = primary->proto;
 
   kv2.key = session_id;
   kv2.value = value;
@@ -80,8 +81,6 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
       return 0;
     }
   }
-
-  session->proto = primary->proto;
 
   if (is_static) {
     session->state = VCDP_SESSION_STATE_STATIC;

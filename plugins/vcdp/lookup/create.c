@@ -73,7 +73,8 @@ VLIB_NODE_FN(vcdp_create_node)
       goto next;
     }
 
-    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, k4, 0, false);
+    u32 flow_index = ~0;
+    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, k4, 0, false, &flow_index);
     if (session) {
       session->rx_id = vcdp_buffer(b[0])->rx_id;
       vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
@@ -81,6 +82,8 @@ VLIB_NODE_FN(vcdp_create_node)
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       b[0]->error = node->errors[VCDP_CREATE_ERROR_FULL_TABLE]; // TODO: Other causes too, like session exists.
     }
+    b[0]->flow_id = flow_index;
+
 next:
     vcdp_next(b[0], next);
     next += 1;
@@ -121,7 +124,7 @@ VLIB_REGISTER_NODE(vcdp_create_node) = {
 
 VCDP_SERVICE_DEFINE(create) = {
   .node_name = "vcdp-create",
-  .runs_before = VCDP_SERVICES(0),
+  .runs_before = VCDP_SERVICES("vcdp-drop"),
   .runs_after = VCDP_SERVICES(0),
   .is_terminal = 0
 };

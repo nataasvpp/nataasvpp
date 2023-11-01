@@ -274,7 +274,7 @@ int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 vcdp_session_t *vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary,
-                                       vcdp_session_ip4_key_t *secondary, bool is_static);
+                                       vcdp_session_ip4_key_t *secondary, bool is_static, u32 *flow_index);
 vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
                                        u16 dport);
 void vcdp_session_clear(void);

@@ -103,7 +103,8 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
     .proto = mp->protocol,
   };
   u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
-  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, true);
+  u32 flow_index;
+  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, true, &flow_index);
   if (!session)
     rv = -1;
 
