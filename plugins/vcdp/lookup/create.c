@@ -27,9 +27,6 @@ format_vcdp_create_trace(u8 *s, va_list *args)
   return s;
 }
 
-VCDP_SERVICE_DECLARE(tcp_check_lite)
-VCDP_SERVICE_DECLARE(vcdp_tcp_mss)
-VCDP_SERVICE_DECLARE(l4_lifecycle)
 VCDP_SERVICE_DECLARE(drop)
 
 void

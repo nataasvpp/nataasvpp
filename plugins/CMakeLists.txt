@@ -23,6 +23,7 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-mss/api.c
 
   vcdp/lookup/node.c
+  vcdp/lookup/session.c
   vcdp/lookup/create.c
   vcdp/drop/node.c
   vcdp/format.c
