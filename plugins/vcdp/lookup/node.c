@@ -76,11 +76,12 @@ vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol,
 /*
  * Create a static VCDP session. (No timer)
  */
-void vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, u32 *bitmaps);
+void vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps);
 
+// TODO: Move this to session.c
 vcdp_session_t *
 vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_session_ip4_key_t *secondary,
-                       vcdp_service_chain_selector_t sc, bool is_static)
+                       bool is_static)
 {
   clib_bihash_kv_16_8_t kv = {};
   clib_bihash_kv_8_8_t kv2;
@@ -123,7 +124,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
 
   /* Assign service chain */
   // TODO. Set service chain based on traffic type!!!!
-  vcdp_set_service_chain(tenant, sc, session->bitmaps);
+  vcdp_set_service_chain(tenant, session->proto, session->bitmaps);
 
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], primary, sizeof(session->keys[0]));
   if (secondary) {
@@ -151,7 +152,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
                              tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index, tenant_idx, 1);
-  VCDP_DBG(3, "Creating session: %d %U %llx", session_idx, format_vcdp_session_key, k, session_id);
+  VCDP_DBG(3, "Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
 
   return session;
 }
@@ -247,6 +248,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       /* known flow which belongs to this thread */
       u32 flow_index = kv.value & (~(u32) 0);
       to_local[n_local] = bi[0];
+
       session_index = vcdp_session_from_flow_index(flow_index);
       si[0] = session_index;
       b[0]->flow_id = flow_index;
@@ -270,6 +272,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
       session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
+
     } else {
       /* known flow which belongs to remote thread */
       to_remote[n_remote] = bi[0];

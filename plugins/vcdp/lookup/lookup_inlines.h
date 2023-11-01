@@ -77,15 +77,14 @@ vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
-static inline void
-vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h, int *sc)
+static inline int
+vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
   ip4_header_t *ip = vlib_buffer_get_current(b);
   int offset = 0;
   udp_header_t *udp;
   icmp46_header_t *icmp;
   icmp_echo_header_t *echo;
-  sc[0] = VCDP_SERVICE_CHAIN_DEFAULT;
 
   skey->src = ip->src_address.as_u32;
   skey->dst = ip->dst_address.as_u32;
@@ -97,7 +96,6 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
     offset = vcdp_header_offset(ip, udp, sizeof(*udp));
     skey->sport = udp->src_port;
     skey->dport = udp->dst_port;
-    sc[0] = VCDP_SERVICE_CHAIN_TCP;
     break;
   case IP_PROTOCOL_UDP:
     udp = (udp_header_t *) ip4_next_header(ip);
@@ -117,7 +115,6 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
       /* Do the same thing for the inner packet */
       ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
       offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
-      sc[0] = VCDP_SERVICE_CHAIN_ICMP_ERROR;
 
       // Swap lookup key for ICMP error
       skey->dst = inner_ip->src_address.as_u32;
@@ -144,7 +141,7 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
           skey->sport = skey->dport = echo->identifier;
         } else {
           VCDP_DBG(3, "Failed dealing with ICMP error");
-          sc[0] = VCDP_SERVICE_CHAIN_DROP;
+          return -1;
         }
         break;
       default:
@@ -160,12 +157,13 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
   }
 
   if (offset > b->current_length) {
-    sc[0] = VCDP_SERVICE_CHAIN_DROP_NO_KEY;
+    return -1;
   }
   skey->context_id = context_id;
 
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
+  return 0;
 }
 
 static inline int

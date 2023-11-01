@@ -20,7 +20,7 @@
 
 #include <vcdp/vcdp_counter.json.h>
 
-#define VCDP_DEBUG  0
+#define VCDP_DEBUG  10
 #if VCDP_DEBUG > 0
 #define VCDP_DBG(_lvl, _fmt, _args...)   \
   if (_lvl <= VCDP_DEBUG)                \
@@ -126,6 +126,7 @@ typedef struct {
   u32 tenant_id;
   u32 context_id;
   u32 bitmaps[VCDP_FLOW_F_B_N];
+  u32 tcp_bitmaps[VCDP_FLOW_F_B_N];
   u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_tenant_t;
 
@@ -158,14 +159,6 @@ typedef struct {
   u32 no_nat_instances;
   u32 no_tunnels;
 } vcdp_cfg_main_t;
-
-typedef enum {
-  VCDP_SERVICE_CHAIN_DEFAULT = 0,
-  VCDP_SERVICE_CHAIN_TCP,
-  VCDP_SERVICE_CHAIN_ICMP_ERROR,
-  VCDP_SERVICE_CHAIN_DROP,
-  VCDP_SERVICE_CHAIN_DROP_NO_KEY,
-} vcdp_service_chain_selector_t;
 
 extern vcdp_main_t vcdp_main;
 extern vcdp_cfg_main_t vcdp_cfg_main;
@@ -281,9 +274,9 @@ int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash
 
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 vcdp_session_t *vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary,
-                                       vcdp_session_ip4_key_t *secondary, vcdp_service_chain_selector_t sc,
-                                       bool is_static);
-vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport);
+                                       vcdp_session_ip4_key_t *secondary, bool is_static);
+vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
+                                       u16 dport);
 void vcdp_session_clear(void);
 
 #endif

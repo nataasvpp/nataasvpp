@@ -71,13 +71,14 @@ class TestVCDPPortForwarding(VppTestCase):
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
         forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'},
-                            {'data': "vcdp-nat-slowpath"}, {'data':'vcdp-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-output'}]
+                            {'data': "vcdp-nat-early-rewrite"}, {'data':'vcdp-output'}]
+        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': "vcdp-nat-late-rewrite"},
+                            {'data': 'vcdp-output'}]
         # outside_services = [{'data': 'vcdp-bypass'}]
         miss_services = [{'data': 'vcdp-nat-port-forwarding'}, {'data': 'vcdp-drop'}]
+
         portforwarding_services = [{'data': 'vcdp-nat-early-rewrite'}, {'data': 'vcdp-output'},]
         portforwarding_reverse_services = [{'data': 'vcdp-nat-late-rewrite'}, {'data': 'vcdp-output'},]
-
 
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
                                     n_services=len(forward_services), services=forward_services)

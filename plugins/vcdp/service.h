@@ -16,6 +16,7 @@ typedef struct _vcdp_service_registration_t {
   u8 *index_in_bitmap;
   u32 *service_mask;
   u8 is_terminal;
+  u8 is_tcp_specific;
 } vcdp_service_registration_t;
 
 typedef struct {

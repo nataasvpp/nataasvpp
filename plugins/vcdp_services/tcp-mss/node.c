@@ -164,7 +164,10 @@ VLIB_REGISTER_NODE(vcdp_tcp_mss_ip4_node) = {
   .sibling_of = "vcdp-lookup-ip4"
 };
 
-VCDP_SERVICE_DEFINE(vcdp_tcp_mss) = {.node_name = "vcdp-tcp-mss",
-                                     .runs_before = VCDP_SERVICES(0),
-                                     .runs_after = VCDP_SERVICES("vcdp-tcp-check"),
-                                     .is_terminal = 0};
+VCDP_SERVICE_DEFINE(vcdp_tcp_mss) = {
+  .node_name = "vcdp-tcp-mss",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-tcp-check"),
+  .is_terminal = 0,
+  .is_tcp_specific = 1
+};

@@ -12,12 +12,6 @@
 #include "lookup_inlines.h"
 #include <vcdp/vcdp.api_enum.h>
 
-enum vcdp_create_next_e {
-  VCDP_CREATE_NEXT_LOOKUP,
-  VCDP_CREATE_NEXT_DROP,
-  VCDP_CREATE_N_NEXT
-};
-
 typedef struct {
   u32 next_index;
 } vcdp_create_trace_t;
@@ -39,30 +33,12 @@ VCDP_SERVICE_DECLARE(l4_lifecycle)
 VCDP_SERVICE_DECLARE(drop)
 
 void
-vcdp_set_service_chain(vcdp_tenant_t *tenant, vcdp_service_chain_selector_t sc, u32 *bitmaps)
+vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps)
 {
-  clib_memcpy_fast(bitmaps, tenant->bitmaps, sizeof(tenant->bitmaps));
-
-  switch (sc) {
-  case VCDP_SERVICE_CHAIN_DEFAULT:
-    /* Disable all TCP services for non-TCP traffic */
-    bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-    bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(vcdp_tcp_mss);
-    break;
-  case VCDP_SERVICE_CHAIN_TCP:
-    bitmaps[VCDP_FLOW_FORWARD] &= ~VCDP_SERVICE_MASK(l4_lifecycle);
-    bitmaps[VCDP_FLOW_REVERSE] &= ~VCDP_SERVICE_MASK(l4_lifecycle);
-    bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(tcp_check_lite);
-    bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(tcp_check_lite);
-    break;
-  case VCDP_SERVICE_CHAIN_ICMP_ERROR:
-    clib_warning("ICMP ERROR SERVICE CHAIN");
-    break;
-  case VCDP_SERVICE_CHAIN_DROP:
-    clib_warning("Drop ERROR SERVICE CHAIN");
-  default:
-    ASSERT(0);
-  }
+  if (proto == IP_PROTOCOL_TCP)
+    clib_memcpy_fast(bitmaps, tenant->tcp_bitmaps, sizeof(tenant->tcp_bitmaps));
+  else
+    clib_memcpy_fast(bitmaps, tenant->bitmaps, sizeof(tenant->bitmaps));
 }
 
 //
@@ -78,7 +54,7 @@ VLIB_NODE_FN(vcdp_create_node)
   u16 nexts[VLIB_FRAME_SIZE], *next = nexts;
   vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4 = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
-  int service_chain[VLIB_FRAME_SIZE], *sc = service_chain;
+  int rv;
 
 
   // Session created successfully: pass packet back to vcdp-lookup
@@ -91,29 +67,29 @@ VLIB_NODE_FN(vcdp_create_node)
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
-    vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, k4, h, sc);
+    rv = vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, k4, h);
     VCDP_DBG(0, "Creating session for: %U", format_vcdp_session_key, k4);
 
-    if (sc[0] == VCDP_SERVICE_CHAIN_DROP_NO_KEY) {
+    if (rv != 0) {
       b[0]->error = node->errors[VCDP_CREATE_ERROR_NO_KEY];
-      next[0] = VCDP_CREATE_NEXT_DROP;
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       goto next;
     }
 
-    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, k4, 0, sc[0], false);
+    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, k4, 0, false);
     if (session) {
-      next[0] = VCDP_CREATE_NEXT_LOOKUP;
       session->rx_id = vcdp_buffer(b[0])->rx_id;
+      vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
     } else {
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       b[0]->error = node->errors[VCDP_CREATE_ERROR_FULL_TABLE]; // TODO: Other causes too, like session exists.
-      next[0] = VCDP_CREATE_NEXT_DROP;
     }
 next:
+    vcdp_next(b[0], next);
     next += 1;
     h += 1;
     k4 += 1;
     b += 1;
-    sc += 1;
     n_left -= 1;
   }
 
@@ -144,13 +120,11 @@ VLIB_REGISTER_NODE(vcdp_create_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_CREATE_N_ERROR,
   .error_counters = vcdp_create_error_counters,
-  .n_next_nodes = VCDP_CREATE_N_NEXT,
-  .next_nodes = { "vcdp-lookup-ip4", "error-drop" }
 };
 
 VCDP_SERVICE_DEFINE(create) = {
   .node_name = "vcdp-create",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES(0),
-  .is_terminal = 1
+  .is_terminal = 0
 };

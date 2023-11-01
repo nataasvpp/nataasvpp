@@ -430,7 +430,7 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   };
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
-  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, VCDP_SERVICE_CHAIN_DEFAULT, true);
+  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, true);
   if (!session)
     error = clib_error_return(0, "Creating static session failed");
 
