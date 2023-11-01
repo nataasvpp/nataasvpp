@@ -195,19 +195,23 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
         continue;
 
-      // vlib_cli_output(vm, n, session - ptd->sessions, session, tenant->tenant_id, now);
-
       f64 remaining_time = session->timer.next_expiration - now;
-      // if (remaining_time < 0)
-      //   continue;
+      if (session->state == VCDP_SESSION_STATE_STATIC)
+        remaining_time = 0;
+
       u64 session_net = clib_host_to_net_u64(session->session_id);
       vcdp_session_ip4_key_t *k1, *k2;
       if (detail) {
         vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
       } else {
-        vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
-                        tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                        format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
+        if (session->state == VCDP_SESSION_STATE_STATIC)
+          vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
+                          tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                          format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
+        else
+          vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
+                          tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                          format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
 
         k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
         k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];

@@ -75,7 +75,8 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
   s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
-  s = format(s, "  expires after: %fs\n", remaining_time);
+  if (session->state != VCDP_SESSION_STATE_STATIC)
+    s = format(s, "  expires after: %fs\n", remaining_time);
   s = format(s, "  timer state: %s\n",
              vcdp_session_timer_running(&ptd->wheel, &session->timer) ? "running" : "stopped");
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);

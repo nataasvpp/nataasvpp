@@ -14,11 +14,6 @@
 #include <vnet/udp/udp_packet.h>
 #include <vnet/ip/icmp46_packet.h>
 
-// select service chain
-// TCP
-// ICMP error
-// default
-// drop
 static inline int
 vcdp_header_offset(void *start, void *end, int header_size)
 {
@@ -166,6 +161,9 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
   return 0;
 }
 
+/*
+ * Find the 5-tuple key for the inner packet of an ICMP error
+ */
 static inline int
 vcdp_calc_key_v4_icmp(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {

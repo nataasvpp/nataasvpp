@@ -221,7 +221,7 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   vcdp_service_main_t *sm = &vcdp_service_main;
   int i;
   bool terminates = false;
-  vec_foreach_index_backwards(i, sm->services) {
+  vec_foreach_index(i, sm->services) {
     if (bitmap & sm->services[i]->service_mask[0]) {
       if (sm->services[i]->is_terminal)
         terminates = true;
@@ -235,6 +235,10 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   }
   tenant->bitmaps[direction] = gen_bitmap;
   tenant->tcp_bitmaps[direction] = tcp_bitmap;
+
+  VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, gen_bitmap);
+  VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, tcp_bitmap);
+
   return 0;
 }
 

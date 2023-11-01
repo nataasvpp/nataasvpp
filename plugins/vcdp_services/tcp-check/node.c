@@ -235,4 +235,6 @@ VCDP_SERVICE_DEFINE(tcp_check) = {
   .node_name = "vcdp-tcp-check",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle"),
-  .is_terminal = 0};
+  .is_terminal = 0,
+  .is_tcp_specific = 1
+  };
