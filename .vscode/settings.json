@@ -26,7 +26,16 @@
         "bihash_8_8.h": "c",
         "feature.h": "c",
         "vcdp.api_enum.h": "c",
-        "lookup_inlines.h": "c"
+        "lookup_inlines.h": "c",
+        "cbor.h": "c",
+        "array": "c",
+        "chrono": "c",
+        "compare": "c",
+        "functional": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",

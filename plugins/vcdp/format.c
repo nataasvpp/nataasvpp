@@ -113,19 +113,19 @@ format_vcdp_tenant(u8 *s, va_list *args)
   s = format(s, "index: %d\n", tenant_idx);
   s = format(s, "%Ucontext: %d\n", format_white_space, indent, tenant->context_id);
   s = format(s, "%Uforward service chain:\n", format_white_space, indent);
-  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_FORWARD]);
-  if (tenant->bitmaps[VCDP_FLOW_FORWARD] != tenant->tcp_bitmaps[VCDP_FLOW_FORWARD]) {
+  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_SERVICE_CHAIN_FORWARD]);
+  if (tenant->bitmaps[VCDP_SERVICE_CHAIN_FORWARD] != tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_FORWARD]) {
     s = format(s, "%Uforward tcp service chain:\n", format_white_space, indent);
-    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_FLOW_FORWARD]);
+    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_FORWARD]);
   }
   s = format(s, "%Ureverse service chain:\n", format_white_space, indent);
-  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_REVERSE]);
-  if (tenant->bitmaps[VCDP_FLOW_REVERSE] != tenant->tcp_bitmaps[VCDP_FLOW_REVERSE]) {
+  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_SERVICE_CHAIN_REVERSE]);
+  if (tenant->bitmaps[VCDP_SERVICE_CHAIN_REVERSE] != tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_REVERSE]) {
     s = format(s, "%Ureverse tcp service chain:\n", format_white_space, indent);
-    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_FLOW_REVERSE]);
+    s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_REVERSE]);
   }
   s = format(s, "%Umiss service chain:\n", format_white_space, indent);
-  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_FLOW_MISS]);
+  s = format(s, "%U%U\n", format_white_space, indent + 2, format_vcdp_bitmap, tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS]);
   return s;
 }
 

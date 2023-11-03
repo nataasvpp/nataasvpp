@@ -57,11 +57,11 @@ vcdp_set_services_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
     else if (unformat_user(line_input, unformat_vcdp_service_bitmap, &bitmap))
       ;
     else if (unformat(line_input, "forward"))
-      direction = VCDP_FLOW_FORWARD;
+      direction = VCDP_SERVICE_CHAIN_FORWARD;
     else if (unformat(line_input, "reverse"))
-      direction = VCDP_FLOW_REVERSE;
+      direction = VCDP_SERVICE_CHAIN_REVERSE;
     else if (unformat(line_input, "miss"))
-      direction = VCDP_FLOW_MISS;
+      direction = VCDP_SERVICE_CHAIN_MISS;
     else {
       err = unformat_parse_error(line_input);
       goto done;

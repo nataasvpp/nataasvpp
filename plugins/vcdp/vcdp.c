@@ -162,19 +162,18 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 defaul
         u16 default_tenant_idx;
         vcdp_tenant_t *default_tenant = vcdp_tenant_get_by_id(default_tenant_id, &default_tenant_idx);
         if (default_tenant) {
-          forward_bitmap = default_tenant->bitmaps[VCDP_FLOW_FORWARD];
-          reverse_bitmap = default_tenant->bitmaps[VCDP_FLOW_REVERSE];
-          tcp_forward_bitmap = default_tenant->tcp_bitmaps[VCDP_FLOW_FORWARD];
-          tcp_reverse_bitmap = default_tenant->tcp_bitmaps[VCDP_FLOW_REVERSE];
-
-          miss_bitmap = default_tenant->bitmaps[VCDP_FLOW_MISS];
+          forward_bitmap = default_tenant->bitmaps[VCDP_SERVICE_CHAIN_FORWARD];
+          reverse_bitmap = default_tenant->bitmaps[VCDP_SERVICE_CHAIN_REVERSE];
+          tcp_forward_bitmap = default_tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_FORWARD];
+          tcp_reverse_bitmap = default_tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_REVERSE];
+          miss_bitmap = default_tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
         }
       }
-      tenant->bitmaps[VCDP_FLOW_FORWARD] = forward_bitmap;
-      tenant->bitmaps[VCDP_FLOW_REVERSE] = reverse_bitmap;
-      tenant->tcp_bitmaps[VCDP_FLOW_FORWARD] = tcp_forward_bitmap;
-      tenant->tcp_bitmaps[VCDP_FLOW_REVERSE] = tcp_reverse_bitmap;
-      tenant->bitmaps[VCDP_FLOW_MISS] = miss_bitmap;
+      tenant->bitmaps[VCDP_SERVICE_CHAIN_FORWARD] = forward_bitmap;
+      tenant->bitmaps[VCDP_SERVICE_CHAIN_REVERSE] = reverse_bitmap;
+      tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_FORWARD] = tcp_forward_bitmap;
+      tenant->tcp_bitmaps[VCDP_SERVICE_CHAIN_REVERSE] = tcp_reverse_bitmap;
+      tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS] = miss_bitmap;
       tenant->tenant_id = tenant_id;
       tenant->context_id = context_id;
       vcdp_tenant_init_timeouts(tenant);

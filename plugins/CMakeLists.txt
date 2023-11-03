@@ -29,6 +29,7 @@ add_vpp_plugin(vcdp
   vcdp/format.c
   vcdp/vcdp.c
   vcdp/service.c
+  vcdp/export.c
   vcdp/bypass/node.c
   vcdp/vcdp_counter.json.c
   vcdp/icmp/icmp4.c
@@ -75,6 +76,8 @@ add_vpp_plugin(vcdp
   vcdp_services/l4-lifecycle/l4_lifecycle.api
   vcdp_services/tcp-check-lite/tcp_check_lite.api
   vcdp_services/stats/stats.api
+
+  LINK_LIBRARIES cbor
 
   INSTALL_HEADERS
   vcdp/vcdp.h

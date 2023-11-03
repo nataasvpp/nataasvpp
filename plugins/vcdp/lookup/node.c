@@ -103,8 +103,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         // Miss-chain
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
         vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-        vcdp_buffer(b[0])->service_bitmap = tenant->bitmaps[VCDP_FLOW_MISS];
-        sb[0] = tenant->bitmaps[VCDP_FLOW_MISS]; // for tracing
+        vcdp_buffer(b[0])->service_bitmap = sb[0] = tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
       }
       vcdp_next(b[0], current_next);
       to_local[n_local] = bi[0];

@@ -67,9 +67,15 @@ typedef u16 session_version_t;
 typedef enum {
    VCDP_FLOW_FORWARD = 0,
    VCDP_FLOW_REVERSE = 1,
-   VCDP_FLOW_MISS = 2,
-   VCDP_FLOW_F_B_N = 3
+   VCDP_FLOW_F_B_N = 2,
 } vcdp_session_direction_t;
+
+typedef enum {
+  VCDP_SERVICE_CHAIN_FORWARD = 0,
+  VCDP_SERVICE_CHAIN_REVERSE = 1,
+  VCDP_SERVICE_CHAIN_MISS = 2,
+  VCDP_SERVICE_CHAIN_N = 3,
+} vcdp_service_chain_t;
 
 enum { VCDP_SESSION_KEY_PRIMARY, VCDP_SESSION_KEY_SECONDARY, VCDP_SESSION_N_KEY };
 /* Flags to determine key validity in the session */
@@ -96,18 +102,19 @@ STATIC_ASSERT_SIZEOF(vcdp_session_ip4_key_t, 16);
 
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
+  u32 bitmaps[VCDP_FLOW_F_B_N]; // 12   /// SHOULD MISS CHAIN REALLY BE PART OF THIS!!?!?!?!
   u64 session_id;               // 8
   vcdp_session_timer_t timer;   // 12
   u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
   vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY]; //32
 
-  u64 bytes[VCDP_FLOW_F_B_N];   // 16
-  u32 pkts[VCDP_FLOW_F_B_N];    // 8
+  u64 bytes[VCDP_FLOW_F_B_N];   // 24
+  u32 pkts[VCDP_FLOW_F_B_N];    // 12
+  f64 created;                  // 8
   session_version_t session_version;    // 2
   u16 tenant_idx;               // 2
   u8 state; /* see vcdp_session_state_t */ // 1
-  u8 proto;                     // 1 TODO: Needed?
+  u8 proto;                     // 1 TODO: Needed? Could use protocol from key instead
   u8 type; /* see vcdp_session_type_t */ // 1
   u8 key_flags;                 // 1
 } vcdp_session_t; /* TODO: optimise mem layout */
@@ -125,8 +132,8 @@ typedef struct {
 typedef struct {
   u32 tenant_id;
   u32 context_id;
-  u32 bitmaps[VCDP_FLOW_F_B_N];
-  u32 tcp_bitmaps[VCDP_FLOW_F_B_N];
+  u32 bitmaps[VCDP_SERVICE_CHAIN_N];
+  u32 tcp_bitmaps[VCDP_SERVICE_CHAIN_N];
   u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_tenant_t;
 

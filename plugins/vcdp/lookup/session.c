@@ -57,7 +57,7 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   session->tenant_idx = tenant_idx;
   session->rx_id = ~0; // TODO: Set rx_ID into sessions!!!!
   session->proto = primary->proto;
-
+  session->created = unix_time_now();
   kv2.key = session_id;
   kv2.value = value;
   clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
