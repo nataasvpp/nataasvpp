@@ -50,6 +50,7 @@ autoreply autoendian define vcdp_gateway_enable_disable
   vl_api_interface_index_t sw_if_index;
   u32 tenant_id;
   bool is_enable;
+  bool output_arc [default=false];
 };
 
 /*

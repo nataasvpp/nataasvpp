@@ -52,7 +52,8 @@ vl_api_vcdp_gateway_enable_disable_t_handler(vl_api_vcdp_gateway_enable_disable_
   vl_api_vcdp_gateway_enable_disable_reply_t *rmp;
   int rv;
   VALIDATE_SW_IF_INDEX_END(mp);
-  rv = gw_interface_input_enable_disable(mp->sw_if_index, mp->tenant_id, mp->is_enable);
+
+  rv = gw_interface_input_enable_disable(mp->sw_if_index, mp->tenant_id, mp->output_arc, mp->is_enable);
   BAD_SW_IF_INDEX_LABEL;
   REPLY_MACRO_END(VL_API_VCDP_GATEWAY_ENABLE_DISABLE_REPLY);
 }

@@ -7,6 +7,7 @@
 #include <vnet/ip/ip4.h>
 #include <vnet/tcp/tcp_packet.h>
 #include <vcdp/vcdp.h>
+#include <vcdp/vcdp_funcs.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
 
@@ -102,7 +103,7 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
   vlib_get_buffers(vm, from, bufs, n_left);
 
   while (n_left > 0) {
-    ip4_header_t *ip = (ip4_header_t *) vlib_buffer_get_current(b[0]);
+    ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
     tcp_header_t *tcp = ip4_next_header(ip);
     if (!tcp_syn(tcp))
       goto done;

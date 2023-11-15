@@ -37,8 +37,8 @@ nat_fastpath_process_one(nat_rewrite_data_t *nat_session, vcdp_session_t *sessio
     vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     goto end_of_packet;
   }
-  nat_rewrite(vlib_buffer_get_current(b[0]), nat_session);
-  vnet_buffer(b[0])->sw_if_index[VLIB_TX] = nat_session->rewrite.fib_index;
+  nat_rewrite(vcdp_get_ip4_header(b[0]), nat_session);
+  //vnet_buffer(b[0])->sw_if_index[VLIB_TX] = nat_session->rewrite.fib_index;
 
 end_of_packet:
   vcdp_next(b[0], to_next);

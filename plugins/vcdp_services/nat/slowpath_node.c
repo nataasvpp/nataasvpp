@@ -370,7 +370,7 @@ VLIB_NODE_FN(vcdp_nat_port_forwarding_node)
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     clib_bihash_kv_16_8_t kv;
-    if (vcdp_nat_lookup_3tuple(vlib_buffer_get_current(b[0]), vcdp_buffer(b[0])->context_id, &kv)) {
+    if (vcdp_nat_lookup_3tuple(vcdp_get_ip4_header(b[0]), vcdp_buffer(b[0])->context_id, &kv)) {
       // Continue down the miss-chain
       vcdp_next(b[0], to_next);
       goto next;

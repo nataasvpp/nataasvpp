@@ -3,6 +3,7 @@
 
 #include <vlib/vlib.h>
 #include <vcdp/service.h>
+#include <vcdp/vcdp_funcs.h>
 #include <vnet/feature/feature.h>
 #include <vnet/ip/ip4.h>
 #include <vnet/fib/ip4_fib.h>
@@ -58,7 +59,7 @@ VLIB_NODE_FN(vcdp_bypass_node)
     // vnet_feature_next_u16(next, b[0]);
     next[0] = VCDP_BYPASS_NEXT_LOOKUP;
 
-    ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+    ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
     // u32 lbi = ip4_fib_forwarding_lookup(vnet_buffer(b)->ip.fib_index, &ip0->src_address);
     // TODO: Fix VRF
 
@@ -71,7 +72,7 @@ VLIB_NODE_FN(vcdp_bypass_node)
       b[0]->error = node->errors[VCDP_BYPASS_ERROR_BYPASS];
      } else if (dpo->dpoi_type == vcdp_nat_if_dpo_type) { // matches interface pool
       next[0] = VCDP_BYPASS_NEXT_RECEIVE;
-     }    
+     }
 
     next += 1;
     n_left -= 1;
@@ -110,8 +111,8 @@ VLIB_REGISTER_NODE(vcdp_bypass_node) = {
 };
 
 VCDP_SERVICE_DEFINE(bypass) = {
-  .node_name = "vcdp-bypass", 
-  .runs_before = VCDP_SERVICES(0), 
+  .node_name = "vcdp-bypass",
+  .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES(0),
   .is_terminal = 1
 };

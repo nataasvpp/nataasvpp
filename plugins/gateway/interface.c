@@ -11,10 +11,15 @@
 #include <vcdp/common.h>
 #include <vcdp/service.h>
 #include <vnet/ip/reass/ip4_sv_reass.h>
+#include <vcdp/vcdp_funcs.h>
 #include "gateway.h"
 
-enum vcdp_input_next_e { VCDP_INPUT_NEXT_LOOKUP, VCDP_INPUT_N_NEXT };
-enum vcdp_output_next_e { VCDP_OUTPUT_NEXT_LOOKUP, VCDP_OUTPUT_NEXT_ICMP_ERROR, VCDP_OUTPUT_N_NEXT };
+enum vcdp_input_next_e {
+   VCDP_GW_NEXT_LOOKUP,
+   VCDP_GW_NEXT_IP4_LOOKUP,
+   VCDP_GW_NEXT_ICMP_ERROR,
+   VCDP_GW_N_NEXT
+};
 
 typedef struct {
   u16 tenant_index;
@@ -73,7 +78,7 @@ VLIB_NODE_FN(vcdp_input_node)
     vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx[0]);
     vcdp_buffer(b[0])->context_id = tenant->context_id;
     vcdp_buffer(b[0])->tenant_index = tenant_idx[0];
-    current_next[0] = VCDP_INPUT_NEXT_LOOKUP;
+    current_next[0] = VCDP_GW_NEXT_LOOKUP;
 
   next:
     b += 1;
@@ -105,15 +110,22 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_input_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
-  .n_next_nodes = VCDP_INPUT_N_NEXT,
+  .n_next_nodes = VCDP_GW_N_NEXT,
   .next_nodes =
     {
-      [VCDP_INPUT_NEXT_LOOKUP] = "vcdp-lookup-ip4",
+      [VCDP_GW_NEXT_LOOKUP] = "vcdp-lookup-ip4",
+      [VCDP_GW_NEXT_IP4_LOOKUP] = "ip4-lookup",
+      [VCDP_GW_NEXT_ICMP_ERROR] = "vcdp-icmp-error",
     },
 };
 
 VNET_FEATURE_INIT(vcdp_input_feat, static) = {
   .arc_name = "ip4-unicast",
+  .node_name = "vcdp-input",
+};
+
+VNET_FEATURE_INIT(vcdp_output_feat, static) = {
+  .arc_name = "ip4-output",
   .node_name = "vcdp-input",
 };
 
@@ -129,18 +141,22 @@ VLIB_NODE_FN(vcdp_output_node)
   b = bufs;
 
   while (n_left > 0) {
-    next[0] = VCDP_OUTPUT_NEXT_LOOKUP;
+    if (vnet_buffer(b[0])->ip.save_rewrite_length) {
+      vnet_feature_next_u16(next, b[0]);
+    } else {
+      next[0] = VCDP_GW_NEXT_IP4_LOOKUP;
+    }
 
     /*
      * If the ttl drops below 1 when forwarding, generate
      * an ICMP response.
      */
-    ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+    ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
     if (PREDICT_FALSE(ip->ttl <= 1)) {
       // b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
-      next[0] = VCDP_OUTPUT_NEXT_ICMP_ERROR;
+      next[0] = VCDP_GW_NEXT_ICMP_ERROR;
     }
 
     b++;
@@ -169,8 +185,7 @@ VLIB_REGISTER_NODE(vcdp_output_node) = {
   .vector_size = sizeof(u32),
   .type = VLIB_NODE_TYPE_INTERNAL,
   .format_trace = format_vcdp_output_trace,
-  .n_next_nodes = VCDP_OUTPUT_N_NEXT,
-  .next_nodes = { "ip4-lookup", "vcdp-icmp-error" }
+  .sibling_of = "vcdp-input",
 };
 
 VCDP_SERVICE_DEFINE(output) = {

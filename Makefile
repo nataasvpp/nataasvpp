@@ -47,7 +47,8 @@ run run-release debug debug-release:
 	@make -C $(VPP_DIR) STARTUP_DIR=$(PWD) $@
 
 test-debug: build
-	@make -C $(VPP_DIR) EXTERN_APIDIR=$(debug_build_dir) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins TEST=vcdp_portforwarding $@
+	make -C $(VPP_DIR) EXTERN_TESTS=$(PWD)/test2 EXTERN_APIDIR=$(debug_build_dir) EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins $@
+	# make -C $(VPP_DIR) EXTERN_APIDIR=$(debug_build_dir) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins $@
 	# @make -C $(VPP_DIR) EXTERN_APIDIR=$(debug_build_dir) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(debug_build_dir)/lib/vpp_plugins TEST=nataascpe DEBUG=gdb $@
 test: build-release
 	@make -C $(VPP_DIR) EXTERN_APIDIR=$(release_build_dir) EXTERN_TESTS=$(PWD)/test EXTERN_PLUGINS=$(release_build_dir)/lib/vpp_plugins TEST=nataas $@

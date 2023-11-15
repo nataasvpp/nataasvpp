@@ -15,6 +15,8 @@ gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *inp
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   u32 sw_if_index = ~0, tenant_id = ~0;
+  bool output_arc = false;
+
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
 
@@ -23,6 +25,8 @@ gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *inp
       ;
     else if (unformat(line_input, "tenant %d", &tenant_id))
       ;
+    else if (unformat(line_input, "output"))
+      output_arc = true;
     else {
       err = unformat_parse_error(line_input);
       goto done;
@@ -32,7 +36,7 @@ gateway_interface_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *inp
     err = clib_error_return(0, "missing arguments");
     goto done;
   }
-  int rv = gw_interface_input_enable_disable(sw_if_index, tenant_id, true);
+  int rv = gw_interface_input_enable_disable(sw_if_index, tenant_id, output_arc, true);
   if (rv != 0) {
     err = clib_error_return(0, "could not enable interface");
   }

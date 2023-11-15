@@ -160,4 +160,10 @@ vcdp_calc_bihash_buckets (u32 n_elts)
   return lower_pow2;
 }
 
+static inline ip4_header_t *
+vcdp_get_ip4_header(vlib_buffer_t *b)
+{
+  return vlib_buffer_get_current(b) + vnet_buffer(b)->ip.save_rewrite_length;
+}
+
 #endif

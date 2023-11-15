@@ -3,11 +3,11 @@
 option version = "0.0.1";
 import "vnet/ip/ip_types.api";
 
-enum vcdp_session_direction : u8
+enum vcdp_service_chain : u8
 {
-  VCDP_API_FORWARD = 0,
-  VCDP_API_REVERSE = 1,
-  VCDP_API_MISS = 2,
+  VCDP_API_SERVICE_CHAIN_FORWARD = 0,
+  VCDP_API_SERVICE_CHAIN_REVERSE = 1,
+  VCDP_API_SERVICE_CHAIN_MISS = 2,
 };
 
 enum vcdp_session_state : u8

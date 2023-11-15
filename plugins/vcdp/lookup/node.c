@@ -35,8 +35,9 @@ typedef struct {
 VCDP_SERVICE_DECLARE(drop)
 
 static bool
-icmp_is_error(ip4_header_t *ip)
+icmp_is_error(vlib_buffer_t *b)
 {
+  ip4_header_t *ip = vcdp_get_ip4_header(b);
   if (ip->protocol == IP_PROTOCOL_ICMP) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
     if (icmp->type != ICMP4_echo_request && icmp->type != ICMP4_echo_reply)
@@ -97,7 +98,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
-      if (icmp_is_error(vlib_buffer_get_current(b[0]))) {
+      if (icmp_is_error(b[0])) {
         vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain
@@ -322,8 +323,9 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
     else
       s = format(s, "missed session:");
   }
-  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u  key 0x%U",
-             format_white_space, indent, t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4));
+  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u  key 0x%U %U",
+             format_white_space, indent, t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4),
+             format_vcdp_session_key, &t->k4);
   s = format(s, "\n%Uservice chain: %U", format_white_space, indent, format_vcdp_bitmap, t->service_bitmap);
   return s;
 }

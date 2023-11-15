@@ -13,6 +13,7 @@
 #include <arpa/inet.h> // TODO: remove
 #include <vnet/udp/udp_packet.h>
 #include <vnet/ip/icmp46_packet.h>
+#include <vcdp/vcdp_funcs.h>
 
 static inline int
 vcdp_header_offset(void *start, void *end, int header_size)
@@ -23,7 +24,7 @@ vcdp_header_offset(void *start, void *end, int header_size)
 static inline void
 vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
-  ip4_header_t *ip = vlib_buffer_get_current(b);
+  ip4_header_t *ip = vcdp_get_ip4_header(b);
   udp_header_t *udp = (udp_header_t *) (ip+1);
   skey->proto = ip->protocol;
   skey->context_id = context_id;
@@ -75,7 +76,7 @@ vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t
 static inline int
 vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
-  ip4_header_t *ip = vlib_buffer_get_current(b);
+  ip4_header_t *ip = vcdp_get_ip4_header(b);
   int offset = 0;
   udp_header_t *udp;
   icmp46_header_t *icmp;
@@ -167,7 +168,7 @@ vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
 static inline int
 vcdp_calc_key_v4_icmp(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
-  ip4_header_t *ip = vlib_buffer_get_current(b);
+  ip4_header_t *ip = vcdp_get_ip4_header(b);
   int offset = 0;
   udp_header_t *udp;
   icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);

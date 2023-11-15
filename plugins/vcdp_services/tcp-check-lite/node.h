@@ -75,7 +75,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tw_t *
                      vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
                      f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
-  ip4_header_t *ip4 = (ip4_header_t *) vlib_buffer_get_current(b[0]);
+  ip4_header_t *ip4 = vcdp_get_ip4_header(b[0]);
   tcp_header_t *tcp = ip4_next_header(ip4);
 
   /* Ignore non first fragments */
