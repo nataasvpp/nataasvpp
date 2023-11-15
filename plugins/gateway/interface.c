@@ -16,7 +16,6 @@
 
 enum vcdp_input_next_e {
    VCDP_GW_NEXT_LOOKUP,
-   VCDP_GW_NEXT_IP4_LOOKUP,
    VCDP_GW_NEXT_ICMP_ERROR,
    VCDP_GW_N_NEXT
 };
@@ -114,7 +113,6 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
   .next_nodes =
     {
       [VCDP_GW_NEXT_LOOKUP] = "vcdp-lookup-ip4",
-      [VCDP_GW_NEXT_IP4_LOOKUP] = "ip4-lookup",
       [VCDP_GW_NEXT_ICMP_ERROR] = "vcdp-icmp-error",
     },
 };
@@ -141,11 +139,7 @@ VLIB_NODE_FN(vcdp_output_node)
   b = bufs;
 
   while (n_left > 0) {
-    if (vnet_buffer(b[0])->ip.save_rewrite_length) {
-      vnet_feature_next_u16(next, b[0]);
-    } else {
-      next[0] = VCDP_GW_NEXT_IP4_LOOKUP;
-    }
+    vnet_feature_next_u16(next, b[0]);
 
     /*
      * If the ttl drops below 1 when forwarding, generate
