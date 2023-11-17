@@ -11,7 +11,8 @@
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
 import uuid
-from framework import VppTestCase, VppTestRunner
+from framework import VppTestCase
+from asfframework import VppTestRunner
 from scapy.layers.inet import ICMP
 from scapy.layers.dhcp import BOOTP, DHCP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6

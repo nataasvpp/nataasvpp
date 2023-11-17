@@ -11,7 +11,8 @@
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
 import uuid
-from framework import VppTestCase, VppTestRunner
+from framework import VppTestCase
+from asfframework import VppTestRunner
 from scapy.layers.inet import ICMP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
 from scapy.layers.vxlan import VXLAN
@@ -271,7 +272,7 @@ class TestNATaaS(VppTestCase):
             else:
                 interface = t['interface']
                 t['send'] =  Ether(src=interface.remote_mac, dst=interface.local_mac) / t['send']
-                
+
             if t['expect']: # If a reply is expected
                 t['expect'][IP].ttl -= 1
 

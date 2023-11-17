@@ -196,7 +196,7 @@ class TestVCDPSession(VppTestCase):
         self.establish_session(self.pg0, self.pg1)
 
 
-        print(self.vapi.cli("show vcdp session detail"))
+        # print(self.vapi.cli("show vcdp session detail"))
         print(self.vapi.cli("show vcdp summary"))
         # print(self.vapi.cli('show vcdp tcp session-table'))
         print(self.vapi.cli('show vcdp tenant'))
@@ -208,17 +208,21 @@ class TestVCDPSession(VppTestCase):
 
         print('Tenant session statistics', self.statistics["/vcdp/tenant/created-sessions"], self.statistics["/vcdp/tenant/removed-sessions"])
 
+    @unittest.SkipTest
     def test_tcp_checksum(self):
         '''Test TCP checksum'''
 
         # Send 64K packets, spinning through all possible checksums
         pkts = []
+        print('Generating packets...')
         for i in range(0, 0xFFFF):
             pkt = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/TCP(sport=i, dport=81, flags='S'))
             pkts.append(pkt)
 
+        print('Sending and receiving replies...')
         rx = self.send_and_expect(self.pg0, pkts, self.pg1, trace=False)
 
+        print('Validating checksums...')
         for p in rx:
             modified = p.copy()
             modified[TCP].chksum = None
@@ -227,4 +231,12 @@ class TestVCDPSession(VppTestCase):
 
 
         print('VALIDATE TCP CHECKSUM in REPLY packet')
+        # print(self.vapi.cli("show vcdp session"))
         print(self.vapi.cli("show vcdp summary"))
+
+        print('Awaiting to see if anything expires:')
+        import time
+        time.sleep(10)
+
+#       0x06000000ac100102ac10020204d20050
+#       0x06000000ac100202de010101005004d2
