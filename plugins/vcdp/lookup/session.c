@@ -29,13 +29,17 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   u32 thread_index = vlib_get_thread_index(); // TODO: Check if this should be vm->thread_index instead
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+  if (!tenant) {
+    VCDP_DBG(0, "Unknown tenant %d", tenant_idx);
+    return 0;
+  }
+
   vcdp_session_t *session;
   pool_get(ptd->sessions, session);
   u32 session_idx = session - ptd->sessions;
   u32 pseudo_flow_idx = (session_idx << 1);
   u64 value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
   *flow_index = pseudo_flow_idx;
-  if (!tenant) return 0;
 
   kv.key[0] = primary->as_u64[0];
   kv.key[1] = primary->as_u64[1];
@@ -60,7 +64,10 @@ vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary, vcdp_ses
   session->created = unix_time_now();
   kv2.key = session_id;
   kv2.value = value;
-  clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1);
+
+  if (clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1)) {
+    VCDP_DBG(0, "cannot add: %lx session already exists", session_id);
+  }
 
   /* Assign service chain */
   // TODO. Set service chain based on traffic type!!!!

@@ -72,6 +72,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
   ptd->current_time = time_now;
+
   vcdp_expire_timers(&ptd->wheel, time_now);
 
   // Calculate key and hash
@@ -135,6 +136,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
       }
+
       u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
       vcdp_buffer(b[0])->service_bitmap = sb[0] = pbmp;
 

@@ -11,7 +11,8 @@
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
 import uuid
-from framework import VppTestCase, VppTestRunner
+from framework import VppTestCase
+from asfframework import VppTestRunner
 from scapy.layers.inet import ICMP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
 from scapy.layers.vxlan import VXLAN
@@ -53,7 +54,7 @@ class TestVCDPSession(VppTestCase):
         outside_tenant=1000
         pool = '222.1.1.1'
         nat_id = 'nat-instance-1'
-        services_flags = VppEnum.vl_api_vcdp_session_direction_t
+        services_flags = VppEnum.vl_api_vcdp_service_chain_t
         mss = 1280
 
         # NATs
@@ -68,18 +69,17 @@ class TestVCDPSession(VppTestCase):
 
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
-        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'},
-                            {'data': "vcdp-nat-slowpath"}, {'data':'vcdp-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-output'}]
+        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-check-lite'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-output'}]
+        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-check-lite'},     {'data': 'vcdp-output'}]
         outside_services = [{'data': 'vcdp-bypass'}]
-        miss_services = [{'data': 'vcdp-create'}]
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
+        miss_services = [{'data': 'vcdp-nat-slowpath'}, {'data': 'vcdp-drop'}]
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(forward_services), services=forward_services)
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_REVERSE,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
                                     n_services=len(reverse_services), services=reverse_services)
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_MISS,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
                                     n_services=len(miss_services), services=miss_services)
-        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
+        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(outside_services), services=outside_services)
 
         # MSS clamping
@@ -134,12 +134,14 @@ class TestVCDPSession(VppTestCase):
         print('SYN')
         syn = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/TCP(sport=1234, dport=80, flags='S', seq=1000, options=[("MSS", (mss)), ("EOL", None)]))
         rx = self.send_and_expect(interface, syn, expect_interface)
+        rx[0].show2()
         self.assertEqual(rx[0][TCP].options[0][1], self.mss)
 
         print('SYN-ACK')
         synack = self.make_reply(rx[0])
         synack[TCP].flags='SA'
         rx = self.send_and_expect(expect_interface, synack, interface)
+        rx[0].show2()
 
         # Send ACK
         print('ACK')
@@ -194,7 +196,7 @@ class TestVCDPSession(VppTestCase):
         self.establish_session(self.pg0, self.pg1)
 
 
-        print(self.vapi.cli("show vcdp session"))
+        print(self.vapi.cli("show vcdp session detail"))
         print(self.vapi.cli("show vcdp summary"))
         # print(self.vapi.cli('show vcdp tcp session-table'))
         print(self.vapi.cli('show vcdp tenant'))
@@ -212,7 +214,7 @@ class TestVCDPSession(VppTestCase):
         # Send 64K packets, spinning through all possible checksums
         pkts = []
         for i in range(0, 0xFFFF):
-            pkt = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/TCP(sport=i, dport=80, flags='S'))
+            pkt = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/TCP(sport=i, dport=81, flags='S'))
             pkts.append(pkt)
 
         rx = self.send_and_expect(self.pg0, pkts, self.pg1, trace=False)

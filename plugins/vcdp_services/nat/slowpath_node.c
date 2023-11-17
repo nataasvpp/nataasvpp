@@ -87,6 +87,9 @@ nat_rewrites(u32 instructions, u32 oldaddr, u32 newaddr, u16 oldport, u16 newpor
   nat_session->l4_csum_delta = l4_sum_delta;
 }
 
+VCDP_SERVICE_DECLARE(nat_early_rewrite)
+VCDP_SERVICE_DECLARE(nat_late_rewrite)
+
 /*
  * Only do SNAT
  */
@@ -220,6 +223,9 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       goto next;
     }
 
+    session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_early_rewrite);
+    session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_late_rewrite);
+
     VCDP_DBG(3, "Creating session for: %U", format_vcdp_session_key, &k4);
     session_idx = session - ptd->sessions;
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
@@ -271,8 +277,6 @@ VCDP_SERVICE_DEFINE(nat_output) = {
   .is_terminal = 0
 };
 
-VCDP_SERVICE_DECLARE(nat_early_rewrite)
-
 /*
  * nat_port_forwarding_process_one
  */
@@ -302,6 +306,9 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   vcdp_session_t *full_session = vcdp_create_session_v4(tenant_idx, &k4, &reverse_k4, false, &flow_index);
   if (!full_session)
     goto error;
+
+  full_session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_early_rewrite);
+  full_session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_late_rewrite);
 
   // Create reverse NAT session
   u32 fib_index = 0; // TODO: fix

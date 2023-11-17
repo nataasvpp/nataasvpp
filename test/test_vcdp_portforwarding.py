@@ -1,6 +1,5 @@
-# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
-#
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2023 Cisco and/or its affiliates.
 
  # pylint: disable=line-too-long
@@ -11,7 +10,8 @@
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
 import uuid
-from framework import VppTestCase, VppTestRunner
+from framework import VppTestCase
+from asfframework import VppTestRunner
 from scapy.layers.inet import ICMP
 from scapy.layers.inet6 import IP, TCP, UDP, Ether, IPv6
 from scapy.layers.vxlan import VXLAN
@@ -54,7 +54,7 @@ class TestVCDPPortForwarding(VppTestCase):
         portforwarding_tenant=2000
         cls.pool = '222.1.1.1'
         nat_id = 'nat-instance-1'
-        services_flags = VppEnum.vl_api_vcdp_session_direction_t
+        services_flags = VppEnum.vl_api_vcdp_service_chain_t
         mss = 1280
 
         # NATs
@@ -80,19 +80,19 @@ class TestVCDPPortForwarding(VppTestCase):
         portforwarding_services = [{'data': 'vcdp-nat-early-rewrite'}, {'data': 'vcdp-output'},]
         portforwarding_reverse_services = [{'data': 'vcdp-nat-late-rewrite'}, {'data': 'vcdp-output'},]
 
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(forward_services), services=forward_services)
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_REVERSE,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
                                     n_services=len(reverse_services), services=reverse_services)
         # cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
         #                             n_services=len(outside_services), services=outside_services)
-        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_MISS,
+        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
                                     n_services=len(miss_services), services=miss_services)
 
         # Service chain template for port-forwarding
-        cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_FORWARD,
+        cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(portforwarding_services), services=portforwarding_services)
-        cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_REVERSE,
+        cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
                                     n_services=len(portforwarding_reverse_services), services=portforwarding_reverse_services)
 
         # MSS clamping
@@ -106,7 +106,7 @@ class TestVCDPPortForwarding(VppTestCase):
                                              nat_id=nat_id, match=match, rewrite=rewrite)
 
         # Enable interfaces
-        cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=tenant)
+        cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, output_arc=True, is_enable=True, tenant_id=tenant)
         cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant)
 
         cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")

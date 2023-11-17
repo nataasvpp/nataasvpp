@@ -102,14 +102,14 @@ STATIC_ASSERT_SIZEOF(vcdp_session_ip4_key_t, 16);
 
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  u32 bitmaps[VCDP_FLOW_F_B_N]; // 12   /// SHOULD MISS CHAIN REALLY BE PART OF THIS!!?!?!?!
+  u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
   u64 session_id;               // 8
   vcdp_session_timer_t timer;   // 12
   u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
   vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY]; //32
 
-  u64 bytes[VCDP_FLOW_F_B_N];   // 24
-  u32 pkts[VCDP_FLOW_F_B_N];    // 12
+  u64 bytes[VCDP_FLOW_F_B_N];   // 16
+  u32 pkts[VCDP_FLOW_F_B_N];    // 8
   f64 created;                  // 8
   session_version_t session_version;    // 2
   u16 tenant_idx;               // 2

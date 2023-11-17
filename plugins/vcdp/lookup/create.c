@@ -32,10 +32,13 @@ VCDP_SERVICE_DECLARE(drop)
 void
 vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps)
 {
-  if (proto == IP_PROTOCOL_TCP)
-    clib_memcpy_fast(bitmaps, tenant->tcp_bitmaps, sizeof(tenant->tcp_bitmaps));
-  else
-    clib_memcpy_fast(bitmaps, tenant->bitmaps, sizeof(tenant->bitmaps));
+  if (proto == IP_PROTOCOL_TCP) {
+    bitmaps[VCDP_FLOW_FORWARD] = tenant->tcp_bitmaps[VCDP_FLOW_FORWARD];
+    bitmaps[VCDP_FLOW_REVERSE] = tenant->tcp_bitmaps[VCDP_FLOW_REVERSE];
+  } else {
+    bitmaps[VCDP_FLOW_FORWARD] = tenant->bitmaps[VCDP_FLOW_FORWARD];
+    bitmaps[VCDP_FLOW_REVERSE] = tenant->bitmaps[VCDP_FLOW_REVERSE];
+  }
 }
 
 //
