@@ -70,30 +70,28 @@ class TestVCDPPortForwarding(VppTestCase):
 
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
-        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'},
-                            {'data': "vcdp-nat-early-rewrite"}, {'data':'vcdp-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': "vcdp-nat-late-rewrite"},
-                            {'data': 'vcdp-output'}]
+        forward_services = 'vcdp-l4-lifecycle vcdp-tcp-mss vcdp-nat-early-rewrite vcdp-output'
+        reverse_services = 'vcdp-l4-lifecycle vcdp-nat-late-rewrite vcdp-output'
         # outside_services = [{'data': 'vcdp-bypass'}]
-        miss_services = [{'data': 'vcdp-nat-port-forwarding'}, {'data': 'vcdp-drop'}]
+        miss_services = 'vcdp-nat-port-forwarding vcdp-drop'
 
-        portforwarding_services = [{'data': 'vcdp-nat-early-rewrite'}, {'data': 'vcdp-output'},]
-        portforwarding_reverse_services = [{'data': 'vcdp-nat-late-rewrite'}, {'data': 'vcdp-output'},]
+        portforwarding_services = 'vcdp-nat-early-rewrite vcdp-output'
+        portforwarding_reverse_services = 'vcdp-nat-late-rewrite vcdp-output'
 
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
-                                    n_services=len(forward_services), services=forward_services)
+                                    services=forward_services)
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
-                                    n_services=len(reverse_services), services=reverse_services)
+                                    services=reverse_services)
         # cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_FORWARD,
         #                             n_services=len(outside_services), services=outside_services)
         cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-                                    n_services=len(miss_services), services=miss_services)
+                                    services=miss_services)
 
         # Service chain template for port-forwarding
         cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
-                                    n_services=len(portforwarding_services), services=portforwarding_services)
+                                    services=portforwarding_services)
         cls.vapi.vcdp_set_services(tenant_id=portforwarding_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
-                                    n_services=len(portforwarding_reverse_services), services=portforwarding_reverse_services)
+                                    services=portforwarding_reverse_services)
 
         # MSS clamping
         cls.vapi.vcdp_tcp_mss_enable_disable(tenant_id=tenant, ip4_mss=[mss, 0xFFFF], is_enable=True)

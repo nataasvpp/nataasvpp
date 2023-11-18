@@ -167,7 +167,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       //   ICMP chain
       // Calculate the service chain for this packet, based on direction...
       u32 nbmp = icmp_service_chain(session->bitmaps[vcdp_direction_from_flow_index(flow_index)]);
-      clib_warning("MAKING ICMP SERVICE CHAIN: %U", format_vcdp_bitmap, nbmp);
+      VCDP_DBG(5, "ICMP Service Chain: %U", format_vcdp_bitmap, nbmp);
       vcdp_buffer(b[0])->service_bitmap = sb[0] = nbmp;
 
       /* The tenant of the buffer is the tenant of the session */

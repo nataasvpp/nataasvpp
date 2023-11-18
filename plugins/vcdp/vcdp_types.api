@@ -22,11 +22,6 @@ enum vcdp_session_type : u8
   VCDP_API_SESSION_TYPE_IP4 = 0,
 };
 
-typedef vcdp_service_name
-{
-  string data[32];
-};
-
 typedef vcdp_session_key
 {
   u32 context_id;

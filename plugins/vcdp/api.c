@@ -29,30 +29,53 @@ vl_api_vcdp_tenant_add_del_t_handler(vl_api_vcdp_tenant_add_del_t *mp)
   REPLY_MACRO_END(VL_API_VCDP_TENANT_ADD_DEL_REPLY);
 }
 
+
+  // for (uword i = 0; i < mp->n_services; i++) {
+  //   char *cstring = (char *) mp->services[i].data;
+  //   unformat_input_t tmp;
+  //   unformat_init_string(&tmp, cstring, strnlen(cstring, sizeof(mp->services[0].data)));
+  //   rv = unformat_user(&tmp, unformat_vcdp_service, &idx);
+  //   unformat_free(&tmp);
+  //   if (!rv) {
+  //     rv = -1;
+  //     goto fail;
+  //   }
+  //   bitmap |= (1 << idx);
+  // }
+
+uword
+unformat_service_names(unformat_input_t *input, va_list *va)
+{
+  u32 *bitmap = va_arg(*va, u32 *);
+  u32 idx = 0;
+  while (unformat_check_input(input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(input, "%U", unformat_vcdp_service, &idx))
+      *bitmap |= (1 << idx);
+    else
+      goto error;
+  }
+  return 1;
+error:
+  return 0;
+}
+
 static void
 vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
-  u32 idx = 0;
   int rv;
-  for (uword i = 0; i < mp->n_services; i++) {
-    char *cstring = (char *) mp->services[i].data;
-    unformat_input_t tmp;
-    unformat_init_string(&tmp, cstring, strnlen(cstring, sizeof(mp->services[0].data)));
-    rv = unformat_user(&tmp, unformat_vcdp_service, &idx);
-    unformat_free(&tmp);
-    if (!rv) {
-      rv = -1;
-      goto fail;
-    }
-    bitmap |= (1 << idx);
-  }
+
+  unformat_input_t input;
+  unformat_init_string (&input, (char *)mp->services.buf, vl_api_string_len(&mp->services));
+  if (!unformat_user(&input, unformat_service_names, &bitmap))
+    goto fail;
   clib_error_t *err = vcdp_set_services(vcdp, tenant_id, bitmap, mp->dir);
   vl_api_vcdp_set_services_reply_t *rmp;
   rv = err ? -1 : 0;
 fail:
+  unformat_free(&input);
   REPLY_MACRO_END(VL_API_VCDP_SET_SERVICES_REPLY);
 }
 

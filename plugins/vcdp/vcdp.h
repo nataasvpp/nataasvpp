@@ -262,16 +262,6 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
 
 vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
-// TODO: Remove
-static_always_inline u8
-vcdp_session_n_keys(vcdp_session_t *session)
-{
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4))
-    return 2;
-  else
-    return 1;
-}
-
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);

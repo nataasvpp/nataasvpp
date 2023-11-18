@@ -22,8 +22,7 @@ autoreply autoendian define vcdp_set_services
 
   u32 tenant_id;
   vl_api_vcdp_service_chain_t dir;
-  u8 n_services;
-  vl_api_vcdp_service_name_t services[n_services];
+  string services[];
 };
 
 autoreply autoendian define vcdp_session_add

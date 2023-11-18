@@ -69,18 +69,18 @@ class TestVCDPSession(VppTestCase):
 
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
-        forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-check-lite'}, {'data': 'vcdp-tcp-mss'}, {'data':'vcdp-output'}]
-        reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-check-lite'},     {'data': 'vcdp-output'}]
-        outside_services = [{'data': 'vcdp-bypass'}]
-        miss_services = [{'data': 'vcdp-nat-slowpath'}, {'data': 'vcdp-drop'}]
+        forward_services = 'vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-tcp-mss vcdp-output'
+        reverse_services = 'vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output'
+        outside_services = 'vcdp-bypass'
+        miss_services = 'vcdp-nat-slowpath vcdp-drop'
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
-                                    n_services=len(forward_services), services=forward_services)
+                                   services=forward_services)
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
-                                    n_services=len(reverse_services), services=reverse_services)
+                                    services=reverse_services)
         cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-                                    n_services=len(miss_services), services=miss_services)
+                                    services=miss_services)
         cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
-                                    n_services=len(outside_services), services=outside_services)
+                                    services=outside_services)
 
         # MSS clamping
         cls.vapi.vcdp_tcp_mss_enable_disable(tenant_id=tenant, ip4_mss=[mss, 0xFFFF], is_enable=True)
