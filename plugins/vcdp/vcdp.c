@@ -289,6 +289,26 @@ vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx)
   return vcdp_tenant_at_index(&vcdp_main, *tenant_idx);
 }
 
+u32
+vcdp_calc_bihash_buckets (u32 n_elts)
+{
+  n_elts = n_elts / 2.5;
+  u64 lower_pow2 = 1;
+  while (lower_pow2 * 2 < n_elts)
+    {
+      lower_pow2 = 2 * lower_pow2;
+    }
+  u64 upper_pow2 = 2 * lower_pow2;
+  if ((upper_pow2 - n_elts) < (n_elts - lower_pow2))
+    {
+      if (upper_pow2 <= UINT32_MAX)
+        {
+          return upper_pow2;
+        }
+    }
+  return lower_pow2;
+}
+
 /*
  * vcdp_session_clear. Delete all sessions.
  * This requires to be called within a barrier.

@@ -9,7 +9,7 @@
 #include <vcdp/common.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
-#include "lookup_inlines.h"
+#include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/vcdp.api_enum.h>
 
 typedef struct {
