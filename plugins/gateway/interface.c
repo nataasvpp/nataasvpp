@@ -15,9 +15,9 @@
 #include "gateway.h"
 
 enum vcdp_input_next_e {
-   VCDP_GW_NEXT_LOOKUP,
-   VCDP_GW_NEXT_ICMP_ERROR,
-   VCDP_GW_N_NEXT
+  VCDP_GW_NEXT_LOOKUP,
+  VCDP_GW_NEXT_ICMP_ERROR,
+  VCDP_GW_N_NEXT
 };
 
 typedef struct {
@@ -139,7 +139,6 @@ VLIB_NODE_FN(vcdp_output_node)
   b = bufs;
 
   while (n_left > 0) {
-    vnet_feature_next_u16(next, b[0]);
 
     /*
      * If the ttl drops below 1 when forwarding, generate
@@ -151,6 +150,8 @@ VLIB_NODE_FN(vcdp_output_node)
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
       next[0] = VCDP_GW_NEXT_ICMP_ERROR;
+    } else {
+      vnet_feature_next_u16(next, b[0]);
     }
 
     b++;

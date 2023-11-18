@@ -86,6 +86,7 @@ nat_icmp_error_process_one(vlib_node_runtime_t * node, nat_rewrite_data_t *nat_r
   ip->checksum = ip4_header_checksum (ip);
 
 end_of_packet:
+// vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
   vcdp_next(b[0], to_next);
 
   return;
@@ -122,12 +123,21 @@ vcdp_nat_icmp_error_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
+    session = vcdp_session_at_index_check(ptd, session_idx);
+    if (!session) {
+      // b[0]->error = node->errors[VCDP_NAT_ICMP_ERROR_NO_SESSION];
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      vcdp_next(b[0], to_next);
+
+      goto next;
+    }
+    // TODO: Check if session is valid
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
 
     // Call fastpath process on outer and then on inner
     nat_icmp_error_process_one(node, nat_rewrites, session, to_next, b);
 
+  next:
     n_left -= 1;
     b += 1;
     to_next += 1;

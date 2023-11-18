@@ -58,7 +58,7 @@ class TestNATaaSCPE(VppTestCase):
         pool = '222.222.222.222'
         nat_id = 'cpe-nat-instance-1'
         # tenant_flags = VppEnum.vl_api_vcdp_tenant_flags_t
-        services_flags = VppEnum.vl_api_vcdp_session_direction_t
+        services_flags = VppEnum.vl_api_vcdp_service_chain_t
 
         mss = 1280
 
@@ -76,18 +76,19 @@ class TestNATaaSCPE(VppTestCase):
         # Configure services
         # cls.assertEqual(services_flags.VCDP_API_REVERSE, 1)
         forward_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-tcp-mss'},
-                            {'data': "vcdp-nat-slowpath"}, {'data':'vcdp-output'}]
+                            {'data':'vcdp-output'}]
+        # forward_services = ['vcdp-l4-lifecycle', 'vcdp-tcp-mss', "vcdp-nat-slowpath", 'vcdp-output']
         reverse_services = [{'data': 'vcdp-l4-lifecycle'}, {'data': 'vcdp-output'}]
-        miss_services = [{'data': 'vcdp-create'}]
+        miss_services = [{'data': 'vcdp-nat-slowpath'}, {'data': 'vcdp-drop'}]
 
         outside_services = [{'data': 'vcdp-bypass'}]
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_FORWARD,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(forward_services), services=forward_services)
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_REVERSE,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
                                     n_services=len(reverse_services), services=reverse_services)
-        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_MISS,
+        cls.vapi.vcdp_set_services(tenant_id=tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
                                     n_services=len(miss_services), services=miss_services)
-        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_MISS,
+        cls.vapi.vcdp_set_services(tenant_id=outside_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
                                     n_services=len(outside_services), services=outside_services)
 
 
@@ -98,7 +99,7 @@ class TestNATaaSCPE(VppTestCase):
         # Set static sessions
         static_tenant = 123
         cls.vapi.vcdp_tenant_add_del(tenant_id=static_tenant, context_id=0, is_add=True)
-        cls.vapi.vcdp_set_services(tenant_id=static_tenant, dir=services_flags.VCDP_API_FORWARD,
+        cls.vapi.vcdp_set_services(tenant_id=static_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
                                     n_services=len(outside_services), services=outside_services)
         cls.vapi.vcdp_session_add(tenant_id=static_tenant, src='0.0.0.0', dst='255.255.255.255', sport=68, dport=67, protocol=17)
 

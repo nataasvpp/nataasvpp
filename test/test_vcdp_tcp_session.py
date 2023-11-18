@@ -238,5 +238,92 @@ class TestVCDPSession(VppTestCase):
         import time
         time.sleep(10)
 
-#       0x06000000ac100102ac10020204d20050
-#       0x06000000ac100202de010101005004d2
+    def test_icmp_error_local(self):
+        # TTL==1 - inside
+        pkt = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/
+               IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4, ttl=1)/
+               ICMP(id=1234))
+        expected = (IP(src=self.pg0.local_ip4, dst=self.pg0.remote_ip4)/
+                    ICMP(type="time-exceeded", code="ttl-zero-during-transit")/
+                    pkt[IP])
+        rx = self.send_and_expect(self.pg0, [pkt], self.pg0)
+        expected[IP].ttl = rx[0][IP].ttl
+        expected[IP].id = rx[0][IP].id
+        self.validate(rx[0][IP], expected)
+
+
+        # TTL=1 against opened session
+        pkt[IP].ttl = 64
+        rx = self.send_and_expect(self.pg0, pkt, self.pg1)
+        pkt[IP].ttl = 1
+        rx = self.send_and_expect(self.pg0, pkt, self.pg0)
+        self.validate(rx[0][IP], expected)
+
+
+        # TTL=1 against opened session from outside
+        syn = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/
+               IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/
+               TCP(sport=1234, dport=80, flags='S', seq=1000))
+        rx = self.send_and_expect(self.pg0, syn, self.pg1)
+        reply = self.make_reply(rx[0])
+        reply[TCP].flags = 'SA'
+        reply[IP].ttl = 1
+        reply[IP].chksum = None
+        rx = self.send_and_expect(self.pg1, reply, self.pg1)
+        expected = (IP(src=self.pool, dst=self.pg1.remote_ip4, ttl=63, id=rx[0][IP].id)/
+                    ICMP(type="time-exceeded", code="ttl-zero-during-transit")/
+                    reply[IP])
+        self.validate(rx[0][IP], expected)
+
+
+    def test_icmp_error_out2in(self):
+        # ICMP error for established session (error from outside)
+        print('SYN')
+        syn = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/
+               IP(src=self.pg0.remote_ip4, dst=self.pg1.remote_ip4)/
+               TCP(sport=1234, dport=80, flags='S', seq=1000))
+        rx = self.send_and_expect(self.pg0, syn, self.pg1)
+        rx[0].show2()
+
+        # Error for an in2out TCP SYN packet. Matching session
+        pkt = (Ether(src=self.pg1.remote_mac, dst=self.pg1.local_mac)/
+               IP(src='8.8.8.8', dst=self.pool)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/
+               rx[0][IP])
+        print('ICMP error')
+        pkt.show2()
+        rx = self.send_and_expect(self.pg1, [pkt], self.pg0)
+
+        print('Translated ICMP error')
+        rx[0].show2()
+
+        print(self.vapi.cli("show vcdp session"))
+
+    def test_icmp_error_in2out(self):
+        # ICMP error for established session (error from inside)
+        insideif = self.pg0
+        outsideif = self.pg1
+
+        print('SYN')
+        syn = (Ether(src=insideif.remote_mac, dst=insideif.local_mac)/
+               IP(src=insideif.remote_ip4, dst=outsideif.remote_ip4)/
+               TCP(sport=1234, dport=80, flags='S', seq=1000))
+        rx = self.send_and_expect(insideif, syn, outsideif)
+        rx[0].show2()
+
+        synack = self.make_reply(rx[0])
+        synack[TCP].flags='SA'
+        rx = self.send_and_expect(outsideif, synack, insideif)
+        rx[0].show2()
+
+        # Error for an in2out TCP SYN packet. Matching session
+        pkt = (Ether(src=insideif.remote_mac, dst=insideif.local_mac)/
+               IP(src='1.1.1.1', dst=outsideif.remote_ip4)/ICMP(type="dest-unreach", code="fragmentation-needed", nexthopmtu=576)/
+               rx[0][IP])
+        print('ICMP error')
+        pkt.show2()
+        rx = self.send_and_expect(insideif, [pkt], outsideif)
+
+        print('Translated ICMP error')
+        rx[0].show2()
+
+        print(self.vapi.cli("show vcdp session"))

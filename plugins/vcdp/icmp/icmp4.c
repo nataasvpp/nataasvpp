@@ -147,7 +147,7 @@ VLIB_REGISTER_NODE(vcdp_icmp_error_node) = {
   .next_nodes =
     {
       [VCDP_ICMP_ERROR_NEXT_DROP] = "vcdp-drop",
-      [VCDP_ICMP_ERROR_NEXT_LOOKUP] = "vcdp-input",
+      [VCDP_ICMP_ERROR_NEXT_LOOKUP] = "vcdp-icmp-error-forwarding",
     },
   .format_trace = format_vcdp_icmp_error_trace,
 };

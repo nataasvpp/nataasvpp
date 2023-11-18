@@ -127,20 +127,21 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
         // DROP PACKET
       to_local[n_local] = bi[0];
       n_local++;
-      current_next++;
       b[0]->flow_id = ~0; // No session
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       vcdp_next(b[0], current_next);
+      current_next++;
       goto next;
     }
+    VCDP_DBG(5, "Looking up: %U", format_vcdp_session_key, k4);
     if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
       // DROP PACKET
       to_local[n_local] = bi[0];
       n_local++;
-      current_next++;
       b[0]->flow_id = ~0; // No session
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       vcdp_next(b[0], current_next);
+      current_next++;
       goto next;
     }
 
@@ -166,13 +167,14 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       //   ICMP chain
       // Calculate the service chain for this packet, based on direction...
       u32 nbmp = icmp_service_chain(session->bitmaps[vcdp_direction_from_flow_index(flow_index)]);
+      clib_warning("MAKING ICMP SERVICE CHAIN: %U", format_vcdp_bitmap, nbmp);
       vcdp_buffer(b[0])->service_bitmap = sb[0] = nbmp;
 
       /* The tenant of the buffer is the tenant of the session */
       vcdp_buffer(b[0])->tenant_index = session->tenant_idx;
       vcdp_next(b[0], current_next);
 
-      current_next += 1;
+      current_next++;
       n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
       session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
