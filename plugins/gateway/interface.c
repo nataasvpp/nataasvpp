@@ -17,6 +17,7 @@
 enum vcdp_input_next_e {
   VCDP_GW_NEXT_LOOKUP,
   VCDP_GW_NEXT_ICMP_ERROR,
+  VCDP_GW_NEXT_DROP,
   VCDP_GW_N_NEXT
 };
 
@@ -114,6 +115,7 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
     {
       [VCDP_GW_NEXT_LOOKUP] = "vcdp-lookup-ip4",
       [VCDP_GW_NEXT_ICMP_ERROR] = "vcdp-icmp-error",
+      [VCDP_GW_NEXT_DROP] = "error-drop",
     },
 };
 
@@ -152,6 +154,11 @@ VLIB_NODE_FN(vcdp_output_node)
       next[0] = VCDP_GW_NEXT_ICMP_ERROR;
     } else {
       vnet_feature_next_u16(next, b[0]);
+    }
+
+    if (next[0] > node->n_next_nodes) {
+      clib_warning("next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
+      next[0] = VCDP_GW_NEXT_DROP;
     }
 
     b++;
