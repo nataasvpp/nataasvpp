@@ -122,6 +122,7 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
 VNET_FEATURE_INIT(vcdp_input_feat, static) = {
   .arc_name = "ip4-unicast",
   .node_name = "vcdp-input",
+  .runs_after = VNET_FEATURES("ip4-dhcp-client-detect"),
 };
 
 VNET_FEATURE_INIT(vcdp_output_feat, static) = {
