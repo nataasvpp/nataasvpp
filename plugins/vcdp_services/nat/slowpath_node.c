@@ -101,17 +101,17 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
 {
   vcdp_session_ip4_key_t new_key = {
     // .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
-    .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].sport,
-    .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto,
-    .src = session->keys[VCDP_SESSION_KEY_PRIMARY].dst,
-    .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].dport,
+    .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.sport,
+    .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.proto,
+    .src = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.dst,
+    .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.dport,
     .context_id = instance->context_id,
   };
   u32 fib_index = 0;
   u8 proto = session->proto;
   u8 n_retries = 0;
-  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].src;
-  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].sport;
+  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.src;
+  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.sport;
 
   u64 h;
   u32 pseudo_flow_index;
@@ -129,7 +129,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
 
   while ((++n_retries) < nm->port_retries &&
-         vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
+         vcdp_session_try_add_secondary_ip4_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
     /* Use h to try a different port */
     u32 h2 = h;
     u64 reduced = h2;

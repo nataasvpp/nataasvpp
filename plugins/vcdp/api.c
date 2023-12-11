@@ -175,8 +175,8 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
     rmp->remaining_time = session->timer.next_expiration - now;
     rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
     rmp->reverse_bitmap = session->bitmaps[VCDP_FLOW_REVERSE];
-    vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
-    vcdp_session_ip4_key_encode(&session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
+    vcdp_session_key_encode(VCDP_SESSION_KEY_IP4, &session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
+    vcdp_session_key_encode(VCDP_SESSION_KEY_IP4, &session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
   }}));
 }
 

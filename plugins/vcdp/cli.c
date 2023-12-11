@@ -200,7 +200,6 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         remaining_time = 0;
 
       u64 session_net = clib_host_to_net_u64(session->session_id);
-      vcdp_session_ip4_key_t *k1, *k2;
       if (detail) {
         vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
       } else {
@@ -213,12 +212,17 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
                           tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
                           format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
 
+
+        vlib_cli_output(vm, "  %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
+        vlib_cli_output(vm, "  %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
+#if 0
         k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
         k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
         vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
                         clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
         vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
                         clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
+#endif
       }
     }
   }

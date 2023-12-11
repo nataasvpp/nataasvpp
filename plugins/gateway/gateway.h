@@ -21,5 +21,6 @@ typedef struct {
 extern gw_main_t gateway_main;
 
 int gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool output_arc, bool is_enable);
+int gw_prefix_input_enable_disable(ip_prefix_t *prefix, u32 tenant_id, bool is_enable);
 
 #endif /* included_gateway_h */

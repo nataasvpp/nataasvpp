@@ -32,12 +32,27 @@ format_vcdp_session_type(u8 *s, va_list *args)
 u8 *
 format_vcdp_session_key(u8 *s, va_list *args)
 {
-  vcdp_session_ip4_key_t *k = va_arg(*args, vcdp_session_ip4_key_t *);
-  // Copy out the bitfields.
-  u32 context_id = k->context_id;
-  int proto = k->proto;
-  s = format(s, "%d: %U:%d %U %U:%d", context_id, format_ip4_address, &k->src, clib_net_to_host_u16(k->sport),
-             format_ip_protocol, proto, format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
+  vcdp_session_key_flag_t flags = va_arg(*args, vcdp_session_key_flag_t);
+  vcdp_session_key_t *key = va_arg(*args, vcdp_session_key_t *);
+
+  if (flags & VCDP_SESSION_KEY_IP4) {
+    vcdp_session_ip4_key_t *k = &key->ip4;
+//    s = format(s, "%U ", format_vcdp_session_type, k->session_type);
+    u32 context_id = k->context_id;
+    int proto = k->proto;
+    s = format(s, "%d: %U:%d %U %U:%d", context_id, format_ip4_address, &k->src, clib_net_to_host_u16(k->sport),
+               format_ip_protocol, proto, format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
+    return s;
+  }
+  if (flags & VCDP_SESSION_KEY_IP6) {
+    vcdp_session_ip6_key_t *k = &key->ip6;
+//    s = format(s, "%U ", format_vcdp_session_type, k->session_type);
+    u32 context_id = k->context_id;
+    int proto = k->proto;
+    s = format(s, "%d: %U:%d %U %U:%d", context_id, format_ip6_address, &k->src, clib_net_to_host_u16(k->sport),
+               format_ip_protocol, proto, format_ip6_address, &k->dst, clib_net_to_host_u16(k->dport));
+    return s;
+  }
   return s;
 }
 
@@ -64,7 +79,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   f64 remaining_time = session->timer.next_expiration - now;
   u64 session_net = clib_host_to_net_u64(session->session_id);
   uword thread_index = ptd - vcdp_main.per_thread_data;
-  vcdp_session_ip4_key_t *skey;
+  vcdp_session_key_t *skey;
 
   /* TODO: deal with secondary keys */
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));

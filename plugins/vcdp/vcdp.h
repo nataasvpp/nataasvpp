@@ -12,6 +12,7 @@
 #include <vppinfra/error.h>
 #include <vppinfra/elog.h>
 
+#include <vppinfra/bihash_40_8.h>
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_8_8.h>
 
@@ -45,6 +46,7 @@
 
 typedef enum {
   VCDP_SESSION_TYPE_IP4,
+  VCDP_SESSION_TYPE_IP6,
   /* last */
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
@@ -77,17 +79,26 @@ typedef enum {
   VCDP_SERVICE_CHAIN_N = 3,
 } vcdp_service_chain_t;
 
-enum { VCDP_SESSION_KEY_PRIMARY, VCDP_SESSION_KEY_SECONDARY, VCDP_SESSION_N_KEY };
-/* Flags to determine key validity in the session */
-#define foreach_vcdp_session_key_flag                                                                                  \
-  _(PRIMARY_VALID_IP4, 0x1, "primary-valid-ip4")                                                                       \
-  _(SECONDARY_VALID_IP4, 0x4, "secondary-valid-ip4")
+typedef enum {
+  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 = 1 << 0,
+  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 = 1 << 1,
+  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 = 1 << 2,
+  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 = 1 << 3,
+} vcdp_session_key_flag_t;
+
+#define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
+#define VCDP_SESSION_KEY_IP6 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
 
 enum {
-#define _(x, n, s) VCDP_SESSION_KEY_FLAG_##x = n,
-  foreach_vcdp_session_key_flag
-#undef _
+  VCDP_SESSION_KEY_PRIMARY = 0,
+  VCDP_SESSION_KEY_SECONDARY = 1,
+  VCDP_SESSION_N_KEY = 2,
 };
+
+// typedef enum {
+//   VCDP_SESSION_KEY_IP4 = 0,
+//   VCDP_SESSION_KEY_IP6 = 1,
+// } vcdp_session_key_type_t;
 
 typedef union {
   struct {
@@ -98,15 +109,30 @@ typedef union {
   };
   u64 as_u64[2];
 } __clib_packed vcdp_session_ip4_key_t;
-STATIC_ASSERT_SIZEOF(vcdp_session_ip4_key_t, 16);
+_Static_assert(sizeof(vcdp_session_ip4_key_t) == 16, "Size of vcdp_session_ip4_key_t should be 16");
 
+typedef union {
+  struct {
+    u8 proto : 8;
+    u32 context_id : 24;
+    ip6_address_t src, dst;
+    u16 sport, dport;
+  };
+  u64 as_u64[5];
+} __clib_packed vcdp_session_ip6_key_t;
+_Static_assert(sizeof(vcdp_session_ip6_key_t) == 40, "Size of vcdp_session_ip6_key_t should be 40");
+
+typedef union {
+  vcdp_session_ip4_key_t ip4;
+  vcdp_session_ip6_key_t ip6;
+} vcdp_session_key_t;
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
   u64 session_id;               // 8
   vcdp_session_timer_t timer;   // 12
   u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
-  vcdp_session_ip4_key_t keys[VCDP_SESSION_N_KEY]; //32
+  vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 72
 
   u64 bytes[VCDP_FLOW_F_B_N];   // 16
   u32 pkts[VCDP_FLOW_F_B_N];    // 8
@@ -116,9 +142,9 @@ typedef struct {
   u8 state; /* see vcdp_session_state_t */ // 1
   u8 proto;                     // 1 TODO: Needed? Could use protocol from key instead
   u8 type; /* see vcdp_session_type_t */ // 1
-  u8 key_flags;                 // 1
+  u8 key_flags;                 // vcdp_session_key_flag_t
 } vcdp_session_t; /* TODO: optimise mem layout */
-STATIC_ASSERT_SIZEOF(vcdp_session_t, 128);
+//_Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
 
 typedef struct {
   vcdp_session_t *sessions; /* fixed pool */
@@ -144,6 +170,9 @@ typedef struct {
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_16_8_t table4;
+#if VCDP_IP6_ENABLED
+  clib_bihash_40_8_t table6;
+#endif
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
   u32 frame_queue_icmp_index;
@@ -275,8 +304,8 @@ vcdp_session_t *vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *p
 vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
                                        u16 dport);
 void vcdp_session_clear(void);
-int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                       u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h);
+int vcdp_session_try_add_secondary_ip4_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
+                                           u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h);
 void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
 void vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, u32 session_index);

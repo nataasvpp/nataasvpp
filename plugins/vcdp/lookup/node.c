@@ -46,9 +46,11 @@ icmp_is_error(vlib_buffer_t *b)
   return false;
 }
 
+int vcdp_lookup_with_hash(u64 hash, clib_bihash_kv_16_8_t *kv);
+
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -77,7 +79,10 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-    vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
+    if (is_ip6)
+      vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
+    else
+      vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
     h += 1;
     k4 += 1;
     b += 1;
@@ -96,7 +101,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
     b[0]->error = 0;
     clib_bihash_kv_16_8_t kv;
     clib_memcpy_fast(&kv, k4, 16);
-    if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
+    if (vcdp_lookup_with_hash(h[0], &kv)) {
+      // if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
       if (icmp_is_error(b[0])) {
@@ -230,7 +236,13 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame);
+   return vcdp_lookup_inline(vm, node, frame, false);
+}
+
+VLIB_NODE_FN(vcdp_lookup_ip6_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, true);
 }
 
 /*
@@ -410,6 +422,15 @@ VLIB_REGISTER_NODE (vcdp_session_expire_node) =
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .name = "vcdp-lookup-ip4",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_LOOKUP_N_ERROR,
+  .error_counters = vcdp_lookup_error_counters,
+};
+
+VLIB_REGISTER_NODE(vcdp_lookup_ip6_node) = {
+  .name = "vcdp-lookup-ip6",
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_lookup_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,

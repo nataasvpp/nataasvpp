@@ -8,6 +8,7 @@
 #include <vnet/vnet.h>
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
+#include "vcdp_dpo.h"
 
 gw_main_t gateway_main;
 
@@ -32,3 +33,25 @@ gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool output_ar
   else
     return vnet_feature_enable_disable("ip4-unicast", "vcdp-input", sw_if_index, is_enable, 0, 0);
 }
+
+int
+gw_prefix_input_enable_disable(ip_prefix_t *prefix, u32 tenant_id, bool is_enable)
+{
+  // gw_main_t *gm = &gateway_main;
+  // u16 *config;
+  u16 tenant_idx;
+
+  if (is_enable) {
+    vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
+    if (!tenant)
+      return -1;
+
+    // vec_validate(gm->tenant_idx_by_prefix, prefix->len);
+    // config = gm->tenant_idx_by_prefix + prefix->len;
+    // config[0] = tenant_idx;
+
+    vcdp_dpo_entry(&prefix->addr.ip.ip6, prefix->len, 0);
+  }
+  return 0;
+}
+

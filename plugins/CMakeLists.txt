@@ -14,8 +14,8 @@ add_vpp_plugin(vcdp
   vcdp/plugin.c
   vcdp/cli.c
   vcdp/api.c
-  vcdp_services/tcp-check/cli.c
-  vcdp_services/tcp-check/api.c
+  # vcdp_services/tcp-check/cli.c
+  # vcdp_services/tcp-check/api.c
   vcdp_services/nat/cli.c
   vcdp_services/nat/api.c
   gateway/cli.c
@@ -35,9 +35,9 @@ add_vpp_plugin(vcdp
   vcdp/icmp/icmp4.c
   vcdp/icmp/node.c
 
-  vcdp_services/tcp-check/node.c
-  vcdp_services/tcp-check/tcp_check.c
-  vcdp_services/tcp-check/format.c
+  # vcdp_services/tcp-check/node.c
+  # vcdp_services/tcp-check/tcp_check.c
+  # vcdp_services/tcp-check/format.c
 
   vcdp_services/tcp-check-lite/api.c
   vcdp_services/tcp-check-lite/node.c
@@ -56,6 +56,7 @@ add_vpp_plugin(vcdp
 
   gateway/gateway.c
   gateway/interface.c
+  gateway/vcdp_dpo.c
   gateway/tunnel/tunnel.c
   gateway/tunnel/node.c
 

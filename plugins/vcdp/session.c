@@ -229,8 +229,8 @@ vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
 }
 
 int
-vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
+vcdp_session_try_add_secondary_ip4_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
+                                       u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h)
 {
   int rv;
   clib_bihash_kv_16_8_t kv;
@@ -240,12 +240,6 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
 
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
 
-#if 0
-  // Ensure we don't change original key
-  // TODO: Should not be needed!!!
-  vcdp_session_ip4_key_t _k = *orgkey, *key = &_k;
-  vcdp_session_key_swap(key);
-#endif
   kv.key[0] = key->as_u64[0];
   kv.key[1] = key->as_u64[1];
   kv.value = value;
@@ -253,9 +247,8 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
   if ((rv = vcdp_bihash_add_del_inline_with_hash_16_8(&vcdp->table4, &kv, *h, 2)) == 0) {
     session_index = vcdp_session_from_flow_index(pseudo_flow_index);
     session = vcdp_session_at_index(ptd, session_index);
-    session->keys[VCDP_SESSION_KEY_SECONDARY] = *key;
+    session->keys[VCDP_SESSION_KEY_SECONDARY].ip4 = *key;
     session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
   }
   return rv;
 }
-
