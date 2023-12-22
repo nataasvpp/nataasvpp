@@ -137,6 +137,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   u64 session_id;
   bool session_id_set = false, detail = false;
   u32 session_idx = ~0;
+  u8 *s = 0;
 
   if (unformat_user(input, unformat_line_input, line_input)) {
     while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
@@ -189,7 +190,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     if (vec_len(vcdp->per_thread_data) > 1)
       vlib_cli_output(vm, "Thread #%d:", thread_index);
-    vlib_cli_output(vm, "session id         tenant  index type proto      state TTL(s)");
+    vlib_cli_output(vm, "session id         tenant  index  type proto        state TTL(s)");
     pool_foreach (session, ptd->sessions) {
       tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
@@ -203,26 +204,21 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       if (detail) {
         vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
       } else {
-        if (session->state == VCDP_SESSION_STATE_STATIC)
-          vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
-                          tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                          format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
-        else
-          vlib_cli_output(vm, "0x%U %6d %6d %4U %5U %10U %6f", format_hex_bytes, &session_net, sizeof(session_net),
-                          tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                          format_ip_protocol, session->proto, format_vcdp_session_state, session->state, remaining_time);
+        // if (session->state == VCDP_SESSION_STATE_STATIC)
+        //   vlib_cli_output(vm, "0x%U %6d %6d %5U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
+        //                   tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+        //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
 
+        u8 proto = session->proto;
+        s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
+                       tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                       format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
+                       format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
+        if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
+          s = format(s, "%U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
-        vlib_cli_output(vm, "  %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
-        vlib_cli_output(vm, "  %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
-#if 0
-        k1 = &session->keys[VCDP_SESSION_KEY_PRIMARY];
-        k2 = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-        vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k1->context_id, format_ip4_address, &k1->src,
-                        clib_net_to_host_u16(k1->sport), format_ip4_address, &k1->dst, clib_net_to_host_u16(k1->dport));
-        vlib_cli_output(vm, "%4d %15U:%u -> %15U:%u", k2->context_id, format_ip4_address, &k2->src,
-                        clib_net_to_host_u16(k2->sport), format_ip4_address, &k2->dst, clib_net_to_host_u16(k2->dport));
-#endif
+        vlib_cli_output(vm, "%s", s);
+        vec_reset_length(s);
       }
     }
   }
@@ -401,6 +397,7 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   ip_address_t src, dst;
   u8 proto;
   u32 tenant_id = ~0;
+  u32 context_id = 0; // TODO: support context_id
 
   /* Get a line of input. */
   if (!unformat_user(input, unformat_line_input, line_input))
@@ -428,18 +425,28 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     goto done;
   }
 
-  vcdp_session_ip4_key_t k = {
-    .context_id = 0,
-    .src = src.ip.ip4.as_u32,
-    .dst = dst.ip.ip4.as_u32,
-    .sport = clib_host_to_net_u16(sport),
-    .dport = clib_host_to_net_u16(dport),
-    .proto = proto,
-  };
+  vcdp_session_key_t k;
+  if (src.version ==  AF_IP6) {
+    k.ip6.context_id = context_id;
+    k.ip6.src = src.ip.ip6;
+    k.ip6.dst = dst.ip.ip6;
+    k.ip6.sport = clib_host_to_net_u16(sport);
+    k.ip6.dport = clib_host_to_net_u16(dport);
+    k.ip6.proto = proto;
+    k.is_ip6 = true;
+  } else {
+    k.ip4.context_id = context_id;
+    k.ip4.src = src.ip.ip4.as_u32;
+    k.ip4.dst = dst.ip.ip4.as_u32;
+    k.ip4.sport = clib_host_to_net_u16(sport);
+    k.ip4.dport = clib_host_to_net_u16(dport);
+    k.ip4.proto = proto;
+    k.is_ip6 = false;
+  }
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
   u32 flow_index;
-  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, true, &flow_index);
+  vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, true, &flow_index);
   if (!session)
     error = clib_error_return(0, "Creating static session failed");
 
@@ -453,3 +460,120 @@ VLIB_CLI_COMMAND(set_vcdp_session_command, static) = {
   .short_help = "set vcdp session tenant <tenant> <ipaddr:port> <protocol> <ipaddr:port>",
   .function = set_vcdp_session_command_fn,
 };
+
+#if 0
+static int
+vcdp_session_table_walk_ip6_cb (clib_bihash_kv_40_8_t *kvp, void *arg)
+{
+  clib_warning("vcdp_session_table_walk_ip6_cb %llx", kvp->value);
+
+  vcdp_session_ip6_key_t *k = (vcdp_session_ip6_key_t *)&kvp->key;
+  clib_warning("KEY %U", format_vcdp_session_ip6_key, k);
+  return BIHASH_WALK_CONTINUE;
+}
+
+static clib_error_t *
+test_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  unformat_input_t _line_input, *line_input = &_line_input;
+  clib_error_t *error = 0;
+  u32 dport, sport;
+  ip_address_t src, dst;
+  u8 proto;
+  u32 tenant_id = ~0;
+  u32 context_id = 0; // TODO: support context_id
+
+  /* Get a line of input. */
+  if (!unformat_user(input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip_address, &src, &sport,
+                 unformat_ip_protocol, &proto, unformat_ip_address, &dst, &dport)) {
+    } else if (unformat(line_input, "tenant %d [%U]:%d %U [%U]:%d", &tenant_id, unformat_ip_address, &src, &sport,
+                        unformat_ip_protocol, &proto, unformat_ip_address, &dst, &dport)) {
+    } else {
+      error = clib_error_return(0, "unknown input `%U'", format_unformat_error, line_input);
+      goto done;
+    }
+  }
+
+  if (sport == 0 || sport > 65535) {
+    error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
+    goto done;
+  }
+  if (dport == 0 || dport > 65535) {
+    error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
+    goto done;
+  }
+
+  if (tenant_id == ~0) {
+    error = clib_error_return(0, "Specify tenant");
+    goto done;
+  }
+
+  bool is_ip6 = src.version == AF_IP6;
+  vcdp_session_key_t k;
+  if (is_ip6) {
+    k.ip6.context_id = context_id;
+    k.ip6.src = src.ip.ip6;
+    k.ip6.dst = dst.ip.ip6;
+    k.ip6.sport = clib_host_to_net_u16(sport);
+    k.ip6.dport = clib_host_to_net_u16(dport);
+    k.ip6.proto = proto;
+    k.is_ip6 = true;
+  } else {
+    k.ip4.context_id = context_id;
+    k.ip4.src = src.ip.ip4.as_u32;
+    k.ip4.dst = dst.ip.ip4.as_u32;
+    k.ip4.sport = clib_host_to_net_u16(sport);
+    k.ip4.dport = clib_host_to_net_u16(dport);
+    k.ip4.proto = proto;
+    k.is_ip6 = false;
+  }
+
+  clib_warning("Adding a session");
+  u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
+  u32 flow_index;
+  vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, true, &flow_index);
+  if (!session)
+    error = clib_error_return(0, "Creating static session failed");
+  session->type = is_ip6 ? VCDP_SESSION_TYPE_IP6 : VCDP_SESSION_TYPE_IP4;
+
+  u64 v;
+  int rv = vcdp_lookup(&k, is_ip6, &v);
+  clib_warning("Looking up the same session %d %llx", rv, v);
+
+  clib_bihash_kv_40_8_t kv;
+  kv.key[0] = k.ip6.as_u64[0];
+  kv.key[1] = k.ip6.as_u64[1];
+  kv.key[2] = k.ip6.as_u64[2];
+  kv.key[3] = k.ip6.as_u64[3];
+  kv.key[4] = k.ip6.as_u64[4];
+  kv.value = 123;
+
+  vcdp_main_t *vcdp = &vcdp_main;
+
+
+  kv.value = 0x12345678;
+  rv = clib_bihash_add_del_40_8(&vcdp->table6, &kv, 2);
+  clib_warning("adding key to table %d", rv);
+
+  clib_bihash_kv_40_8_t kv2 = {0};
+  rv = clib_bihash_search_40_8(&vcdp_main.table6, &kv, &kv2);
+  clib_warning("Looking up the same session %d %llx", rv, kv2.value);
+
+
+  clib_bihash_foreach_key_value_pair_40_8 (&vcdp->table6, vcdp_session_table_walk_ip6_cb, 0);
+
+done:
+  unformat_free(line_input);
+  return error;
+}
+
+VLIB_CLI_COMMAND(test_vcdp_session_command, static) = {
+  .path = "test vcdp session",
+  .short_help = "test vcdp session",
+  .function = test_vcdp_session_command_fn,
+};
+#endif

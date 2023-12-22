@@ -36,7 +36,8 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "vcdp_funcs.h": "c"
+        "vcdp_funcs.h": "c",
+        "bihash_40_8.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
@@ -44,7 +45,7 @@
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
     "[python]": {
-        "editor.defaultFormatter": "ms-python.python"
+        "editor.defaultFormatter": null
     },
     "python.formatting.provider": "none",
     "workbench.colorTheme": "Solarized Light",

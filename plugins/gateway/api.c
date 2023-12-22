@@ -59,6 +59,20 @@ vl_api_vcdp_gateway_enable_disable_t_handler(vl_api_vcdp_gateway_enable_disable_
 }
 
 static void
+vl_api_vcdp_gateway_prefix_enable_disable_t_handler(vl_api_vcdp_gateway_prefix_enable_disable_t *mp)
+{
+  gw_main_t *gw = &gateway_main;
+  vl_api_vcdp_gateway_prefix_enable_disable_reply_t *rmp;
+  int rv;
+  ip_prefix_t prefix;
+  ip_prefix_decode2(&mp->prefix, &prefix);
+
+  rv = gw_prefix_input_enable_disable(&prefix, mp->tenant_id, mp->is_enable);
+
+  REPLY_MACRO_END(VL_API_VCDP_GATEWAY_PREFIX_ENABLE_DISABLE_REPLY);
+}
+
+static void
 vl_api_vcdp_gateway_tunnel_enable_disable_t_handler(vl_api_vcdp_gateway_tunnel_enable_disable_t *mp)
 {
   gw_main_t *gw = &gateway_main;

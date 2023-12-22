@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
 
-#define _GNU_SOURCE
-#include <sys/mman.h>
+// #define _GNU_SOURCE
+// #include <sys/mman.h>
 
-#include <vcdp/vcdp.h>
+#include <vppinfra/bihash_8_8.h>
+#include <vppinfra/bihash_template.h>
+#include <vppinfra/bihash_template.c>
+
+#undef BIHASH_TYPE
+#undef __included_bihash_template_h__
+#include <vppinfra/bihash_16_8.h>
+#include <vppinfra/bihash_template.h>
+#include <vppinfra/bihash_template.c>
+
+#undef BIHASH_TYPE
+#undef __included_bihash_template_h__
+#include <vppinfra/bihash_40_8.h>
+#include <vppinfra/bihash_template.h>
+#include <vppinfra/bihash_template.c>
+
+
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/service.h>
 #include <vnet/plugin/plugin.h>
@@ -15,13 +31,9 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 
-#include <vppinfra/bihash_8_8.h>
-#include <vppinfra/bihash_template.h>
-#include <vppinfra/bihash_template.c>
 
-#include <vppinfra/bihash_16_8.h>
-#include <vppinfra/bihash_template.h>
-#include <vppinfra/bihash_template.c>
+
+#include <vcdp/vcdp.h>
 
 #define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK(drop)
 
@@ -63,6 +75,7 @@ vcdp_init(vlib_main_t *vm)
 
   vlib_call_init_function(vm, vcdp_service_init);
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
+  vcdp_service_next_indices_init(vm, vcdp_lookup_ip6_node.index);
   vcdp_service_next_indices_init(vm, vcdp_handoff_node.index);
 
   time_t epoch = time(NULL);
@@ -88,6 +101,7 @@ vcdp_init(vlib_main_t *vm)
   u32 tenant_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tenants);
 
   clib_bihash_init_16_8(&vcdp->table4, "vcdp ipv4 session table", session_buckets, 0);
+  clib_bihash_init_40_8(&vcdp->table6, "vcdp ipv6 session table", session_buckets, 0);
   clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", tenant_buckets, 0);
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 
@@ -352,10 +366,10 @@ vcdp_config(vlib_main_t *vm, unformat_input_t *input)
   u32 sessions = 0;
 
   /* Set defaults */
-  vcdp_cfg_main.no_nat_instances = 1 << 10; // 1024
-  vcdp_cfg_main.no_sessions_per_thread = 1 << 20; // 1M
+  vcdp_cfg_main.no_nat_instances = 16;            // 1 << 10; // 1024
+  vcdp_cfg_main.no_sessions_per_thread = 128000;    //1 << 20;                            // 1M
   vcdp_cfg_main.no_tenants = 1 << 10; // 1024
-  vcdp_cfg_main.no_tunnels = 1 << 20; // 1M;
+  vcdp_cfg_main.no_tunnels = 0; //1 << 20; // 1M;
 
   while (unformat_check_input(input) != UNFORMAT_END_OF_INPUT) {
     if (unformat(input, "tenants %d", &tenants))

@@ -35,8 +35,17 @@ typedef struct {
 VCDP_SERVICE_DECLARE(drop)
 
 static bool
-icmp_is_error(vlib_buffer_t *b)
+icmp_is_error(vlib_buffer_t *b, bool is_ip6)
 {
+  if (is_ip6) {
+    ip6_header_t *ip = vcdp_get_ip6_header(b);
+    if (ip->protocol == IP_PROTOCOL_ICMP6) {
+      icmp46_header_t *icmp = (icmp46_header_t *) ip6_next_header(ip);
+      if (icmp->type != ICMP6_echo_request && icmp->type != ICMP6_echo_reply)
+        return true;
+    }
+    return false;
+  }
   ip4_header_t *ip = vcdp_get_ip4_header(b);
   if (ip->protocol == IP_PROTOCOL_ICMP) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
@@ -46,7 +55,36 @@ icmp_is_error(vlib_buffer_t *b)
   return false;
 }
 
-int vcdp_lookup_with_hash(u64 hash, clib_bihash_kv_16_8_t *kv);
+int
+vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  if (is_ip6) {
+    clib_bihash_kv_40_8_t kv;
+    clib_memcpy_fast(&kv, &k->ip6, 40);
+    kv.value = 0;
+    int rv = clib_bihash_search_inline_with_hash_40_8(&vcdp->table6, hash, &kv);
+    *v = kv.value;
+    return rv;
+  } else {
+    clib_bihash_kv_16_8_t kv;
+    clib_memcpy_fast(&kv, &k->ip4, 16);
+    int rv = clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, hash, &kv);
+    *v = kv.value;
+    return rv;
+  }
+}
+
+int
+vcdp_lookup (vcdp_session_key_t *k, bool is_ip6, u64 *v)
+{
+  u64 h;
+  if (k->is_ip6)
+    h = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (&k->ip6.as_u64));
+  else
+    h = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (&k->ip4.as_u64));
+  return vcdp_lookup_with_hash(h, k, is_ip6, v);
+}
 
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
 static_always_inline uword
@@ -64,7 +102,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
   u16 local_next_indices[VLIB_FRAME_SIZE];
-  vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4= keys;
+  vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k= keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   f64 time_now = vlib_time_now(vm);
   bool hits[VLIB_FRAME_SIZE], *hit = hits;
@@ -79,18 +117,15 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-    if (is_ip6)
-      vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
-    else
-      vcdp_calc_key_v4(b[0], vcdp_buffer(b[0])->context_id, k4, h);
+      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
     h += 1;
-    k4 += 1;
+    k += 1;
     b += 1;
     n_left -= 1;
   }
 
   h = hashes;
-  k4 = keys;
+  k = keys;
   b = bufs;
   u16 *current_next = local_next_indices;
   bi = from;
@@ -99,13 +134,11 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   while (n_left) {
   again:
     b[0]->error = 0;
-    clib_bihash_kv_16_8_t kv;
-    clib_memcpy_fast(&kv, k4, 16);
-    if (vcdp_lookup_with_hash(h[0], &kv)) {
-      // if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
+    u64 value;
+    if (vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
-      if (icmp_is_error(b[0])) {
+      if (icmp_is_error(b[0], is_ip6)) {
         vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain
@@ -124,10 +157,10 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
     hit[0] = true;
     // Figure out if this is local or remote thread
-    u32 flow_thread_index = vcdp_thread_index_from_lookup(kv.value);
+    u32 flow_thread_index = vcdp_thread_index_from_lookup(value);
     if (flow_thread_index == thread_index) {
       /* known flow which belongs to this thread */
-      u32 flow_index = kv.value & (~(u32) 0);
+      u32 flow_index = value & (~(u32) 0);
       to_local[n_local] = bi[0];
 
       session_index = vcdp_session_from_flow_index(flow_index);
@@ -135,9 +168,10 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       b[0]->flow_id = flow_index;
 
       session = vcdp_session_at_index(ptd, session_index);
+
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
+        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k,
                      session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
@@ -162,13 +196,13 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       n_remote++;
     }
 
-    b[0]->flow_id = kv.value & (~(u32) 0);
+    b[0]->flow_id = value & (~(u32) 0);
 
   next:
     b += 1;
     n_left -= 1;
     h += 1;
-    k4 += 1;
+    k += 1;
     bi += 1;
     hit += 1;
     si += 1;

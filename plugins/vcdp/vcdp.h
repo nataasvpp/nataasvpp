@@ -12,9 +12,9 @@
 #include <vppinfra/error.h>
 #include <vppinfra/elog.h>
 
-#include <vppinfra/bihash_40_8.h>
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_8_8.h>
+#include <vppinfra/bihash_40_8.h>
 
 #include <vppinfra/tw_timer_1t_3w_1024sl_ov.h>
 #include <vppinfra/format_table.h>
@@ -44,9 +44,12 @@
  * Reverse direction always uses secondary key.
  */
 
+
+// TODO: Needed?
 typedef enum {
   VCDP_SESSION_TYPE_IP4,
   VCDP_SESSION_TYPE_IP6,
+  VCDP_SESSION_TYPE_NAT64,
   /* last */
   VCDP_SESSION_N_TYPES,
 } vcdp_session_type_t;
@@ -86,8 +89,11 @@ typedef enum {
   VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 = 1 << 3,
 } vcdp_session_key_flag_t;
 
-#define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
-#define VCDP_SESSION_KEY_IP6 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
+// #define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
+// #define VCDP_SESSION_KEY_IP6 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
+
+#define VCDP_SESSION_KEY_IS_PRIMARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6)
+#define VCDP_SESSION_KEY_IS_SECONDARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
 
 enum {
   VCDP_SESSION_KEY_PRIMARY = 0,
@@ -102,9 +108,9 @@ enum {
 
 typedef union {
   struct {
-    u8 proto : 8;
-    u32 context_id : 24;
     u32 src, dst;
+    u32 proto : 8;
+    u32 context_id : 24;
     u16 sport, dport;
   };
   u64 as_u64[2];
@@ -113,19 +119,25 @@ _Static_assert(sizeof(vcdp_session_ip4_key_t) == 16, "Size of vcdp_session_ip4_k
 
 typedef union {
   struct {
-    u8 proto : 8;
-    u32 context_id : 24;
     ip6_address_t src, dst;
+    u32 proto : 8;
+    u32 context_id : 24;
     u16 sport, dport;
   };
   u64 as_u64[5];
 } __clib_packed vcdp_session_ip6_key_t;
 _Static_assert(sizeof(vcdp_session_ip6_key_t) == 40, "Size of vcdp_session_ip6_key_t should be 40");
 
-typedef union {
-  vcdp_session_ip4_key_t ip4;
-  vcdp_session_ip6_key_t ip6;
+typedef struct {
+  union {
+    vcdp_session_ip6_key_t ip6;
+    vcdp_session_ip4_key_t ip4;
+  };
+  u8 pad[23];
+  bool is_ip6;
 } vcdp_session_key_t;
+_Static_assert(sizeof(vcdp_session_key_t) == 64, "Size of vcdp_session_key_t should be 64");
+
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
@@ -143,7 +155,7 @@ typedef struct {
   u8 proto;                     // 1 TODO: Needed? Could use protocol from key instead
   u8 type; /* see vcdp_session_type_t */ // 1
   u8 key_flags;                 // vcdp_session_key_flag_t
-} vcdp_session_t; /* TODO: optimise mem layout */
+} vcdp_session_t;               /* TODO: optimise mem layout */
 //_Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
 
 typedef struct {
@@ -170,9 +182,7 @@ typedef struct {
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_16_8_t table4;
-#if VCDP_IP6_ENABLED
   clib_bihash_40_8_t table6;
-#endif
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
   u32 frame_queue_icmp_index;
@@ -200,6 +210,7 @@ extern vcdp_main_t vcdp_main;
 extern vcdp_cfg_main_t vcdp_cfg_main;
 extern vlib_node_registration_t vcdp_handoff_node;
 extern vlib_node_registration_t vcdp_lookup_ip4_node;
+extern vlib_node_registration_t vcdp_lookup_ip6_node;
 extern vlib_node_registration_t vcdp_input_node;
 extern vlib_node_registration_t vcdp_icmp_fwd_ip4_node;
 
@@ -210,6 +221,8 @@ format_function_t format_vcdp_session_type;
 format_function_t format_vcdp_tenant;
 format_function_t format_vcdp_tenant_extra;
 format_function_t format_vcdp_session_key;
+format_function_t format_vcdp_session_ip4_key;
+format_function_t format_vcdp_session_ip6_key;
 format_function_t format_vcdp_bitmap;
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
@@ -299,17 +312,19 @@ u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 u32 vcdp_calc_bihash_buckets (u32 n_elts);
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
-vcdp_session_t *vcdp_create_session_v4(u16 tenant_idx, vcdp_session_ip4_key_t *primary,
-                                       vcdp_session_ip4_key_t *secondary, bool is_static, u32 *flow_index);
-vcdp_session_t *vcdp_lookup_session_v4(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
-                                       u16 dport);
+vcdp_session_t *vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_key_t *secondary,
+                                    bool is_static, u32 *flow_index);
+vcdp_session_t *vcdp_lookup_session(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
+                                    u16 dport);
 void vcdp_session_clear(void);
-int vcdp_session_try_add_secondary_ip4_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                           u32 pseudo_flow_index, vcdp_session_ip4_key_t *key, u64 *h);
+int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
+                                       u32 pseudo_flow_index, vcdp_session_key_t *key, u64 *h);
 void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
 void vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, u32 session_index);
 bool vcdp_session_is_expired(vcdp_session_t *session, f64 time_now);
 void vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session);
+int vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v);
+int vcdp_lookup(vcdp_session_key_t *k, bool is_ip6, u64 *v);
 
 #endif

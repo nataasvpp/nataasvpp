@@ -45,17 +45,16 @@ vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps)
 // Terminal service.
 // Recycle back to fast-path lookup
 //
-VLIB_NODE_FN(vcdp_create_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+static_always_inline uword
+vcdp_create_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
 {
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b = bufs;
   u32 *from;
   u32 n_left = frame->n_vectors;
   u16 nexts[VLIB_FRAME_SIZE], *next = nexts;
-  vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4 = keys;
+  vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   int rv;
-
 
   // Session created successfully: pass packet back to vcdp-lookup
   // Session already exists / collision: pass packet back to vcdp-lookup
@@ -67,8 +66,8 @@ VLIB_NODE_FN(vcdp_create_node)
     u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
-    rv = vcdp_calc_key_v4_slow(b[0], vcdp_buffer(b[0])->context_id, k4, h);
-    VCDP_DBG(0, "Creating session for: %U", format_vcdp_session_key, k4);
+    rv = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
+    VCDP_DBG(0, "Creating session for: %U", format_vcdp_session_key, k);
 
     if (rv != 0) {
       b[0]->error = node->errors[VCDP_CREATE_ERROR_NO_KEY];
@@ -77,7 +76,7 @@ VLIB_NODE_FN(vcdp_create_node)
     }
 
     u32 flow_index = ~0;
-    vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, k4, 0, false, &flow_index);
+    vcdp_session_t *session = vcdp_create_session(tenant_idx, k, 0, false, &flow_index);
     if (session) {
       session->rx_id = vcdp_buffer(b[0])->rx_id;
       vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
@@ -91,7 +90,7 @@ next:
     vcdp_next(b[0], next);
     next += 1;
     h += 1;
-    k4 += 1;
+    k += 1;
     b += 1;
     n_left -= 1;
   }
@@ -116,8 +115,28 @@ next:
   return frame->n_vectors;
 }
 
-VLIB_REGISTER_NODE(vcdp_create_node) = {
+VLIB_NODE_FN(vcdp_create_ip4_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_create_inline(vm, node, frame, false);
+}
+
+VLIB_NODE_FN(vcdp_create_ip6_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_create_inline(vm, node, frame, true);
+}
+
+VLIB_REGISTER_NODE(vcdp_create_ip4_node) = {
   .name = "vcdp-create",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_create_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_CREATE_N_ERROR,
+  .error_counters = vcdp_create_error_counters,
+};
+VLIB_REGISTER_NODE(vcdp_create_ip6_node) = {
+  .name = "vcdp-create-ip6",
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_create_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,

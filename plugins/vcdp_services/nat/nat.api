@@ -147,3 +147,12 @@ counters vcdp_nat_port_forwarding {
     description "drop";
   };
 };
+
+counters vcdp_nat64_fastpath {
+  drop {
+    severity error;
+    type counter64;
+    units "packets";
+    description "drop";
+  };
+};

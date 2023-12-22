@@ -54,12 +54,12 @@ vcdp_session_ip6_key_encode(vcdp_session_ip6_key_t *skey, vl_api_vcdp_session_ke
 }
 
 static_always_inline void
-vcdp_session_key_encode(vcdp_session_key_flag_t session_type, vcdp_session_key_t *skey, vl_api_vcdp_session_key_t *out)
+vcdp_session_key_encode(vcdp_session_key_t *skey, vl_api_vcdp_session_key_t *out)
 {
-  if (session_type & VCDP_SESSION_KEY_IP4)
-    return vcdp_session_ip4_key_encode(&skey->ip4, out);
-  if (session_type & VCDP_SESSION_KEY_IP6)
+  if (skey->is_ip6)
     return vcdp_session_ip6_key_encode(&skey->ip6, out);
+  else
+    return vcdp_session_ip4_key_encode(&skey->ip4, out);
 }
 
 #endif /*__included_vcdp_types_funcs_h__*/

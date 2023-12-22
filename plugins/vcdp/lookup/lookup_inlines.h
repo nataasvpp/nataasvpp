@@ -25,23 +25,64 @@ static inline void
 vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
 {
   ip4_header_t *ip = vcdp_get_ip4_header(b);
-  udp_header_t *udp = (udp_header_t *) (ip+1);
   skey->proto = ip->protocol;
   skey->context_id = context_id;
   skey->src = ip->src_address.as_u32;
   skey->dst = ip->dst_address.as_u32;
-  skey->sport = udp->src_port;
-  skey->dport = udp->dst_port;
 
   /* TODO: Consider moving this to the ICMP forwarding node */
-  if (ip->protocol == IP_PROTOCOL_ICMP) {
+  if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
+    udp_header_t *udp = (udp_header_t *) (ip+1);
+    skey->sport = udp->src_port;
+    skey->dport = udp->dst_port;
+  } else if (ip->protocol == IP_PROTOCOL_ICMP) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
     icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
     skey->sport = skey->dport = echo->identifier;
+  } else {
+    skey->sport = skey->dport = 0;
   }
 
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
+}
+
+static inline void
+vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey, u64 *h)
+{
+  ip6_header_t *ip = vcdp_get_ip6_header(b);
+  skey->proto = ip->protocol;
+  skey->context_id = context_id;
+  skey->src = ip->src_address;
+  skey->dst = ip->dst_address;
+
+  /* TODO: Consider moving this to the ICMP forwarding node */
+  if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
+    udp_header_t *udp = (udp_header_t *) (ip+1);
+    skey->sport = udp->src_port;
+    skey->dport = udp->dst_port;
+  } else if (ip->protocol == IP_PROTOCOL_ICMP6) {
+    icmp46_header_t *icmp = (icmp46_header_t *) ip6_next_header(ip);
+    icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
+    skey->sport = skey->dport = echo->identifier;
+  } else {
+    skey->sport = skey->dport = 0;
+  }
+
+  /* calculate hash */
+  h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (skey));
+}
+
+static inline void
+vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6)
+{
+  if (is_ip6) {
+    skey->is_ip6 = true;
+    return vcdp_calc_key_v6(b, context_id, &skey->ip6, h);
+  } else {
+    skey->is_ip6 = false;
+    return vcdp_calc_key_v4(b, context_id, &skey->ip4, h);
+  }
 }
 
 static inline void
@@ -74,91 +115,120 @@ vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t
 }
 
 static inline int
-vcdp_calc_key_v4_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
+vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6)
 {
-  ip4_header_t *ip = vcdp_get_ip4_header(b);
   int offset = 0;
   udp_header_t *udp;
   icmp46_header_t *icmp;
   icmp_echo_header_t *echo;
 
-  skey->src = ip->src_address.as_u32;
-  skey->dst = ip->dst_address.as_u32;
-  skey->proto = ip->protocol;
+  if (is_ip6) {
+    ip6_header_t *ip = vcdp_get_ip6_header(b);
+    vcdp_session_ip6_key_t *k = &skey->ip6;
+    k->src = ip->src_address;
+    k->dst = ip->dst_address;
+    k->proto = ip->protocol;
+    k->context_id = context_id;
+    skey->is_ip6 = true;
 
-  switch (ip->protocol) {
-  case IP_PROTOCOL_TCP:
-    udp = (udp_header_t *) ip4_next_header(ip);
-    offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-    skey->sport = udp->src_port;
-    skey->dport = udp->dst_port;
-    break;
-  case IP_PROTOCOL_UDP:
-    udp = (udp_header_t *) ip4_next_header(ip);
-    offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-    skey->sport = udp->src_port;
-    skey->dport = udp->dst_port;
-    break;
-  case IP_PROTOCOL_ICMP:
-    icmp = (icmp46_header_t *) ip4_next_header(ip);
-    echo = (icmp_echo_header_t *) (icmp + 1);
-    offset = vcdp_header_offset(ip, echo, sizeof(*echo));
-
-    if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
-      skey->sport = skey->dport = echo->identifier;
-    } else {
-
-      /* Do the same thing for the inner packet */
-      ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
-      offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
-
-      // Swap lookup key for ICMP error
-      skey->dst = inner_ip->src_address.as_u32;
-      skey->src = inner_ip->dst_address.as_u32;
-      skey->proto = inner_ip->protocol;
-      switch (inner_ip->protocol) {
-      case IP_PROTOCOL_TCP:
-        udp = (udp_header_t *) ip4_next_header(inner_ip);
-        offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-        skey->dport = udp->src_port;
-        skey->sport = udp->dst_port;
-        break;
-      case IP_PROTOCOL_UDP:
-        udp = (udp_header_t *) ip4_next_header(inner_ip);
-        offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-        skey->dport = udp->src_port;
-        skey->sport = udp->dst_port;
-        break;
-      case IP_PROTOCOL_ICMP:
-        icmp = (icmp46_header_t *) ip4_next_header(inner_ip);
-        echo = (icmp_echo_header_t *) (icmp + 1);
-        offset = vcdp_header_offset(ip, echo, sizeof(*echo));
-        if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
-          skey->sport = skey->dport = echo->identifier;
-        } else {
-          VCDP_DBG(3, "Failed dealing with ICMP error");
-          return -1;
+    if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
+      udp = (udp_header_t *) (ip + 1);
+      offset = vcdp_header_offset(ip, udp, sizeof(*udp));
+      k->sport = udp->src_port;
+      k->dport = udp->dst_port;
+    } else if (ip->protocol == IP_PROTOCOL_ICMP6) {
+      icmp = (icmp46_header_t *) ip6_next_header(ip);
+      echo = (icmp_echo_header_t *) (icmp + 1);
+      offset = vcdp_header_offset(ip, echo, sizeof(*echo));
+      k->sport = k->dport = 0; // default
+      if (icmp->type == ICMP6_echo_request || icmp->type == ICMP6_echo_reply) {
+        k->sport = k->dport = echo->identifier;
+      } else if (icmp->type < 128) {
+        /* Do the same thing for the inner packet */
+        ip6_header_t *inner_ip = (ip6_header_t *) (echo + 1);
+        offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
+        // Swap lookup key for ICMP error
+        k->dst = inner_ip->src_address;
+        k->src = inner_ip->dst_address;
+        k->proto = inner_ip->protocol;
+        if (inner_ip->protocol == IP_PROTOCOL_TCP || inner_ip->protocol == IP_PROTOCOL_UDP) {
+          udp = (udp_header_t *) ip6_next_header(inner_ip);
+          offset = vcdp_header_offset(ip, udp, sizeof(*udp));
+          k->dport = udp->src_port;
+          k->sport = udp->dst_port;
+        } else if (inner_ip->protocol == IP_PROTOCOL_ICMP) {
+          icmp = (icmp46_header_t *) ip6_next_header(inner_ip);
+          echo = (icmp_echo_header_t *) (icmp + 1);
+          offset = vcdp_header_offset(ip, echo, sizeof(*echo));
+          if (icmp->type == ICMP6_echo_request || icmp->type == ICMP6_echo_reply) {
+            k->sport = k->dport = echo->identifier;
+          } else {
+            VCDP_DBG(3, "Failed dealing with ICMP error");
+            return -1;
+          }
         }
-        break;
-      default:
-        skey->sport = skey->dport = 0;
-        break;
       }
-      break;
+    } else {
+      k->sport = k->dport = 0;
     }
-    break;
-  default:
-    skey->sport = skey->dport = 0;
-    break;
-  }
+    /* calculate hash */
+    h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
+  } else {
+    ip4_header_t *ip = vcdp_get_ip4_header(b);
+    vcdp_session_ip4_key_t *k = &skey->ip4;
+    k->src = ip->src_address.as_u32;
+    k->dst = ip->dst_address.as_u32;
+    k->proto = ip->protocol;
+    k->context_id = context_id;
+    skey->is_ip6 = false;
 
+    if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
+      udp = (udp_header_t *) (ip + 1);
+      offset = vcdp_header_offset(ip, udp, sizeof(*udp));
+      k->sport = udp->src_port;
+      k->dport = udp->dst_port;
+    } else if (ip->protocol == IP_PROTOCOL_ICMP) {
+      icmp = (icmp46_header_t *) ip4_next_header(ip);
+      echo = (icmp_echo_header_t *) (icmp + 1);
+      offset = vcdp_header_offset(ip, echo, sizeof(*echo));
+      k->sport = k->dport = 0; // default
+
+      if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
+        k->sport = k->dport = echo->identifier;
+      } else {
+        /* Do the same thing for the inner packet */
+        ip4_header_t *inner_ip = (ip4_header_t *) (echo + 1);
+        offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
+        // Swap lookup key for ICMP error
+        k->dst = inner_ip->src_address.as_u32;
+        k->src = inner_ip->dst_address.as_u32;
+        k->proto = inner_ip->protocol;
+        if (inner_ip->protocol == IP_PROTOCOL_TCP || inner_ip->protocol == IP_PROTOCOL_UDP) {
+          udp = (udp_header_t *) ip4_next_header(inner_ip);
+          offset = vcdp_header_offset(ip, udp, sizeof(*udp));
+          k->dport = udp->src_port;
+          k->sport = udp->dst_port;
+        } else if (inner_ip->protocol == IP_PROTOCOL_ICMP) {
+          icmp = (icmp46_header_t *) ip4_next_header(inner_ip);
+          echo = (icmp_echo_header_t *) (icmp + 1);
+          offset = vcdp_header_offset(ip, echo, sizeof(*echo));
+          if (icmp->type == ICMP4_echo_request || icmp->type == ICMP4_echo_reply) {
+            k->sport = k->dport = echo->identifier;
+          } else {
+            VCDP_DBG(3, "Failed dealing with ICMP error");
+            return -1;
+          }
+        }
+      }
+    } else {
+      k->sport = k->dport = 0;
+    }
+    /* calculate hash */
+    h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (k));
+  }
   if (offset > b->current_length) {
     return -1;
   }
-  skey->context_id = context_id;
-
-  /* calculate hash */
-  h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
   return 0;
 }
 

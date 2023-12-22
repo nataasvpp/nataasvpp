@@ -44,7 +44,7 @@ typedef struct {
   _(DADDR, 0x4, "dst-addr")                                                                                            \
   _(DPORT, 0x8, "dst-port")                                                                                            \
   _(ICMP_ID, 0x10, "icmp-id")                                                                                          \
-  _(TXFIB, 0x20, "tx-fib")
+  _(TXFIB, 0x20, "tx-fib")                                                                                             \
 
 typedef enum {
 #define _(sym, x, s) NAT_REWRITE_OP_##sym = x,
@@ -68,10 +68,32 @@ typedef struct {
   session_version_t version;
   u16 nat_idx; // index into nat_main.instances
 } nat_rewrite_data_t;
-STATIC_ASSERT_SIZEOF(nat_rewrite_data_t, CLIB_CACHE_LINE_BYTES);
+_Static_assert(sizeof(nat_rewrite_data_t) == CLIB_CACHE_LINE_BYTES, "nat_rewrite_data_t is not cache aligned");
+
+typedef enum {
+  NAT64_REWRITE_OP_HDR_64 = 1 << 1,
+  NAT64_REWRITE_OP_HDR_46 = 1 << 2,
+  NAT64_REWRITE_OP_SPORT = 1 << 3,
+  NAT64_REWRITE_OP_DPORT = 1 << 4,
+} nat64_rewrite_op_t;
+
+typedef struct {
+  CLIB_CACHE_LINE_ALIGN_MARK(cache0);
+  union {
+    ip6_header_t ip6;
+    ip4_header_t ip4;
+  };
+  u16 sport;
+  u16 dport;
+  nat64_rewrite_op_t ops;
+  session_version_t version;
+  u16 nat_idx; // index into nat_main.instances
+} nat64_rewrite_data_t;
+// _Static_assert(sizeof(nat64_rewrite_data_t) == CLIB_CACHE_LINE_BYTES, "nat64_rewrite_data_t is not cache aligned");
 
 typedef struct {
   nat_rewrite_data_t *flows; /* by flow_index */
+  nat64_rewrite_data_t *flows64; /* by flow_index */
 } nat_per_thread_data_t;
 
 /*
@@ -126,7 +148,9 @@ typedef struct {
 extern nat_main_t nat_main;
 
 format_function_t format_vcdp_nat_rewrite;
+format_function_t format_vcdp_nat64_rewrite;
 u8 *format_vcdp_nat_service(u8 *s, u32 thread_index, u32 session_index);
+u8 *format_vcdp_nat64_service(u8 *s, u32 thread_index, u32 session_index);
 
 int vcdp_nat_add(char *natid, u32 context_id, ip4_address_t *addr, bool is_if);
 int vcdp_nat_if_add(char *nat_id, u32 sw_if_index);

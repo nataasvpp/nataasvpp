@@ -117,17 +117,28 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
   ip_address_decode2(&mp->src, &src);
   ip_address_decode2(&mp->dst, &dst);
 
-  vcdp_session_ip4_key_t k = {
-    .context_id = 0,
-    .src = src.ip.ip4.as_u32,
-    .dst = dst.ip.ip4.as_u32,
-    .sport = clib_host_to_net_u16(mp->sport),
-    .dport = clib_host_to_net_u16(mp->dport),
-    .proto = mp->protocol,
-  };
+  vcdp_session_key_t k;
+  if (src.version ==  AF_IP6) {
+    k.ip6.context_id = mp->context;
+    k.ip6.src = src.ip.ip6;
+    k.ip6.dst = dst.ip.ip6;
+    k.ip6.sport = clib_host_to_net_u16(mp->sport);
+    k.ip6.dport = clib_host_to_net_u16(mp->dport);
+    k.ip6.proto = mp->protocol;
+    k.is_ip6 = true;
+  } else {
+    k.ip4.context_id = mp->context;
+    k.ip4.src = src.ip.ip4.as_u32;
+    k.ip4.dst = dst.ip.ip4.as_u32;
+    k.ip4.sport = clib_host_to_net_u16(mp->sport);
+    k.ip4.dport = clib_host_to_net_u16(mp->dport);
+    k.ip4.proto = mp->protocol;
+    k.is_ip6 = false;
+  }
+
   u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
   u32 flow_index;
-  vcdp_session_t *session = vcdp_create_session_v4(tenant_idx, &k, 0, true, &flow_index);
+  vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, true, &flow_index);
   if (!session)
     rv = -1;
 
@@ -154,9 +165,8 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
   ip_address_decode2(&mp->src, &src);
   ip_address_decode2(&mp->dst, &dst);
 
-  session = vcdp_lookup_session_v4(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport),
-                                   mp->protocol, &dst,
-                                   clib_host_to_net_u16(mp->dport));
+  session = vcdp_lookup_session(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->protocol, &dst,
+                                clib_host_to_net_u16(mp->dport));
   if (!session)
     rv = -1;
 
@@ -175,8 +185,8 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
     rmp->remaining_time = session->timer.next_expiration - now;
     rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
     rmp->reverse_bitmap = session->bitmaps[VCDP_FLOW_REVERSE];
-    vcdp_session_key_encode(VCDP_SESSION_KEY_IP4, &session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
-    vcdp_session_key_encode(VCDP_SESSION_KEY_IP4, &session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
+    vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
+    vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
   }}));
 }
 

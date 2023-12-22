@@ -430,6 +430,7 @@ nat_init(vlib_main_t *vm)
   // Two flows per session
   vec_foreach (ptd, nat->ptd) {
     vec_validate(ptd->flows, 2 * vcdp_cfg_main.no_sessions_per_thread);
+    vec_validate(ptd->flows64, 2 * vcdp_cfg_main.no_sessions_per_thread);
   }
 
   // Create a FIB entry for the NAT pool addresses.

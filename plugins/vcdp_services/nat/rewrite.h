@@ -7,8 +7,10 @@
 #include <vnet/ip/ip.h>
 #include <vnet/tcp/tcp_packet.h>
 #include "nat.h"
+#include <vnet/ip/ip4_to_ip6.h>
+#include <vnet/ip/ip6_to_ip4.h>
 
-static inline void 
+static inline void
 nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
 {
   ip_csum_t ip_sum = 0, tcp_sum = 0, udp_sum = 0, icmp_sum = 0;
@@ -42,7 +44,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     ip4->dst_address = rewrite->rewrite.daddr;
 
   if (proto == IP_PROTOCOL_TCP) {
-    tcp = ip4_next_header(ip4);
+    tcp = (tcp_header_t *)ip4_next_header(ip4);
     tcp_sum = tcp->checksum;
     tcp_sum = ip_csum_sub_even(tcp_sum, rewrite->l3_csum_delta);
     tcp_sum = ip_csum_sub_even(tcp_sum, rewrite->l4_csum_delta);
@@ -57,7 +59,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     if (ops & NAT_REWRITE_OP_DPORT)
       tcp->dst_port = rewrite->rewrite.dport;
   } else if (proto == IP_PROTOCOL_UDP) {
-    udp = ip4_next_header(ip4);
+    udp = (udp_header_t *)ip4_next_header(ip4);
     udp_sum = udp->checksum;
     udp_sum = ip_csum_sub_even(udp_sum, rewrite->l3_csum_delta);
     udp_sum = ip_csum_sub_even(udp_sum, rewrite->l4_csum_delta);
@@ -104,6 +106,130 @@ nat_rewrite_outer(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   if (ops & NAT_REWRITE_OP_DADDR)
     ip4->dst_address = rewrite->rewrite.daddr;
   ip4->checksum = ip4_header_checksum(ip4);
+}
+
+#if 0
+static int
+nat64_inner_icmp_set_cb(ip6_header_t *ip6, ip4_header_t *ip4, void *arg)
+{
+  return 0;
+}
+static int
+nat64_icmp_set_cb (ip6_header_t * ip6, ip4_header_t * ip4, void *arg)
+{
+  return 0;
+}
+#endif
+
+static inline void
+nat64_rewrite(vlib_buffer_t *b, nat64_rewrite_data_t *rewrite)
+{
+  u8 protocol;
+  void *ulp;
+  ip6_header_t *ip6;
+  ip4_header_t *ip4;
+  vlib_main_t *vm = vlib_get_main();
+
+  if (rewrite->ops & NAT64_REWRITE_OP_HDR_64) {
+    // Copy out the pieces I need from the IPv6 header
+    ip6 = vlib_buffer_get_current(b);
+    protocol = ip6->protocol;
+    u16 payload_length = clib_net_to_host_u16(ip6->payload_length);
+    u8 ttl = ip6->hop_limit;
+    // Set IPv4 header
+    vlib_buffer_advance(b, 20);
+    ip4 = vlib_buffer_get_current(b);
+    ASSERT((u8 *)ip4 - (u8 *)ip6 == 20);
+    clib_memcpy(ip4, &rewrite->ip4, sizeof(ip4_header_t));
+    ip4->ttl = ttl;
+    ip4->length = clib_host_to_net_u16(payload_length + sizeof(ip4_header_t));
+    ip4->checksum = ip4_header_checksum(ip4);
+    ulp = ip4 + 1;
+    ASSERT((u8 *) ulp - (u8 *) ip6 == 40);
+  } else if (rewrite->ops & NAT64_REWRITE_OP_HDR_46) {
+    ip4 = vlib_buffer_get_current(b);
+    protocol = ip4->protocol;
+    ASSERT(protocol == IP_PROTOCOL_TCP || protocol == IP_PROTOCOL_UDP || protocol == IP_PROTOCOL_ICMP);
+
+    u8 ttl = ip4->ttl;
+    u16 payload_length = clib_net_to_host_u16(ip4->length) - sizeof(ip4_header_t);
+
+    // Set IPv6 header
+    vlib_buffer_advance(b, -20);
+    ip6 = vlib_buffer_get_current(b);
+    clib_memcpy(ip6, &rewrite->ip6, sizeof(ip6_header_t));
+    ip6->hop_limit = ttl;
+    ip6->payload_length = clib_host_to_net_u16(payload_length);
+    ulp = ip6 + 1;
+  } else {
+    ASSERT(0);
+  }
+
+  // TCP checksum (and port)
+  if (protocol == IP_PROTOCOL_TCP) {
+    tcp_header_t *tcp = ulp;
+    tcp->checksum = 0;
+    if (rewrite->ops & NAT64_REWRITE_OP_SPORT)
+      tcp->src_port = rewrite->sport;
+    if (rewrite->ops & NAT64_REWRITE_OP_DPORT)
+      tcp->dst_port = rewrite->dport;
+    if (rewrite->ops & NAT64_REWRITE_OP_HDR_64)
+      tcp->checksum = ip4_tcp_udp_compute_checksum(vm, b, ip4);
+    else {
+      int length;
+      tcp->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b, ip6, &length);
+    }
+  } else if (protocol == IP_PROTOCOL_UDP) {
+    udp_header_t *udp = ulp;
+    udp->checksum = 0;
+    if (rewrite->ops & NAT64_REWRITE_OP_SPORT)
+      udp->src_port = rewrite->sport;
+    if (rewrite->ops & NAT64_REWRITE_OP_DPORT)
+      udp->dst_port = rewrite->dport;
+    if (rewrite->ops & NAT64_REWRITE_OP_HDR_64)
+      udp->checksum = ip4_tcp_udp_compute_checksum(vm, b, ip4);
+    else {
+      int length;
+      udp->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b, ip6, &length);
+    }
+  } else if (protocol == IP_PROTOCOL_ICMP6) {
+    // if (icmp6_to_icmp(vm, b, nat64_in2out_icmp_set_cb, &ctx0, nat64_in2out_inner_icmp_set_cb, &ctx0))
+    icmp46_header_t *icmp = ulp;
+    ip6_header_t *inner_ip6;
+    if (icmp6_to_icmp_header(icmp, &inner_ip6)) {
+      VCDP_DBG(1, "icmp6_to_icmp_header failed %U", format_ip6_header, ip6, 40);
+      return;
+    }
+    if (rewrite->ops & NAT64_REWRITE_OP_SPORT) {
+      icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
+      echo->identifier = rewrite->sport;
+    }
+
+    // int rv = icmp6_to_icmp(vm, b, nat64_icmp_set_cb, 0, nat64_inner_icmp_set_cb, 0);
+    // clib_warning("translate icmp6 to icmp %d", rv);
+    // icmp46_header_t *icmp = ulp;
+    // icmp->type = ICMP4_echo_request;
+    icmp->checksum = 0;
+    ip_csum_t sum = ip_incremental_checksum(0, icmp, b->current_length - sizeof(ip4_header_t));
+    icmp->checksum = ~ip_csum_fold(sum);
+  } else if (protocol == IP_PROTOCOL_ICMP) {
+    icmp46_header_t *icmp = ulp;
+    ip4_header_t *inner_ip4;
+    if (icmp_to_icmp6_header(icmp, &inner_ip4)) {
+      VCDP_DBG(1, "icmp_to_icmp6_header failed %U", format_ip4_header, ip4, 20);
+      return;
+    }
+    if (rewrite->ops & NAT64_REWRITE_OP_DPORT) {
+      icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
+      echo->identifier = rewrite->sport;
+    }
+    int length;
+    icmp->checksum = 0;
+    icmp->checksum = ip6_tcp_udp_icmp_compute_checksum(vm, b, ip6, &length);
+  } else {
+    // Pass any other protocol unharmed.
+    ;
+  }
 }
 
 #endif

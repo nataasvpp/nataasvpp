@@ -198,3 +198,22 @@ VCDP_SERVICE_DEFINE(output) = {
                               "vcdp-nat-late-rewrite", "vcdp-nat-early-rewrite"),
   .is_terminal = 1
 };
+
+/*
+ * Add traditional IPv4 lookup as a terminal service for chains not on a feature arc.
+ */
+VCDP_SERVICE_DEFINE(ip4_lookup) = {
+  .node_name = "ip4-lookup",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check",
+                              "vcdp-nat-late-rewrite", "vcdp-nat-early-rewrite"),
+  .is_terminal = 1
+};
+
+VCDP_SERVICE_DEFINE(ip6_lookup) = {
+  .node_name = "ip6-lookup",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check",
+                              "vcdp-nat64-late-rewrite", "vcdp-nat64-early-rewrite"),
+  .is_terminal = 1
+};

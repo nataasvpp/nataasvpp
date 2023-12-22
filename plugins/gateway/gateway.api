@@ -40,7 +40,7 @@ autoreply autoendian define vcdp_tunnel_remove
 };
 
 /*
- * Attach/Detach VCDP to the IPv4 input feature arc.
+ * Attach/Detach VCDP to the IPv4/IPv6 input/output feature arc.
  */
 autoreply autoendian define vcdp_gateway_enable_disable
 {
@@ -51,6 +51,19 @@ autoreply autoendian define vcdp_gateway_enable_disable
   u32 tenant_id;
   bool is_enable;
   bool output_arc [default=false];
+};
+
+/*
+ * Attach/Detach VCDP to a DPO in the IPv4/IPv6 FIB via a prefix.
+ */
+autoreply autoendian define vcdp_gateway_prefix_enable_disable
+{
+  u32 client_index;
+  u32 context;
+
+  vl_api_prefix_t prefix;
+  u32 tenant_id;
+  bool is_enable;
 };
 
 /*

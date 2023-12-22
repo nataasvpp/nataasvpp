@@ -44,20 +44,9 @@ cbor_build_bitmap(u32 bitmap)
 }
 
 static cbor_item_t *
-cbor_build_session_key(vcdp_session_key_flag_t flag, vcdp_session_key_t *key)
+cbor_build_session_key(vcdp_session_key_t *key)
 {
-  if (flag & VCDP_SESSION_KEY_IP4) {
-    vcdp_session_ip4_key_t *k = &key->ip4;
-    cbor_item_t *cbor = cbor_new_definite_array(6);
-    cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->src)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport))));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->dst)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport))));
-    return cbor;
-  }
-  if (flag & VCDP_SESSION_KEY_IP6) {
+  if (key->is_ip6) {
     vcdp_session_ip6_key_t *k = &key->ip6;
     cbor_item_t *cbor = cbor_new_definite_array(6);
     cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id)));
@@ -65,6 +54,16 @@ cbor_build_session_key(vcdp_session_key_flag_t flag, vcdp_session_key_t *key)
     cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport))));
     cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto)));
     cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->dst)));
+    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport))));
+    return cbor;
+  } else {
+    vcdp_session_ip4_key_t *k = &key->ip4;
+    cbor_item_t *cbor = cbor_new_definite_array(6);
+    cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id)));
+    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->src)));
+    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport))));
+    cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto)));
+    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->dst)));
     cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport))));
     return cbor;
   }
@@ -112,8 +111,8 @@ vcdp_session_to_cbor(vcdp_session_t *session)
   cbor_array_push(s, cbor_move(cbor_build_uint64(session->session_id)));
   cbor_array_push(s, cbor_move(cbor_build_session_state(session->state)));
   cbor_array_push(s, cbor_move(cbor_build_uint32(session->rx_id)));
-  cbor_array_push(s, cbor_move(cbor_build_session_key(session->key_flags, &session->keys[VCDP_SESSION_KEY_PRIMARY])));
-  cbor_array_push(s, cbor_move(cbor_build_session_key(session->key_flags, &session->keys[VCDP_SESSION_KEY_SECONDARY])));
+  cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_PRIMARY])));
+  cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_SECONDARY])));
   cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(session->created))));
   cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(remaining_time))));
   cbor_array_push(s, cbor_move(cbor_build_bitmap(session->bitmaps[VCDP_FLOW_FORWARD])));

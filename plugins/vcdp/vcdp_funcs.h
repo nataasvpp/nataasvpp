@@ -12,4 +12,10 @@ vcdp_get_ip4_header(vlib_buffer_t *b)
   return vlib_buffer_get_current(b) + vnet_buffer(b)->ip.save_rewrite_length;
 }
 
+static inline ip6_header_t *
+vcdp_get_ip6_header(vlib_buffer_t *b)
+{
+  return vlib_buffer_get_current(b) + vnet_buffer(b)->ip.save_rewrite_length;
+}
+
 #endif
