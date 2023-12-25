@@ -200,7 +200,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
-
+  vcdp_session_t *session;
   vlib_get_buffers(vm, from, bufs, n_left);
 
   while (n_left > 0) {
@@ -219,8 +219,29 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       error = VCDP_NAT_SLOWPATH_ERROR_NO_KEY;
       goto next;
     }
+
+    /* Check if already created */
+    u64 value;
+    if (vcdp_lookup_with_hash(h, &k, false, &value) == 0) {
+      // ASSERT THAT THIS SESSION IS ON THE SAME THREAD
+      VCDP_DBG(3, "Session already exists for %U sending to fast-path", format_vcdp_session_key, &k);
+      u32 flow_thread_index = vcdp_thread_index_from_lookup(value);
+      if (flow_thread_index != thread_index) {
+        VCDP_DBG(0, "ERROR: Session %U already exists on thread %d", format_vcdp_session_key, &k, flow_thread_index);
+        error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
+        goto next;
+      }
+      /* known flow which belongs to this thread */
+      u32 flow_index = value & (~(u32) 0);
+      u32 session_index = vcdp_session_from_flow_index(flow_index);
+      b[0]->flow_id = flow_index;
+      session = vcdp_session_at_index(ptd, session_index);
+      vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
+      goto next;
+    }
+
     u32 flow_index = ~0;
-    vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
+    session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
     if (!session) {
       error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
       goto next;
