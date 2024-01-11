@@ -218,6 +218,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 defaul
   return err;
 }
 
+VCDP_SERVICE_DECLARE(l4_lifecycle)
 clib_error_t *
 vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction)
 {
@@ -248,6 +249,9 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   }
   tenant->bitmaps[direction] = gen_bitmap;
   tenant->tcp_bitmaps[direction] = tcp_bitmap;
+
+  // Special case l4_lifecycle for now for TCP services which should use tcp-check(-lite)
+  tenant->tcp_bitmaps[direction]  &= ~VCDP_SERVICE_MASK(l4_lifecycle);
 
   VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, gen_bitmap);
   VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, tcp_bitmap);

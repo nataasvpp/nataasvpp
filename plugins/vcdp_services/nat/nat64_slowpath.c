@@ -173,7 +173,6 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
   while (n_left > 0) {
     vcdp_session_key_t k;
     u64 h;
-    // int rv;
     u32 error = 0;
     vcdp_session_t *session;
     tenant_idx = vcdp_buffer(b[0])->tenant_index;
@@ -183,14 +182,25 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
       goto next;
     }
     int rv = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, &k, &h, true);
-    if (rv != 0) {
+    switch (rv) {
+    case 0:
+      break;
+    case -1:
       error = VCDP_NAT_SLOWPATH_ERROR_NO_KEY;
+      goto next;
+    case -2:
+      error = VCDP_NAT_SLOWPATH_ERROR_FRAGMENT;
+      goto next;
+    case -3:
+      error = VCDP_NAT_SLOWPATH_ERROR_TRUNCATED;
+      goto next;
+    default:
+      error = VCDP_NAT_SLOWPATH_ERROR_UNKNOWN;
       goto next;
     }
 
     /* Check if already created */
     u64 value;
-
     if (vcdp_lookup_with_hash(h, &k, true, &value) == 0) {
       // ASSERT THAT THIS SESSION IS ON THE SAME THREAD
       VCDP_DBG(3, "Session already exists for %U sending to fast-path", format_vcdp_session_key, &k);

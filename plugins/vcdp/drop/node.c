@@ -3,6 +3,7 @@
 
 #include <vlib/vlib.h>
 #include <vcdp/service.h>
+#include <vcdp/vcdp.api_enum.h>
 
 #define foreach_vcdp_drop_next _(DROP, "error-drop")
 typedef enum {
@@ -35,6 +36,15 @@ VLIB_NODE_FN(vcdp_drop_node)
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
 
+  vlib_get_buffers(vm, from, bufs, n_left);
+
+  for (int i=0; i<n_left; i++) {
+    vlib_buffer_t *b = bufs[i];
+    if (b->error)
+      continue;
+    b->error = node->errors[VCDP_DROP_ERROR_UNKNOWN];
+  }
+
   vlib_buffer_enqueue_to_single_next(vm, node, from, VCDP_DROP_NEXT_DROP, n_left);
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
@@ -62,7 +72,10 @@ VLIB_REGISTER_NODE(vcdp_drop_node) = {
 #define _(n, x) [VCDP_DROP_NEXT_##n] = x,
   foreach_vcdp_drop_next
 #undef _
-  }
+  },
+  .error_counters = vcdp_drop_error_counters,
+  .n_errors = VCDP_DROP_N_ERROR,
+
 };
 
 VCDP_SERVICE_DEFINE(drop) = {

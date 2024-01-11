@@ -77,6 +77,12 @@ counters vcdp_nat_icmp {
     units "packets";
     description "no tenant";
   };
+  no_session {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no session";
+  };
   truncated {
     severity error;
     type counter64;
@@ -100,6 +106,18 @@ counters vcdp_nat_icmp {
     type counter64;
     units "packets";
     description "not supported inner protocol";
+  };
+  trans64 {
+    severity error;
+    type counter64;
+    units "packets";
+    description "ICMP6 to ICMP translation failed";
+  };
+  trans46 {
+    severity error;
+    type counter64;
+    units "packets";
+    description "ICMP to ICMP6 translation failed";
   };
 };
 
@@ -127,6 +145,24 @@ counters vcdp_nat_slowpath {
     type counter64;
     units "packets";
     description "lookup key calculation failure";
+  };
+  fragment {
+    severity error;
+    type counter64;
+    units "packets";
+    description "fragmented packet";
+  };
+  truncated {
+    severity error;
+    type counter64;
+    units "packets";
+    description "packet too short to find key";
+  };
+  unknown {
+    severity error;
+    type counter64;
+    units "packets";
+    description "unknown error";
   };
 };
 

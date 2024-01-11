@@ -140,7 +140,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     reduced >>= 32;
     new_key.ip4.dport = clib_host_to_net_u16(1024 + reduced);
     if (PREDICT_FALSE(proto == IP_PROTOCOL_ICMP))
-      new_key.ip4.dport = new_key.ip4.sport;
+      new_key.ip4.sport = new_key.ip4.dport;
   }
 
   if (n_retries == nm->port_retries) {
@@ -215,8 +215,20 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       goto next;
     }
     rv = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, &k, &h, false);
-    if (rv != 0) {
+    switch (rv) {
+    case 0:
+      break;
+    case -1:
       error = VCDP_NAT_SLOWPATH_ERROR_NO_KEY;
+      goto next;
+    case -2:
+      error = VCDP_NAT_SLOWPATH_ERROR_FRAGMENT;
+      goto next;
+    case -3:
+      error = VCDP_NAT_SLOWPATH_ERROR_TRUNCATED;
+      goto next;
+    default:
+      error = VCDP_NAT_SLOWPATH_ERROR_UNKNOWN;
       goto next;
     }
 

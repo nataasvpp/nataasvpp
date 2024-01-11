@@ -54,7 +54,7 @@ format_vcdp_icmp_handoff_trace(u8 *s, va_list *args)
   return s;
 }
 
-static u32
+u32
 icmp_service_chain(u32 pbmp)
 {
   u32 nbmp = 0;
@@ -74,9 +74,10 @@ icmp_service_chain(u32 pbmp)
 }
 
 VCDP_SERVICE_DECLARE(drop);
+u32 icmp_service_chain(u32 pbmp);
 
 static_always_inline uword
-vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -90,7 +91,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
   u16 local_next_indices[VLIB_FRAME_SIZE];
-  vcdp_session_ip4_key_t keys[VLIB_FRAME_SIZE], *k4= keys;
+  vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   f64 time_now = vlib_time_now(vm);
   bool hits[VLIB_FRAME_SIZE], *hit = hits;
@@ -103,16 +104,17 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
 
   // Calculate key and hash
   while (n_left) {
-    rv[0] = vcdp_calc_key_v4_icmp(b[0], vcdp_buffer(b[0])->context_id, k4, h);
+    rv[0] = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
+    // rv[0] = vcdp_calc_key_v4_icmp(b[0], vcdp_buffer(b[0])->context_id, k4, h);
     h += 1;
-    k4 += 1;
+    k += 1;
     b += 1;
     rv += 1;
     n_left -= 1;
   }
 
   h = hashes;
-  k4 = keys;
+  k = keys;
   b = bufs;
   u16 *current_next = local_next_indices;
   bi = from;
@@ -121,35 +123,25 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
 
   while (n_left) {
     b[0]->error = 0;
-    clib_bihash_kv_16_8_t kv;
-    clib_memcpy_fast(&kv, k4, 16);
-    if (rv[0] < 0) {
-        // DROP PACKET
-      to_local[n_local] = bi[0];
-      n_local++;
-      b[0]->flow_id = ~0; // No session
-      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-      vcdp_next(b[0], current_next);
-      current_next++;
-      goto next;
-    }
-    VCDP_DBG(5, "Looking up: %U", format_vcdp_session_key, k4);
-    if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, h[0], &kv)) {
+    u64 value;
+    VCDP_DBG(5, "ICMP %s fwd Looking up: %U (%d)", is_ip6 ? "ip6": "ip4", format_vcdp_session_key, k, rv[0]);
+    if ((rv[0] < 0) || vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
       // DROP PACKET
       to_local[n_local] = bi[0];
       n_local++;
       b[0]->flow_id = ~0; // No session
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[VCDP_ICMP_FWD_ERROR_NO_SESSION];
       vcdp_next(b[0], current_next);
       current_next++;
       goto next;
     }
 
     // Figure out if this is local or remote thread
-    u32 flow_thread_index = vcdp_thread_index_from_lookup(kv.value);
+    u32 flow_thread_index = vcdp_thread_index_from_lookup(value);
     if (flow_thread_index == thread_index) {
       /* known flow which belongs to this thread */
-      u32 flow_index = kv.value & (~(u32) 0);
+      u32 flow_index = value & (~(u32) 0);
       to_local[n_local] = bi[0];
       session_index = vcdp_session_from_flow_index(flow_index);
       si[0] = session_index;
@@ -158,10 +150,12 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       session = vcdp_session_at_index(ptd, session_index);
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k4,
+        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k,
                      session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
-        // DROP PACKET
+        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+        b[0]->error = node->errors[VCDP_ICMP_FWD_ERROR_NO_SESSION];
+        goto next;
       }
 
       //   ICMP chain
@@ -185,13 +179,13 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       n_remote++;
     }
 
-    b[0]->flow_id = kv.value & (~(u32) 0);
+    b[0]->flow_id = value & (~(u32) 0);
 
   next:
     b += 1;
     n_left -= 1;
     h += 1;
-    k4 += 1;
+    k += 1;
     bi += 1;
     hit += 1;
     si += 1;
@@ -259,7 +253,13 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
 VLIB_NODE_FN(vcdp_icmp_fwd_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_icmp_error_fwd_inline(vm, node, frame);
+   return vcdp_icmp_error_fwd_inline(vm, node, frame, false);
+}
+
+VLIB_NODE_FN(vcdp_icmp_fwd_ip6_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_icmp_error_fwd_inline(vm, node, frame, true);
 }
 
 /*
@@ -367,10 +367,26 @@ VLIB_REGISTER_NODE(vcdp_icmp_fwd_ip4_node) = {
   .vector_size = sizeof(u32),
   .format_trace = format_vcdp_icmp_fwd_trace,
   .type = VLIB_NODE_TYPE_INTERNAL,
+  .error_counters = vcdp_icmp_fwd_error_counters,
+  .n_errors = VCDP_ICMP_FWD_N_ERROR,
+};
+VLIB_REGISTER_NODE(vcdp_icmp_fwd_ip6_node) = {
+  .name = "vcdp-icmp6-error-forwarding",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_icmp_fwd_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .error_counters = vcdp_icmp_fwd_error_counters,
+  .n_errors = VCDP_ICMP_FWD_N_ERROR,
 };
 
 VCDP_SERVICE_DEFINE(icmp_error_fwd) = {
   .node_name = "vcdp-icmp-error-forwarding",
+  .runs_before = VCDP_SERVICES("vcdp-drop"),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 0
+};
+VCDP_SERVICE_DEFINE(icmp6_error_fwd) = {
+  .node_name = "vcdp-icmp6-error-forwarding",
   .runs_before = VCDP_SERVICES("vcdp-drop"),
   .runs_after = VCDP_SERVICES(0),
   .is_terminal = 0

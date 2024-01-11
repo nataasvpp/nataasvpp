@@ -215,7 +215,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
                        format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
                        format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
         if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
-          s = format(s, "%U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
+          s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
         vlib_cli_output(vm, "%s", s);
         vec_reset_length(s);

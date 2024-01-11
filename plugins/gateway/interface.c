@@ -147,6 +147,7 @@ VLIB_NODE_FN(vcdp_output_node)
      * If the ttl drops below 1 when forwarding, generate
      * an ICMP response.
      */
+    // TODO: IPV6
     ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
     if (PREDICT_FALSE(ip->ttl <= 1)) {
       // b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;

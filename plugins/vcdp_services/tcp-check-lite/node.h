@@ -73,17 +73,19 @@ VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_tw_t *tw, vcdp_tenant_t *tenant,
                      vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
-                     f64 current_time, u8 dir, u16 *to_next, vlib_buffer_t **b, u32 *sf, u32 *nsf)
+                     f64 current_time, u8 dir, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
-  ip4_header_t *ip4 = vcdp_get_ip4_header(b[0]);
-  tcp_header_t *tcp = ip4_next_header(ip4);
+  tcp_header_t *tcp = (tcp_header_t *) (b[0]->data + vnet_buffer (b[0])->l4_hdr_offset);
 
+#if 0
   /* Ignore non first fragments */
   if (ip4_get_fragment_offset(ip4) > 0) {
     vcdp_next(b[0], to_next);
     VCDP_DBG(0, "Fragment ignored");
     return;
   }
+#endif
+
   /* Note: We don't care about SYNs apart from reopening sessions */
   u8 flags = tcp->flags & (TCP_FLAG_SYN | TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
   u32 next_timeout = tenant->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
@@ -148,7 +150,6 @@ out:
 
   nsf[0] = tcp_session->state;
   vcdp_session_timer_update_maybe_past(tw, &session->timer, session_index, current_time, next_timeout);
-  vcdp_next(b[0], to_next);
   return;
 }
 
@@ -179,8 +180,18 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
     session = vcdp_session_at_index(ptd, session_idx);
     tcp_session = vec_elt_at_index(tptd->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
-    update_state_one_pkt(vcdp, ptd, tw, tenant, tcp_session, session, session_idx, current_time, vcdp_direction_from_flow_index(b[0]->flow_id),
-                         to_next, b, sf, nsf);
+
+    /* Ignore IP fragments */
+    if (vnet_buffer(b[0])->ip.reass.is_non_first_fragment) {
+      VCDP_DBG(0, "Fragment ignored");
+      clib_warning("OLE OLE OLE OLE ");
+      goto next;
+    } else {
+      update_state_one_pkt(vcdp, ptd, tw, tenant, tcp_session, session, session_idx, current_time,
+                           vcdp_direction_from_flow_index(b[0]->flow_id), b, sf, nsf);
+    }
+  next:
+    vcdp_next(b[0], to_next);
     n_left -= 1;
     b += 1;
     to_next += 1;

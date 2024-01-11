@@ -186,3 +186,21 @@ counters vcdp_create {
     description "not able to create 6-tuple key";
   };
 };
+
+counters vcdp_drop {
+  unknown {
+    severity error;
+    type counter64;
+    units "packets";
+    description "unknown error";
+  };
+};
+
+counters vcdp_icmp_fwd {
+  no_session {
+    severity error;
+    type counter64;
+    units "packets";
+    description "no session";
+  };
+};

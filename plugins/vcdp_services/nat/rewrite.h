@@ -108,6 +108,19 @@ nat_rewrite_outer(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   ip4->checksum = ip4_header_checksum(ip4);
 }
 
+static inline void
+nat64_rewrite_outer(ip4_header_t *ip4, nat64_rewrite_data_t *rewrite)
+{
+#if 0
+  u32 ops = rewrite->ops;
+  if (ops & NAT_REWRITE_OP_SADDR)
+    ip4->src_address = rewrite->rewrite.saddr;
+  if (ops & NAT_REWRITE_OP_DADDR)
+    ip4->dst_address = rewrite->rewrite.daddr;
+  ip4->checksum = ip4_header_checksum(ip4);
+#endif
+}
+
 #if 0
 static int
 nat64_inner_icmp_set_cb(ip6_header_t *ip6, ip4_header_t *ip4, void *arg)
@@ -121,6 +134,9 @@ nat64_icmp_set_cb (ip6_header_t * ip6, ip4_header_t * ip4, void *arg)
 }
 #endif
 
+/*
+ * Rewrite an IPv4 packet to an IPv6 packet and vice versa
+ */
 static inline void
 nat64_rewrite(vlib_buffer_t *b, nat64_rewrite_data_t *rewrite)
 {

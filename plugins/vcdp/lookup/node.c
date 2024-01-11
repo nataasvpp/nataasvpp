@@ -87,6 +87,7 @@ vcdp_lookup (vcdp_session_key_t *k, bool is_ip6, u64 *v)
 }
 
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
+VCDP_SERVICE_DECLARE(icmp6_error_fwd)
 static_always_inline uword
 vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
 {
@@ -139,7 +140,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
       if (icmp_is_error(b[0], is_ip6)) {
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(icmp_error_fwd);
+        vcdp_buffer(b[0])->service_bitmap = is_ip6 ? VCDP_SERVICE_MASK(icmp6_error_fwd) : VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain
         u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;

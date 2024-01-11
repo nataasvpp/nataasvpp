@@ -121,7 +121,7 @@ VLIB_REGISTER_NODE(vcdp_nat64_late_rewrite_node) = {
 
 VCDP_SERVICE_DEFINE(nat64_late_rewrite) = {
   .node_name = "vcdp-nat64-late-rewrite",
-  // .icmp_error = "vcdp-nat64-icmp-error",
+  .icmp_error = "vcdp-nat64-icmp-error",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0,
@@ -130,7 +130,7 @@ VCDP_SERVICE_DEFINE(nat64_late_rewrite) = {
 
 VCDP_SERVICE_DEFINE(nat64_early_rewrite) = {
   .node_name = "vcdp-nat64-early-rewrite",
-  // .icmp_error = "vcdp-nat64-icmp-error",
+  .icmp_error = "vcdp-nat64-icmp-error",
   .runs_before = VCDP_SERVICES("vcdp-tunnel-output"),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-check"),
   .is_terminal = 0,

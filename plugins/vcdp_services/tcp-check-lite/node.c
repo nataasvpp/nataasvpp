@@ -55,7 +55,7 @@ format_vcdp_tcp_check_lite_service(u8 *s, u32 thread_index, u32 session_index)
 
 VCDP_SERVICE_DEFINE(tcp_check_lite) = {
   .node_name = "vcdp-tcp-check-lite",
-  .runs_before = VCDP_SERVICES("vcdp-nat-early-rewrite", "vcdp-nat-late-rewrite"),
+  .runs_before = VCDP_SERVICES("vcdp-nat-early-rewrite", "vcdp-nat-late-rewrite", "ip6-lookup", "ip4-lookup"),
   .runs_after = VCDP_SERVICES("vcdp-l4-lifecycle"),
   .is_terminal = 0,
   .is_tcp_specific = 1,

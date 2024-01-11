@@ -35,10 +35,12 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
     udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
     skey->dport = udp->dst_port;
+    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)udp - (void *)ip;
   } else if (ip->protocol == IP_PROTOCOL_ICMP) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
     icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
     skey->sport = skey->dport = echo->identifier;
+    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)icmp - (void *)ip;
   } else {
     skey->sport = skey->dport = 0;
   }
@@ -61,10 +63,12 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
     udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
     skey->dport = udp->dst_port;
+    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)udp - (void *)ip;
   } else if (ip->protocol == IP_PROTOCOL_ICMP6) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip6_next_header(ip);
     icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
     skey->sport = skey->dport = echo->identifier;
+    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)icmp - (void *)ip;
   } else {
     skey->sport = skey->dport = 0;
   }
@@ -114,6 +118,9 @@ vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
+/*
+ * Find the 5-tuple key. In case of an ICMP error use the inner IP packet.
+ */
 static inline int
 vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6)
 {
@@ -124,6 +131,10 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u
 
   if (is_ip6) {
     ip6_header_t *ip = vcdp_get_ip6_header(b);
+    // if (ip6_is_fragment(ip)) {
+    //   return -1;
+    // }
+
     vcdp_session_ip6_key_t *k = &skey->ip6;
     k->src = ip->src_address;
     k->dst = ip->dst_address;
@@ -148,14 +159,14 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u
         ip6_header_t *inner_ip = (ip6_header_t *) (echo + 1);
         offset = vcdp_header_offset(ip, inner_ip, sizeof(*inner_ip));
         // Swap lookup key for ICMP error
-        k->dst = inner_ip->src_address;
-        k->src = inner_ip->dst_address;
+        k->dst = inner_ip->dst_address;
+        k->src = inner_ip->src_address;
         k->proto = inner_ip->protocol;
         if (inner_ip->protocol == IP_PROTOCOL_TCP || inner_ip->protocol == IP_PROTOCOL_UDP) {
           udp = (udp_header_t *) ip6_next_header(inner_ip);
           offset = vcdp_header_offset(ip, udp, sizeof(*udp));
-          k->dport = udp->src_port;
-          k->sport = udp->dst_port;
+          k->dport = udp->dst_port;
+          k->sport = udp->src_port;
         } else if (inner_ip->protocol == IP_PROTOCOL_ICMP) {
           icmp = (icmp46_header_t *) ip6_next_header(inner_ip);
           echo = (icmp_echo_header_t *) (icmp + 1);
@@ -175,6 +186,11 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u
     h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
   } else {
     ip4_header_t *ip = vcdp_get_ip4_header(b);
+
+    /* Do not support fragmentation for now */
+    if (ip4_get_fragment_offset(ip) > 0) {
+      return -2;
+    }
     vcdp_session_ip4_key_t *k = &skey->ip4;
     k->src = ip->src_address.as_u32;
     k->dst = ip->dst_address.as_u32;
@@ -227,11 +243,12 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u
     h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (k));
   }
   if (offset > b->current_length) {
-    return -1;
+    return -3;
   }
   return 0;
 }
 
+#if 0
 /*
  * Find the 5-tuple key for the inner packet of an ICMP error
  */
@@ -292,5 +309,5 @@ vcdp_calc_key_v4_icmp(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
   return rv;
 }
-
+#endif
 #endif

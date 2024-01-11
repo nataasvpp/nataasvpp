@@ -10,6 +10,9 @@
 - [x] show vcdp services command disappeared??
 - [x] Policy node ahead of VCDP to handle sharing a single interface
 - [ ] Check out2in packets if they match a pool address?
+- [ ] show vcdp session <5-tuple>
+- [ ] Fragment handling. Enable/Disable. Integrate with shallow reassembly / full reassembly.
+- [ ] Timer using double linked lists as configurable alternative / compile time option
 
 
 ## Tunnels
@@ -27,11 +30,9 @@ Interface less tunnels infrastructure integrated with the session router.
 
 ## Services
 
-- [ ] TCP MSS clamping
+- [x] TCP MSS clamping
 - [ ] Shallow reassembly and fragmentation
 - [ ] Telemetry service
-- [ ] - [ ] TCP mss clamping service
-- [ ] Add support for VXLAN GPE???
 
 ### NAT
 - [ ] Copy with mask rewrite instead of individual fields?
@@ -48,7 +49,7 @@ Interface less tunnels infrastructure integrated with the session router.
 	- [x] Other IP protocol
 
 ### TCP -lite state tracker
--[ ] TCP lite service. Track TCP state like UDP
+-[x] TCP lite service. Track TCP state like UDP
 
 ## Testing
 ### Isolated unit testing
@@ -90,11 +91,11 @@ Can multiple NAT instances share a pool ==> Yes
 - [ ] VCDP API
 
 ### CLI
-- [ ] Merge show session-table and session-details
+- [x] Merge show session-table and session-details
 - [ ] Default service chain CLI
 - [ ] unset cli
 - [ ] - [ ] Fix pool CLI
-- [ ] Clear VCDP session tables command
+- [x] Clear VCDP session tables command
 
 
 ## Telemetry
@@ -115,20 +116,35 @@ Are NAT counters really part of just session counters?
 
 ### Tracing
 - [ ] Session tracing
-- [ ] Sessions snapshot
+- [x] Sessions snapshot -> Add documentation. Dump CRUD file.
 
 ## Documentation
 - [ ] Update README in VCDP repo
 
 ## Tasks for Others
-- [ ] Move vnet VXLAN to plugin (and lots of others)
 - [ ] /usr/lib/python3/dist-packages/setuptools/command/install.py:34: SetuptoolsDeprecationWarning: setup.py install is deprecated. Use build and pip and other standards-based tools.
 - [ ] Performance tests of VCDP NATaaS
 
 ## MISC
-- [ ] Show session table also shows data from services. Function table to call
+- [x] Show session table also shows data from services. Function table to call
 - [ ] Remove errors counters for normal traffic. expired / local
-- [ ] Add error events to trace 
-- [ ] TCP session creation state like UDP
+- [ ] Add error events to trace
+- [x] TCP session creation state like UDP
 - [ ] Handle NAT looping back via loopback interface. DPO for pool?
 - [ ] Tunnel and handover multi-worker
+
+## IP fragmentation
+
+How to deal with services that need to see the transport header? TCP state tracking for example.
+That cannot depend on shallow reassembly.
+1. Bypass L4 specific services?
+2. Require full reassembly
+3. Check for fragment in each of the services?
+
+How to integrate with shallow reassembly?
+- Part of feature chain?
+- Custom node, called as part of VCDP? Loop fragment and fragmented parts back into VCDP?
+
+## NAT64
+
+- [ ] vcdp-output is IPv4 only in it's TTL check
