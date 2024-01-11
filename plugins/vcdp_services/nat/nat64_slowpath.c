@@ -25,7 +25,8 @@ format_vcdp_nat64_slowpath_trace(u8 *s, va_list *args)
   vcdp_nat64_slowpath_trace_t *t = va_arg(*args, vcdp_nat64_slowpath_trace_t *);
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, t->thread_index);
-  /* FIXME: This is a scam, the session-idx can be invalid at format time!*/
+  if (t->flow_id == ~0)
+    return format(s, "vcdp-nat64-slowpath: drop");
   vcdp_session_t *session = &ptd->sessions[t->flow_id >> 1];
   s = format(s, "vcdp-nat64-slowpath: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
              t->flow_id & 0x1 ? "reverse" : "forward");
@@ -175,6 +176,8 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
     u64 h;
     u32 error = 0;
     vcdp_session_t *session;
+    u32 flow_index = ~0;
+
     tenant_idx = vcdp_buffer(b[0])->tenant_index;
     instance = vcdp_nat_instance_by_tenant_idx(tenant_idx, &nat_idx);
     if (!instance) {
@@ -211,7 +214,7 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
         goto next;
       }
       /* known flow which belongs to this thread */
-      u32 flow_index = value & (~(u32) 0);
+      flow_index = value & (~(u32) 0);
       u32 session_index = vcdp_session_from_flow_index(flow_index);
       b[0]->flow_id = flow_index;
       session = vcdp_session_at_index(ptd, session_index);
@@ -219,7 +222,6 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
       goto next;
     }
 
-      u32 flow_index = ~0;
       session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
       if (!session) {
         error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
