@@ -337,6 +337,7 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   reverse_k.ip4.src = nat_session->addr.as_u32;
   reverse_k.ip4.sport = nat_session->port;
   reverse_k.ip4.context_id = 0;
+  reverse_k.is_ip6 = false;
 
   u32 flow_index = ~0;
   vcdp_session_t *full_session = vcdp_create_session(tenant_idx, &k, &reverse_k, false, &flow_index);
@@ -351,7 +352,7 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   nat_rewrite_data_t *nat_rewrite; /* rewrite data in both directions */
-  nat_rewrite = vec_elt_at_index(nptd->flows, full_session - ptd->sessions);
+  nat_rewrite = vec_elt_at_index(nptd->flows, (full_session - ptd->sessions) << 1);
 
   nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, k.ip4.dst, reverse_k.ip4.src,
               k.ip4.dport, reverse_k.ip4.sport, fib_index, full_session->session_version, &nat_rewrite[0]);
@@ -366,6 +367,7 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   return;
 
 error:
+  b[0]->flow_id = flow_index;
   vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
   vcdp_next(b[0], to_next);
   b[0]->error = node->errors[VCDP_NAT_PORT_FORWARDING_ERROR_DROP];

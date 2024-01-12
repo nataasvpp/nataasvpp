@@ -82,7 +82,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], primary, sizeof(session->keys[0]));
 
   if (secondary) {
-    if (vcdp_session_add_del_key(secondary, 2, value, &h)) {
+    if (vcdp_session_add_del_key(secondary, 2, value | 0x1, &h)) {
       /* already exists */
       VCDP_DBG(0, "session already exists");
       pool_put(ptd->sessions, session);
