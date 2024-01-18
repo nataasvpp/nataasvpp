@@ -22,7 +22,7 @@ vcdp_header_offset(void *start, void *end, int header_size)
 }
 
 static inline void
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_ip4_key_t *skey, u64 *h)
 {
   ip4_header_t *ip = vcdp_get_ip4_header(b);
   skey->proto = ip->protocol;
@@ -30,7 +30,6 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   skey->src = ip->src_address.as_u32;
   skey->dst = ip->dst_address.as_u32;
 
-  /* TODO: Consider moving this to the ICMP forwarding node */
   if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
     udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
@@ -44,13 +43,16 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, vcdp_session_ip4_key_t *skey,
   } else {
     skey->sport = skey->dport = 0;
   }
-
+  if (is_3tuple) {
+    skey->sport = 0;
+    skey->src = 0;
+  }
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
 static inline void
-vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey, u64 *h)
+vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_ip6_key_t *skey, u64 *h)
 {
   ip6_header_t *ip = vcdp_get_ip6_header(b);
   skey->proto = ip->protocol;
@@ -58,7 +60,6 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   skey->src = ip->src_address;
   skey->dst = ip->dst_address;
 
-  /* TODO: Consider moving this to the ICMP forwarding node */
   if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
     udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
@@ -72,50 +73,26 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, vcdp_session_ip6_key_t *skey,
   } else {
     skey->sport = skey->dport = 0;
   }
+  if (is_3tuple) {
+    skey->sport = 0;
+    skey->src.as_u64[0] = 0;
+    skey->src.as_u64[1] = 0;
+  }
 
   /* calculate hash */
   h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (skey));
 }
 
 static inline void
-vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6)
+vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6, bool is_3tuple)
 {
   if (is_ip6) {
     skey->is_ip6 = true;
-    return vcdp_calc_key_v6(b, context_id, &skey->ip6, h);
+    return vcdp_calc_key_v6(b, context_id, is_3tuple, &skey->ip6, h);
   } else {
     skey->is_ip6 = false;
-    return vcdp_calc_key_v4(b, context_id, &skey->ip4, h);
+    return vcdp_calc_key_v4(b, context_id, is_3tuple, &skey->ip4, h);
   }
-}
-
-static inline void
-vcdp_calc_key_v4_3tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
-{
-  skey->proto = ip->protocol;
-  skey->context_id = context_id;
-  skey->src = ip->src_address.as_u32;
-  skey->dst = ip->dst_address.as_u32;
-  skey->sport = 0;
-  skey->dport = 0;
-
-  /* calculate hash */
-  h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
-}
-
-static inline void
-vcdp_calc_key_v4_4tuple(ip4_header_t *ip, u32 context_id, vcdp_session_ip4_key_t *skey, u64 *h)
-{
-  udp_header_t *udp = (udp_header_t *) (ip+1);
-  skey->proto = ip->protocol;
-  skey->context_id = context_id;
-  skey->src = ip->src_address.as_u32;
-  skey->dst = ip->dst_address.as_u32;
-  skey->sport = 0;
-  skey->dport = udp->dst_port;
-
-  /* calculate hash */
-  h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
 /*

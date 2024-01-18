@@ -89,7 +89,7 @@ vcdp_lookup (vcdp_session_key_t *k, bool is_ip6, u64 *v)
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
 VCDP_SERVICE_DECLARE(icmp6_error_fwd)
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6)
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6, bool is_3tuple)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -118,7 +118,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
+      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, is_3tuple);
     h += 1;
     k += 1;
     b += 1;
@@ -142,10 +142,12 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       if (icmp_is_error(b[0], is_ip6)) {
         vcdp_buffer(b[0])->service_bitmap = is_ip6 ? VCDP_SERVICE_MASK(icmp6_error_fwd) : VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
-        // Miss-chain
-        u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
-        vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
-        vcdp_buffer(b[0])->service_bitmap = sb[0] = tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
+        // Miss-chain. Continue down the existing miss-chain or start a new one.
+        if (!is_3tuple) {
+          u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
+          vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+          vcdp_buffer(b[0])->service_bitmap = sb[0] = tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
+        }
       }
       vcdp_next(b[0], current_next);
       to_local[n_local] = bi[0];
@@ -271,13 +273,18 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false);
+   return vcdp_lookup_inline(vm, node, frame, false, false);
+}
+VLIB_NODE_FN(vcdp_lookup_ip4_3tuple_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, false, true);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip6_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, true);
+   return vcdp_lookup_inline(vm, node, frame, true, false);
 }
 
 /*
@@ -462,6 +469,21 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
+};
+
+VLIB_REGISTER_NODE(vcdp_lookup_ip4_3tuple_node) = {
+  .name = "vcdp-lookup-ip4-3tuple",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_LOOKUP_N_ERROR,
+  .error_counters = vcdp_lookup_error_counters,
+};
+VCDP_SERVICE_DEFINE(lookup_ip4_3tuple) = {
+  .node_name = "vcdp-lookup-ip4-3tuple",
+  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 0
 };
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip6_node) = {

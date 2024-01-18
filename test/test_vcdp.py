@@ -372,6 +372,11 @@ class Tests(Test):
                 # reply=fixup_tcp,
                 reply=True,
             ),
+            Test(
+                name="Hairpinning",
+                send=(IP(src=inside.remote_ip4, dst=pool) / TCP(sport=12340, dport=8000)),
+                no_expect=True,
+            )
         ]
 
         # Verify TCP establishment and teardown
@@ -466,7 +471,7 @@ class TestVCDP(VppTestCase):
     def setUpClass(cls):
         """Initialise tests"""
         super(TestVCDP, cls).setUpClass()
-        cls.create_pg_interfaces(range(3))
+        cls.create_pg_interfaces(range(4))
         cls.interfaces = list(cls.pg_interfaces)
         for i in cls.interfaces:
             i.admin_up()
@@ -478,6 +483,7 @@ class TestVCDP(VppTestCase):
         tenant = 0
         v4tenant = 1
         iftenant = 2
+        hairpinningtenant = 3
         outside_tenant = 1000
         portforwarding_tenant = 2000
         cls.pool = "222.1.1.1"
@@ -500,11 +506,13 @@ class TestVCDP(VppTestCase):
             tenant_id=portforwarding_tenant, context_id=0, is_add=True
         )
         cls.vapi.vcdp_tenant_add_del(tenant_id=iftenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_tenant_add_del(tenant_id=portforwarding_tenant, context_id=0, is_add=True)
 
         # Bind tenant to nat
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=v4tenant, nat_id=nat_id, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=iftenant, nat_id=nat_id2, is_set=True)
+        cls.vapi.vcdp_nat_bind_set_unset(tenant_id=portforwarding_tenant, nat_id=nat_id, is_set=True)
 
         # Configure services
         forward_services = "vcdp-l4-lifecycle vcdp-tcp-check-lite ip4-lookup"
@@ -579,6 +587,27 @@ class TestVCDP(VppTestCase):
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
             services="vcdp-nat-port-forwarding vcdp-drop",
         )
+
+        '''
+        cls.vapi.vcdp_set_services(
+            tenant_id=portforwarding_tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output",
+        )
+        cls.vapi.vcdp_set_services(
+            tenant_id=portforwarding_tenant
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output",
+        )
+        cls.vapi.vcdp_set_services(
+            tenant_id=portforwarding_tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
+            services="vcdp-nat-port-forwarding vcdp-nat-slowpath vcdp-drop",
+        )
+        '''
+
+
+
         # NAT port forwarding
         match = {"addr": cls.pool, "port": 8000, "protocol": 6}
         rewrite = {
@@ -630,7 +659,7 @@ class TestVCDP(VppTestCase):
         test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
         # test_suites = [tests.nat44_tests]
-        # test_suites = [tests.port_forwarding_tests]
+        test_suites = [tests.port_forwarding_tests]
         # test_suites = [tests.tcp_tests]
         # test_suites = [tests.nat64_tests]
 
