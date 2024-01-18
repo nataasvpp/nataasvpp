@@ -413,6 +413,22 @@ class Tests(Test):
             ),
         ]
 
+        # Verify that DHCP packets are bypassed and no session is created
+        self.dhcp_tests = [
+            Test(
+                name="DHCP client to server broadcast",
+                send=(IP(src='0.0.0.0', dst='255.255.255.255') / UDP(sport=68, dport=67) / BOOTP() /
+                      DHCP(options=[("message-type","discover"),"end"])),
+                no_expect=True,
+            ),
+            Test(
+                name="DHCP client to server unicast",
+                send=(IP(src=inside.remote_ip4, dst=inside.local_ip4) / UDP(sport=68, dport=67) / BOOTP() /
+                      DHCP(options=[("message-type","discover"),"end"])),
+                no_expect=True,
+            )
+        ]
+
     def make_reply(self, pkt):
         """Given a forward packet, generate the reply"""
         pkt = pkt.copy()
@@ -486,6 +502,7 @@ class TestVCDP(VppTestCase):
         hairpinningtenant = 3
         outside_tenant = 1000
         portforwarding_tenant = 2000
+        bypass_tenant = 3000
         cls.pool = "222.1.1.1"
         nat_id = "nat-instance-1"
         nat_id2 = "nat-instance-2-interface"
@@ -506,7 +523,7 @@ class TestVCDP(VppTestCase):
             tenant_id=portforwarding_tenant, context_id=0, is_add=True
         )
         cls.vapi.vcdp_tenant_add_del(tenant_id=iftenant, context_id=0, is_add=True)
-        cls.vapi.vcdp_tenant_add_del(tenant_id=portforwarding_tenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_tenant_add_del(tenant_id=bypass_tenant, context_id=0, is_add=True)
 
         # Bind tenant to nat
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
@@ -549,7 +566,12 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_set_services(
             tenant_id=v4tenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-            services="vcdp-nat-slowpath vcdp-drop",
+            services="vcdp-lookup-ip4-3tuple vcdp-nat-slowpath vcdp-drop",
+        )
+        cls.vapi.vcdp_set_services(
+            tenant_id=bypass_tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
+            services="vcdp-bypass vcdp-drop",
         )
 
         # Interface NAT tenant service chains
@@ -566,7 +588,7 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_set_services(
             tenant_id=iftenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-            services="vcdp-nat-slowpath vcdp-drop",
+            services="vcdp-lookup-ip4-3tuple vcdp-nat-slowpath vcdp-drop",
         )
 
 
@@ -606,7 +628,11 @@ class TestVCDP(VppTestCase):
         )
         '''
 
-
+        # Add static sessions for DHCP
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, '0.0.0.0', '255.255.255.255', 17, 68, 67)
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, '255.255.255.255', 17, 0, 67)
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg0.local_ip4, 17, 0, 67)
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg2.local_ip4, 17, 0, 67)
 
         # NAT port forwarding
         match = {"addr": cls.pool, "port": 8000, "protocol": 6}
@@ -658,10 +684,11 @@ class TestVCDP(VppTestCase):
         tests = Tests(self, self.pg0, self.pg1, self.pool)
         test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
-        # test_suites = [tests.nat44_tests]
-        test_suites = [tests.port_forwarding_tests]
+        test_suites = [tests.nat44_tests]
+        # test_suites = [tests.port_forwarding_tests]
         # test_suites = [tests.tcp_tests]
         # test_suites = [tests.nat64_tests]
+        test_suites = [tests.dhcp_tests]
 
         for test_suite in test_suites:
             for t in test_suite:
@@ -743,3 +770,11 @@ class TestVCDP(VppTestCase):
         import time
         time.sleep(10)
 
+
+
+###
+### DHCP tests
+### Send broadcast and unicast messages to a punt service.
+### Register port 67 UDP and catch that in tests?
+### Add static sessions and do 3-tuple lookups
+###

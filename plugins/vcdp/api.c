@@ -119,7 +119,7 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
 
   vcdp_session_key_t k;
   if (src.version ==  AF_IP6) {
-    k.ip6.context_id = mp->context;
+    k.ip6.context_id = mp->context_id;
     k.ip6.src = src.ip.ip6;
     k.ip6.dst = dst.ip.ip6;
     k.ip6.sport = clib_host_to_net_u16(mp->sport);
@@ -127,7 +127,7 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
     k.ip6.proto = mp->protocol;
     k.is_ip6 = true;
   } else {
-    k.ip4.context_id = mp->context;
+    k.ip4.context_id = mp->context_id;
     k.ip4.src = src.ip.ip4.as_u32;
     k.ip4.dst = dst.ip.ip4.as_u32;
     k.ip4.sport = clib_host_to_net_u16(mp->sport);

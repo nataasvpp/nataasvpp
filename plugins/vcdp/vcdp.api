@@ -31,6 +31,7 @@ autoreply autoendian define vcdp_session_add
   u32 context;
 
   u32 tenant_id;
+  u32 context_id;
   vl_api_address_t src;
   vl_api_address_t dst;
   u8 protocol;
