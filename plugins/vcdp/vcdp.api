@@ -107,6 +107,26 @@ autoendian autoreply define vcdp_session_clear
   u32 context;
 };
 
+/*
+ * Join a local multicast group.
+ */
+autoreply autoendian define ip_multicast_group_join
+{
+  u32 client_index;
+  u32 context;
+  vl_api_address_t grp_address;
+};
+
+/*
+ * Leave a local multicast group.
+ */
+autoreply autoendian define ip_multicast_group_leave
+{
+  u32 client_index;
+  u32 context;
+  vl_api_address_t grp_address;
+};
+
 counters vcdp_bypass {
   bypass {
     severity info;

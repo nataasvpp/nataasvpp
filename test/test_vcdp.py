@@ -14,6 +14,7 @@ from framework import VppTestCase
 from asfframework import VppTestRunner
 from scapy.layers.inet import ICMP, GRE
 from scapy.layers.dhcp import DHCP, BOOTP
+from scapy.layers.dhcp6 import (DHCP6, DHCP6_Solicit)
 from scapy.layers.inet6 import (
     IP,
     TCP,
@@ -428,6 +429,18 @@ class Tests(Test):
                 no_expect=True,
             )
         ]
+        self.dhcp6_tests = [
+            Test(
+                name="DHCPv6 client to server multicast",
+                send=(IPv6(src='fe80::1', dst='ff02::1:2') / UDP(sport=546, dport=547) / DHCP6_Solicit()),
+                no_expect=True,
+            ),
+            # Test(
+            #     name="DHCPv6 client to server multicast #2",
+            #     send=(IPv6(src='fe80::1', dst='ff02::2') / UDP(sport=546, dport=547) / DHCP6_Solicit()),
+            #     no_expect=True,
+            # ),
+        ]
 
     def make_reply(self, pkt):
         """Given a forward packet, generate the reply"""
@@ -667,6 +680,10 @@ class TestVCDP(VppTestCase):
 
         cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")
         cls.vapi.cli(f"ip route add ::/0 via {cls.pg0.remote_ip6}")
+
+        # Add ourselves to the All DHCPv6 servers group
+        cls.vapi.ip_multicast_group_join(grp_address='FF02::1:2')
+
         cls.nat_id = nat_id
         cls.tenant = tenant
 
@@ -688,7 +705,7 @@ class TestVCDP(VppTestCase):
         # test_suites = [tests.port_forwarding_tests]
         # test_suites = [tests.tcp_tests]
         # test_suites = [tests.nat64_tests]
-        test_suites = [tests.dhcp_tests]
+        test_suites = [tests.dhcp6_tests]
 
         for test_suite in test_suites:
             for t in test_suite:
@@ -709,13 +726,15 @@ class TestVCDP(VppTestCase):
             self.statistics["/vcdp/tenant/removed-sessions"],
         )
         print(self.vapi.cli("show errors"))
+        print(self.vapi.cli("show ip6 mfib FF02::1:2"))
+        print(self.vapi.cli("show ip6 mfib FF02::2"))
 
     def test_vcdp_if_nat(self):
         """Run all the tests with interface NAT"""
         tests = Tests(self, inside=self.pg2, outside=self.pg1, pool=self.pg1.local_ip4)
         test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
-        test_suites = [tests.nat44_tests]
+        # test_suites = [tests.nat44_tests]
         # test_suites = [tests.port_forwarding_tests]
         # test_suites = [tests.tcp_tests]
         # test_suites = [tests.nat64_tests]

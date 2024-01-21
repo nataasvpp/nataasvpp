@@ -10,6 +10,7 @@
 #include <vcdp/vcdp.api_enum.h>
 #include <vcdp/vcdp.api_types.h>
 #include <vcdp/vcdp_types_funcs.h>
+#include <vnet/mfib/mfib_table.h>
 #include "vcdp.h"
 
 #define REPLY_MSG_ID_BASE vcdp->msg_id_base
@@ -242,6 +243,43 @@ vl_api_vcdp_session_clear_t_handler(vl_api_vcdp_session_clear_t *mp)
   vcdp_session_clear();
 
   REPLY_MACRO_END(VL_API_VCDP_SESSION_CLEAR_REPLY);
+}
+
+static void
+vl_api_ip_multicast_group_join_t_handler (vl_api_ip_multicast_group_join_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vl_api_ip_multicast_group_join_reply_t *rmp;
+  int rv = 0;
+  const fib_route_path_t path_for_us = {
+    .frp_proto = DPO_PROTO_IP6,
+    .frp_addr = zero_addr,
+    .frp_sw_if_index = 0xffffffff,
+    .frp_fib_index = ~0,
+    .frp_weight = 1,
+    .frp_flags = FIB_ROUTE_PATH_LOCAL,
+    .frp_mitf_flags = MFIB_ITF_FLAG_FORWARD,
+  };
+  mfib_prefix_t pfx = {
+    .fp_proto = FIB_PROTOCOL_IP6,
+    .fp_len = 128,
+  };
+  u32 fib_index = 0;
+  ip_address_decode(&mp->grp_address, &pfx.fp_grp_addr);
+  // mfib_table_lock(mfib_table->mft_index, FIB_PROTOCOL_IP6, src);
+
+  mfib_table_entry_path_update(fib_index, &pfx, MFIB_SOURCE_SPECIAL, MFIB_ENTRY_ACCEPT_ALL_ITF, &path_for_us);
+  mfib_table_entry_update(fib_index, &pfx, MFIB_SOURCE_SPECIAL, MFIB_RPF_ID_NONE,
+                         MFIB_ENTRY_FLAG_ACCEPT_ALL_ITF);
+  mfib_table_lock(fib_index, FIB_PROTOCOL_IP6, MFIB_SOURCE_DHCP);
+  // mfib_table_unlock (fib_index, FIB_PROTOCOL_IP6, MFIB_SOURCE_DHCP);
+
+  REPLY_MACRO_END(VL_API_IP_MULTICAST_GROUP_JOIN_REPLY);
+}
+static void
+vl_api_ip_multicast_group_leave_t_handler (vl_api_ip_multicast_group_leave_t *mp)
+{
+
 }
 
 #include <vcdp/vcdp.api.c>
