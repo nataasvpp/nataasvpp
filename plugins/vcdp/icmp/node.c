@@ -87,10 +87,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   u32 session_index;
   u32 *bi, *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
-  u32 to_local[VLIB_FRAME_SIZE], n_local = 0;
-  u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
-  u16 thread_indices[VLIB_FRAME_SIZE];
-  u16 local_next_indices[VLIB_FRAME_SIZE];
+  u16 nexts[VLIB_FRAME_SIZE], *next = nexts;
   vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   f64 time_now = vlib_time_now(vm);
@@ -98,6 +95,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   u32 session_indices[VLIB_FRAME_SIZE], *si = session_indices;
   u32 service_bitmaps[VLIB_FRAME_SIZE], *sb = service_bitmaps;
   int rvs[VLIB_FRAME_SIZE], *rv = rvs;
+
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
   ptd->current_time = time_now;
@@ -105,7 +103,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   // Calculate key and hash
   while (n_left) {
     rv[0] = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
-    // rv[0] = vcdp_calc_key_v4_icmp(b[0], vcdp_buffer(b[0])->context_id, k4, h);
     h += 1;
     k += 1;
     b += 1;
@@ -116,24 +113,19 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   h = hashes;
   k = keys;
   b = bufs;
-  u16 *current_next = local_next_indices;
   bi = from;
   n_left = frame->n_vectors;
   rv = rvs;
 
   while (n_left) {
+    u32 error = 0;
     b[0]->error = 0;
     u64 value;
     VCDP_DBG(5, "ICMP %s fwd Looking up: %U (%d)", is_ip6 ? "ip6": "ip4", format_vcdp_session_key, k, rv[0]);
     if ((rv[0] < 0) || vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
       // DROP PACKET
-      to_local[n_local] = bi[0];
-      n_local++;
       b[0]->flow_id = ~0; // No session
-      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-      b[0]->error = node->errors[VCDP_ICMP_FWD_ERROR_NO_SESSION];
-      vcdp_next(b[0], current_next);
-      current_next++;
+      error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
       goto next;
     }
 
@@ -142,7 +134,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     if (flow_thread_index == thread_index) {
       /* known flow which belongs to this thread */
       u32 flow_index = value & (~(u32) 0);
-      to_local[n_local] = bi[0];
       session_index = vcdp_session_from_flow_index(flow_index);
       si[0] = session_index;
       b[0]->flow_id = flow_index;
@@ -153,8 +144,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
         VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k,
                      session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-        b[0]->error = node->errors[VCDP_ICMP_FWD_ERROR_NO_SESSION];
+        error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
         goto next;
       }
 
@@ -166,22 +156,25 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
 
       /* The tenant of the buffer is the tenant of the session */
       vcdp_buffer(b[0])->tenant_index = session->tenant_idx;
-      vcdp_next(b[0], current_next);
-
-      current_next++;
-      n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
       session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
     } else {
       /* known flow which belongs to remote thread */
-      to_remote[n_remote] = bi[0];
-      thread_indices[n_remote] = flow_thread_index;
-      n_remote++;
+      error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
+      goto next;
     }
 
     b[0]->flow_id = value & (~(u32) 0);
 
   next:
+    if (error) {
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[VCDP_ICMP_FWD_ERROR_NO_SESSION];
+
+    }
+    vcdp_next(b[0], next);
+    next++;
+
     b += 1;
     n_left -= 1;
     h += 1;
@@ -192,18 +185,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     sb += 1;
   }
 
-  /* handover buffers to remote node */
-  if (n_remote) {
-    // u32 n_remote_enq;
-    /*n_remote_enq = */vlib_buffer_enqueue_to_thread(vm, node, vcdp->frame_queue_icmp_index, to_remote, thread_indices, n_remote, 1);
-    // vlib_node_increment_counter(vm, node->node_index, VCDP_ICMP_FWD_ERROR_REMOTE, n_remote_enq);
-    // vlib_node_increment_counter(vm, node->node_index, VCDP_ICMP_FWD_ERROR_CON_DROP, n_remote - n_remote_enq);
-  }
-
-  /* enqueue local */
-  if (n_local) {
-    vlib_buffer_enqueue_to_next(vm, node, to_local, local_next_indices, n_local);
-  }
+  vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
 
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
@@ -213,8 +195,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     si = session_indices;
     hit = hits;
     sb = service_bitmaps;
-    u32 *in_local = to_local;
-    u32 *in_remote = to_remote;
+    next = nexts;
 
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
@@ -225,12 +206,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
         t->hit = hit[0];
         t->session_idx = si[0];
         t->service_bitmap = sb[0];
-        if (bi[0] == in_local[0]) {
-          t->next_index = local_next_indices[(in_local++) - to_local];
-        } else {
-          t->next_index = ~0;
-          t->remote_worker = thread_indices[(in_remote++) - to_remote];
-        }
+        t->next_index = next[0];
         if (b[0]->error) {
           t->error = b[0]->error;
         } else {
@@ -243,6 +219,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
         hit++;
         si++;
         sb++;
+        next++;
       } else
         break;
     }

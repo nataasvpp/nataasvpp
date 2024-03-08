@@ -70,6 +70,7 @@ const static char *const vcdp_ip6_nodes[] = {
 };
 
 const static char *const vcdp_ip4_nodes[] = {
+  "vcdp-lookup-ip4",
   NULL,
 };
 
@@ -89,20 +90,35 @@ vcdp_dpo_module_init (vlib_main_t *vm)
 }
 
 void
-vcdp_dpo_entry(ip6_address_t *prefix, u8 prefixlen, u16 index) {
-    // Create DPO for the pool
-  dpo_id_t dpo_v6 = DPO_INVALID;
-  fib_prefix_t pfx = {
-    .fp_proto = FIB_PROTOCOL_IP6,
-    .fp_len = prefixlen,
-    .fp_addr.ip6.as_u64[0] = prefix->as_u64[0],
-    .fp_addr.ip6.as_u64[1] = prefix->as_u64[1],
-  };
-  vcdp_dpo_create(DPO_PROTO_IP6, index, &dpo_v6);
-  u32 fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
-  fib_flags |= FIB_ENTRY_FLAG_EXCLUSIVE ;
-  fib_table_entry_special_dpo_add(0, &pfx, fib_src, fib_flags, &dpo_v6);
-  dpo_reset(&dpo_v6);
+vcdp_dpo_entry(ip_prefix_t *prefix, u16 index)
+{
+  // Create DPO for the pool
+  if (prefix->addr.version == AF_IP6) {
+    dpo_id_t dpo_v6 = DPO_INVALID;
+    fib_prefix_t pfx = {
+      .fp_proto = FIB_PROTOCOL_IP6,
+      .fp_len = prefix->len,
+      .fp_addr.ip6.as_u64[0] = prefix->addr.ip.as_u64[0],
+      .fp_addr.ip6.as_u64[1] = prefix->addr.ip.as_u64[1],
+    };
+    vcdp_dpo_create(DPO_PROTO_IP6, index, &dpo_v6);
+    u32 fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+    fib_flags |= FIB_ENTRY_FLAG_EXCLUSIVE;
+    fib_table_entry_special_dpo_add(0, &pfx, fib_src, fib_flags, &dpo_v6);
+    dpo_reset(&dpo_v6);
+  } else {
+    dpo_id_t dpo_v4 = DPO_INVALID;
+    fib_prefix_t pfx = {
+      .fp_proto = FIB_PROTOCOL_IP4,
+      .fp_len = prefix->len,
+      .fp_addr.ip4.as_u32 = prefix->addr.ip.ip4.as_u32,
+    };
+    vcdp_dpo_create(DPO_PROTO_IP6, index, &dpo_v4);
+    u32 fib_flags = FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+    fib_flags |= FIB_ENTRY_FLAG_EXCLUSIVE;
+    fib_table_entry_special_dpo_add(0, &pfx, fib_src, fib_flags, &dpo_v4);
+    dpo_reset(&dpo_v4);
+  }
 }
 
 VLIB_INIT_FUNCTION(vcdp_dpo_module_init);

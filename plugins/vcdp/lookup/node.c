@@ -89,7 +89,8 @@ vcdp_lookup (vcdp_session_key_t *k, bool is_ip6, u64 *v)
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
 VCDP_SERVICE_DECLARE(icmp6_error_fwd)
 static_always_inline uword
-vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6, bool is_3tuple)
+vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_ip6,
+                   enum vcdp_lookup_mode_e lookup_mode)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
@@ -118,7 +119,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, is_3tuple);
+      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, lookup_mode);
     h += 1;
     k += 1;
     b += 1;
@@ -143,7 +144,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
         vcdp_buffer(b[0])->service_bitmap = is_ip6 ? VCDP_SERVICE_MASK(icmp6_error_fwd) : VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain. Continue down the existing miss-chain or start a new one.
-        if (!is_3tuple) {
+        if (lookup_mode == VCDP_LOOKUP_MODE_DEFAULT) {
           u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
           vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
           vcdp_buffer(b[0])->service_bitmap = sb[0] = tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
@@ -273,12 +274,25 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, false);
+   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_DEFAULT);
 }
+
+VLIB_NODE_FN(vcdp_lookup_ip4_4tuple_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_4TUPLE);
+}
+
 VLIB_NODE_FN(vcdp_lookup_ip4_3tuple_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, true);
+   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_3TUPLE);
+}
+
+VLIB_NODE_FN(vcdp_lookup_ip4_1tuple_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_1TUPLE);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip6_node)
@@ -471,6 +485,21 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .error_counters = vcdp_lookup_error_counters,
 };
 
+VLIB_REGISTER_NODE(vcdp_lookup_ip4_4tuple_node) = {
+  .name = "vcdp-lookup-ip4-4tuple",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_LOOKUP_N_ERROR,
+  .error_counters = vcdp_lookup_error_counters,
+};
+VCDP_SERVICE_DEFINE(lookup_ip4_4tuple) = {
+  .node_name = "vcdp-lookup-ip4-4tuple",
+  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 0
+};
+
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_3tuple_node) = {
   .name = "vcdp-lookup-ip4-3tuple",
   .vector_size = sizeof(u32),
@@ -481,6 +510,21 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_3tuple_node) = {
 };
 VCDP_SERVICE_DEFINE(lookup_ip4_3tuple) = {
   .node_name = "vcdp-lookup-ip4-3tuple",
+  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+  .runs_after = VCDP_SERVICES(0),
+  .is_terminal = 0
+};
+
+VLIB_REGISTER_NODE(vcdp_lookup_ip4_1tuple_node) = {
+  .name = "vcdp-lookup-ip4-1tuple",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_lookup_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .n_errors = VCDP_LOOKUP_N_ERROR,
+  .error_counters = vcdp_lookup_error_counters,
+};
+VCDP_SERVICE_DEFINE(lookup_ip4_1tuple) = {
+  .node_name = "vcdp-lookup-ip4-1tuple",
   .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
   .runs_after = VCDP_SERVICES(0),
   .is_terminal = 0

@@ -50,7 +50,7 @@ gw_prefix_input_enable_disable(ip_prefix_t *prefix, u32 tenant_id, bool is_enabl
     // config = gm->tenant_idx_by_prefix + prefix->len;
     // config[0] = tenant_idx;
 
-    vcdp_dpo_entry(&prefix->addr.ip.ip6, prefix->len, tenant_idx);
+    vcdp_dpo_entry(prefix, tenant_idx);
   }
   return 0;
 }

@@ -22,7 +22,8 @@ vcdp_header_offset(void *start, void *end, int header_size)
 }
 
 static inline void
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_ip4_key_t *skey, u64 *h)
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_ip4_key_t *skey,
+                 u64 *h)
 {
   ip4_header_t *ip = vcdp_get_ip4_header(b);
   skey->proto = ip->protocol;
@@ -43,16 +44,32 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_
   } else {
     skey->sport = skey->dport = 0;
   }
-  if (is_3tuple) {
+  switch (lookup_mode) {
+  case VCDP_LOOKUP_MODE_DEFAULT:
+    break;
+  case VCDP_LOOKUP_MODE_4TUPLE:
+    skey->sport = 0;
+    break;
+  case VCDP_LOOKUP_MODE_3TUPLE:
     skey->sport = 0;
     skey->src = 0;
+    break;
+  case VCDP_LOOKUP_MODE_1TUPLE:
+    skey->sport = 0;
+    skey->dport = 0;
+    skey->proto = 0;
+    skey->src = 0;
+    break;
+  default:
+    ASSERT(0);
   }
   /* calculate hash */
   h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
 static inline void
-vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_ip6_key_t *skey, u64 *h)
+vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_ip6_key_t *skey,
+                 u64 *h)
 {
   ip6_header_t *ip = vcdp_get_ip6_header(b);
   skey->proto = ip->protocol;
@@ -73,10 +90,26 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_
   } else {
     skey->sport = skey->dport = 0;
   }
-  if (is_3tuple) {
+  switch (lookup_mode) {
+  case VCDP_LOOKUP_MODE_DEFAULT:
+    break;
+  case VCDP_LOOKUP_MODE_4TUPLE:
+    skey->sport = 0;
+    break;
+  case VCDP_LOOKUP_MODE_3TUPLE:
     skey->sport = 0;
     skey->src.as_u64[0] = 0;
     skey->src.as_u64[1] = 0;
+    break;
+  case VCDP_LOOKUP_MODE_1TUPLE:
+    skey->sport = 0;
+    skey->dport = 0;
+    skey->proto = 0;
+    skey->src.as_u64[0] = 0;
+    skey->src.as_u64[1] = 0;
+    break;
+  default:
+    ASSERT(0);
   }
 
   /* calculate hash */
@@ -84,14 +117,15 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, bool is_3tuple, vcdp_session_
 }
 
 static inline void
-vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6, bool is_3tuple)
+vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6,
+              enum vcdp_lookup_mode_e lookup_mode)
 {
   if (is_ip6) {
     skey->is_ip6 = true;
-    return vcdp_calc_key_v6(b, context_id, is_3tuple, &skey->ip6, h);
+    return vcdp_calc_key_v6(b, context_id, lookup_mode, &skey->ip6, h);
   } else {
     skey->is_ip6 = false;
-    return vcdp_calc_key_v4(b, context_id, is_3tuple, &skey->ip4, h);
+    return vcdp_calc_key_v4(b, context_id, lookup_mode, &skey->ip4, h);
   }
 }
 

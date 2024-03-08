@@ -206,6 +206,13 @@ typedef struct {
   u32 no_tunnels;
 } vcdp_cfg_main_t;
 
+enum vcdp_lookup_mode_e {
+  VCDP_LOOKUP_MODE_DEFAULT = 0,
+  VCDP_LOOKUP_MODE_4TUPLE,
+  VCDP_LOOKUP_MODE_3TUPLE,
+  VCDP_LOOKUP_MODE_1TUPLE,
+};
+
 extern vcdp_main_t vcdp_main;
 extern vcdp_cfg_main_t vcdp_cfg_main;
 extern vlib_node_registration_t vcdp_handoff_node;

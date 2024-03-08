@@ -579,7 +579,7 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_set_services(
             tenant_id=v4tenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-            services="vcdp-lookup-ip4-3tuple vcdp-nat-slowpath vcdp-drop",
+            services="vcdp-lookup-ip4-1tuple vcdp-nat-slowpath vcdp-drop",
         )
         cls.vapi.vcdp_set_services(
             tenant_id=bypass_tenant,
@@ -601,7 +601,7 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_set_services(
             tenant_id=iftenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
-            services="vcdp-lookup-ip4-3tuple vcdp-nat-slowpath vcdp-drop",
+            services="vcdp-lookup-ip4-1tuple vcdp-nat-slowpath vcdp-drop",
         )
 
 
@@ -644,8 +644,8 @@ class TestVCDP(VppTestCase):
         # Add static sessions for DHCP
         cls.vapi.vcdp_session_add(bypass_tenant, 0, '0.0.0.0', '255.255.255.255', 17, 68, 67)
         cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, '255.255.255.255', 17, 0, 67)
-        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg0.local_ip4, 17, 0, 67)
-        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg2.local_ip4, 17, 0, 67)
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg0.local_ip4, 0, 0, 0)
+        cls.vapi.vcdp_session_add(bypass_tenant, 0, 0, cls.pg2.local_ip4, 0, 0, 0)
 
         # NAT port forwarding
         match = {"addr": cls.pool, "port": 8000, "protocol": 6}
@@ -678,6 +678,13 @@ class TestVCDP(VppTestCase):
             sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
         )
 
+        # Catch inside traffic via DPO instead of as an ip4 input feature
+        # How to follow the 'real'
+        cls.vapi.vcdp_gateway_prefix_enable_disable(
+            prefix="0.0.0.0/0", is_enable=True, tenant_id=v4tenant
+        )
+
+
         cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")
         cls.vapi.cli(f"ip route add ::/0 via {cls.pg0.remote_ip6}")
 
@@ -701,11 +708,11 @@ class TestVCDP(VppTestCase):
         tests = Tests(self, self.pg0, self.pg1, self.pool)
         test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
-        test_suites = [tests.nat44_tests]
+        # test_suites = [tests.nat44_tests]
         # test_suites = [tests.port_forwarding_tests]
-        # test_suites = [tests.tcp_tests]
+        test_suites = [tests.tcp_tests]
         # test_suites = [tests.nat64_tests]
-        test_suites = [tests.dhcp6_tests]
+        # test_suites = [tests.dhcp6_tests]
 
         for test_suite in test_suites:
             for t in test_suite:
@@ -726,8 +733,9 @@ class TestVCDP(VppTestCase):
             self.statistics["/vcdp/tenant/removed-sessions"],
         )
         print(self.vapi.cli("show errors"))
-        print(self.vapi.cli("show ip6 mfib FF02::1:2"))
-        print(self.vapi.cli("show ip6 mfib FF02::2"))
+        self.vapi.cli("ip route add 0.0.0.0/0 via pg0")
+        print(self.vapi.cli("show ip fib 0.0.0.0/0 detail"))
+
 
     def test_vcdp_if_nat(self):
         """Run all the tests with interface NAT"""
