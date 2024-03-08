@@ -224,4 +224,10 @@ counters vcdp_icmp_fwd {
     units "packets";
     description "no session";
   };
+  remote {
+    severity error;
+    type counter64;
+    units "packets";
+    description "remote flow - not implemented";
+  };
 };
