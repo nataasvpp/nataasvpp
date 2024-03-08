@@ -73,10 +73,6 @@ icmp_service_chain(u32 pbmp)
   return nbmp;
 }
 
-typedef enum {
-  VCDP_ICMP_ERROR_FWD_NEXT_DROP,
-  VCDP_ICMP_ERROR_FWD_N_NEXT,
-} vcdp_icmp_error_fwd_next_t;
 
 VCDP_SERVICE_DECLARE(drop);
 u32 icmp_service_chain(u32 pbmp);
@@ -178,12 +174,12 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     }
     u32 bmp = vcdp_buffer(b[0])->service_bitmap;
     u8 first = __builtin_ffs(bmp);
-    if (first) {
-      vcdp_next(b[0], next);
-    } else {
+    if (first == 0) {
       clib_warning("ICMP fwd: no service chain");
-      next[0] = VCDP_ICMP_ERROR_FWD_NEXT_DROP;
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     }
+    vcdp_next(b[0], next);
+
     next++;
 
     b += 1;
@@ -357,12 +353,6 @@ VLIB_REGISTER_NODE(vcdp_icmp_fwd_ip4_node) = {
   .type = VLIB_NODE_TYPE_INTERNAL,
   .error_counters = vcdp_icmp_fwd_error_counters,
   .n_errors = VCDP_ICMP_FWD_N_ERROR,
-  .n_next_nodes = VCDP_ICMP_ERROR_FWD_N_NEXT,
-  .next_nodes =
-    {
-      [VCDP_ICMP_ERROR_FWD_NEXT_DROP] = "error-drop",
-    },
-
 };
 VLIB_REGISTER_NODE(vcdp_icmp_fwd_ip6_node) = {
   .name = "vcdp-icmp6-error-forwarding",
