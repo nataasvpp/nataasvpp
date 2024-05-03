@@ -6,6 +6,7 @@
 
 #include <vlib/vlib.h>
 #include <vnet/fib/fib_table.h>
+#include <vnet/dpo/load_balance.h>
 #include <vnet/feature/feature.h>
 #include <vcdp/vcdp.h>
 #include <vcdp/common.h>
@@ -13,6 +14,7 @@
 #include <vnet/ip/reass/ip4_sv_reass.h>
 #include <vcdp/vcdp_funcs.h>
 #include "gateway.h"
+#include "vcdp_dpo.h"
 
 enum vcdp_input_next_e {
   VCDP_GW_NEXT_LOOKUP,
@@ -48,8 +50,8 @@ format_vcdp_output_trace(u8 *s, va_list *args)
 
 // This node assumes that the tenant has been configured for the given FIB table
 // before being enabled.
-VLIB_NODE_FN(vcdp_input_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+static inline uword
+vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_dpo)
 {
 
   // use VRF ID as tenant ID
@@ -69,11 +71,17 @@ VLIB_NODE_FN(vcdp_input_node)
 
   while (n_left) {
 
-    u32 rx_sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
-    tenant_idx[0] = gw->tenant_idx_by_sw_if_idx[rx_sw_if_index];
-    if ((u32)tenant_idx[0] == ~0) {
-      vnet_feature_next_u16(current_next, b[0]);
-      goto next;
+    if (is_dpo) {
+      vcdp_dpo_t *dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
+      tenant_idx[0] = dpo->tenant_idx;
+      vcdp_buffer(b[0])->next_node = vnet_buffer(b[0])->ip.adj_index[VLIB_TX]; // May be overwritten
+    } else {
+      u32 rx_sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
+      tenant_idx[0] = gw->tenant_idx_by_sw_if_idx[rx_sw_if_index];
+      if ((u32) tenant_idx[0] == ~0) {
+        vnet_feature_next_u16(current_next, b[0]);
+        goto next;
+      }
     }
     vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx[0]);
     vcdp_buffer(b[0])->context_id = tenant->context_id;
@@ -105,6 +113,17 @@ VLIB_NODE_FN(vcdp_input_node)
   return frame->n_vectors;
 }
 
+VLIB_NODE_FN(vcdp_input_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_input_node_inline(vm, node, frame, false);
+}
+VLIB_NODE_FN(vcdp_input_dpo_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_input_node_inline(vm, node, frame, true);
+}
+
 VLIB_REGISTER_NODE(vcdp_input_node) = {
   .name = "vcdp-input",
   .vector_size = sizeof(u32),
@@ -119,6 +138,14 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
     },
 };
 
+VLIB_REGISTER_NODE(vcdp_input_dpo_node) = {
+  .name = "vcdp-input-dpo",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_input_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .sibling_of = "vcdp-input",
+};
+
 VNET_FEATURE_INIT(vcdp_input_feat, static) = {
   .arc_name = "ip4-unicast",
   .node_name = "vcdp-input",
@@ -130,8 +157,8 @@ VNET_FEATURE_INIT(vcdp_output_feat, static) = {
   .node_name = "vcdp-input",
 };
 
-VLIB_NODE_FN(vcdp_output_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+static inline uword
+vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_dpo)
 {
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
@@ -152,16 +179,29 @@ VLIB_NODE_FN(vcdp_output_node)
     if (PREDICT_FALSE(ip->ttl <= 1)) {
       // b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
+      vnet_buffer (b[0])->ip.fib_index = 0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
       next[0] = VCDP_GW_NEXT_ICMP_ERROR;
     } else {
-      vnet_feature_next_u16(next, b[0]);
+      if (is_dpo) {
+        // vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
+        vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vcdp_buffer(b[0])->next_node);
+
+        // TODO: Should this have been cached in the original DPO?
+        u32 lbi = vcdp_dpo->dpo_parent.dpoi_index;
+        load_balance_t *lb = load_balance_get (lbi);
+    	  const dpo_id_t *dpo = load_balance_get_bucket_i (lb, 0);
+        next[0] = dpo->dpoi_next_node;
+        vnet_buffer (b[0])->ip.adj_index[VLIB_TX] = dpo->dpoi_index;
+      } else {
+        vnet_feature_next_u16(next, b[0]);
+        if (next[0] > node->n_next_nodes) {
+          clib_warning("next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
+          next[0] = VCDP_GW_NEXT_DROP;
+        }
+      }
     }
 
-    if (next[0] > node->n_next_nodes) {
-      clib_warning("next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
-      next[0] = VCDP_GW_NEXT_DROP;
-    }
 
     b++;
     next++;
@@ -184,6 +224,17 @@ VLIB_NODE_FN(vcdp_output_node)
   return frame->n_vectors;
 }
 
+VLIB_NODE_FN(vcdp_output_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_output_node_inline(vm, node, frame, false);
+}
+VLIB_NODE_FN(vcdp_output_dpo_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_output_node_inline(vm, node, frame, true);
+}
+
 VLIB_REGISTER_NODE(vcdp_output_node) = {
   .name = "vcdp-output",
   .vector_size = sizeof(u32),
@@ -192,8 +243,23 @@ VLIB_REGISTER_NODE(vcdp_output_node) = {
   .sibling_of = "vcdp-input",
 };
 
+VLIB_REGISTER_NODE(vcdp_output_dpo_node) = {
+  .name = "vcdp-output-dpo",
+  .vector_size = sizeof(u32),
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .format_trace = format_vcdp_output_trace,
+  .sibling_of = "ip4-lookup",
+};
+
 VCDP_SERVICE_DEFINE(output) = {
   .node_name = "vcdp-output",
+  .runs_before = VCDP_SERVICES(0),
+  .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check",
+                              "vcdp-nat-late-rewrite", "vcdp-nat-early-rewrite"),
+  .is_terminal = 1
+};
+VCDP_SERVICE_DEFINE(output_dpo) = {
+  .node_name = "vcdp-output-dpo",
   .runs_before = VCDP_SERVICES(0),
   .runs_after = VCDP_SERVICES("vcdp-drop", "vcdp-l4-lifecycle", "vcdp-tcp-lite-check",
                               "vcdp-nat-late-rewrite", "vcdp-nat-early-rewrite"),

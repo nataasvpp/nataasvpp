@@ -3,6 +3,7 @@
 
 #include <gateway/gateway.h>
 #include <vnet/plugin/plugin.h>
+#include <vnet/fib/fib_table.h>
 #include <vnet/vnet.h>
 #include "tunnel/tunnel.h"
 
@@ -62,6 +63,8 @@ gateway_prefix_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *input,
   clib_error_t *err = 0;
   u32 tenant_id = ~0;
   ip_prefix_t pfx = {0};
+  u32 table_id = 0;
+  bool is_interpose = false;
 
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
@@ -70,6 +73,10 @@ gateway_prefix_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *input,
     if (unformat(line_input, "%U", unformat_ip_prefix, &pfx))
       ;
     else if (unformat(line_input, "tenant %d", &tenant_id))
+      ;
+    else if (unformat(line_input, "interpose"))
+      is_interpose = true;
+    else if (unformat(line_input, "table %d", &table_id))
       ;
     else {
       err = unformat_parse_error(line_input);
@@ -80,8 +87,12 @@ gateway_prefix_input_enable_command_fn(vlib_main_t *vm, unformat_input_t *input,
     err = clib_error_return(0, "missing arguments");
     goto done;
   }
-  int rv = gw_prefix_input_enable_disable(&pfx, tenant_id, true);
-  if (rv != 0) {
+
+  fib_protocol_t proto = pfx.addr.version == AF_IP6 ? FIB_PROTOCOL_IP6 : FIB_PROTOCOL_IP4;
+  u32 fib_index = fib_table_find(proto, table_id);
+
+
+  if (gw_prefix_input_enable_disable(fib_index, &pfx, tenant_id, is_interpose, true)) {
     err = clib_error_return(0, "could not enable prefix dpo");
   }
 

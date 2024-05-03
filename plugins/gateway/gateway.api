@@ -61,8 +61,10 @@ autoreply autoendian define vcdp_gateway_prefix_enable_disable
   u32 client_index;
   u32 context;
 
+  u32 table_id;
   vl_api_prefix_t prefix;
   u32 tenant_id;
+  bool is_interpose; // hijack traffic to VCDP or also forward to the original destination
   bool is_enable;
 };
 

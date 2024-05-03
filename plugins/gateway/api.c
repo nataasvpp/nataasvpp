@@ -8,7 +8,7 @@
 #include <vlibmemory/api.h>
 #include <vnet/ip/ip_types_api.h>
 #include <vnet/ethernet/ethernet_types_api.h>
-
+#include <vnet/fib/fib_table.h>
 #include <vnet/format_fns.h>
 #include "tunnel/tunnel.h"
 #include <gateway/gateway.api_enum.h>
@@ -66,8 +66,10 @@ vl_api_vcdp_gateway_prefix_enable_disable_t_handler(vl_api_vcdp_gateway_prefix_e
   int rv;
   ip_prefix_t prefix;
   ip_prefix_decode2(&mp->prefix, &prefix);
+  fib_protocol_t proto = prefix.addr.version == AF_IP6 ? FIB_PROTOCOL_IP6 : FIB_PROTOCOL_IP4;
+  u32 fib_index = fib_table_find(proto, mp->table_id);
 
-  rv = gw_prefix_input_enable_disable(&prefix, mp->tenant_id, mp->is_enable);
+  rv = gw_prefix_input_enable_disable(fib_index, &prefix, mp->tenant_id, mp->is_interpose, mp->is_enable);
 
   REPLY_MACRO_END(VL_API_VCDP_GATEWAY_PREFIX_ENABLE_DISABLE_REPLY);
 }

@@ -5,7 +5,7 @@
 # pylint: disable=line-too-long
 # pylint: disable=invalid-name
 
-"""VCDP NAT64 tests"""
+"""VCDP tests"""
 
 import unittest
 from socket import AF_INET, AF_INET6, inet_pton
@@ -513,6 +513,8 @@ class TestVCDP(VppTestCase):
         v4tenant = 1
         iftenant = 2
         hairpinningtenant = 3
+        cls.v4tenant_dpo = v4tenant_dpo = 4
+        cls.v4dpo_prefix = v4dpo_prefix = '0.0.0.0/0'
         outside_tenant = 1000
         portforwarding_tenant = 2000
         bypass_tenant = 3000
@@ -537,10 +539,12 @@ class TestVCDP(VppTestCase):
         )
         cls.vapi.vcdp_tenant_add_del(tenant_id=iftenant, context_id=0, is_add=True)
         cls.vapi.vcdp_tenant_add_del(tenant_id=bypass_tenant, context_id=0, is_add=True)
+        cls.vapi.vcdp_tenant_add_del(tenant_id=v4tenant_dpo, context_id=0, is_add=True)
 
         # Bind tenant to nat
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant, nat_id=nat_id, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=v4tenant, nat_id=nat_id, is_set=True)
+        cls.vapi.vcdp_nat_bind_set_unset(tenant_id=v4tenant_dpo, nat_id=nat_id, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=iftenant, nat_id=nat_id2, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=portforwarding_tenant, nat_id=nat_id, is_set=True)
 
@@ -565,6 +569,23 @@ class TestVCDP(VppTestCase):
             services=miss_services,
         )
 
+        # v4 DPO tenant service chains
+        cls.vapi.vcdp_set_services(
+            tenant_id=v4tenant_dpo,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output-dpo",
+        )
+        cls.vapi.vcdp_set_services(
+            tenant_id=v4tenant_dpo,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output-dpo",
+        )
+        cls.vapi.vcdp_set_services(
+            tenant_id=v4tenant_dpo,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
+            services="vcdp-nat-slowpath vcdp-drop",
+        )
+
         # v4 tenant service chains
         cls.vapi.vcdp_set_services(
             tenant_id=v4tenant,
@@ -581,6 +602,7 @@ class TestVCDP(VppTestCase):
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
             services="vcdp-lookup-ip4-1tuple vcdp-nat-slowpath vcdp-drop",
         )
+
         cls.vapi.vcdp_set_services(
             tenant_id=bypass_tenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
@@ -603,7 +625,6 @@ class TestVCDP(VppTestCase):
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
             services="vcdp-lookup-ip4-1tuple vcdp-nat-slowpath vcdp-drop",
         )
-
 
         # Port forwarding service chains
         cls.vapi.vcdp_set_services(
@@ -660,7 +681,7 @@ class TestVCDP(VppTestCase):
 
         # Enable interfaces
         cls.vapi.vcdp_gateway_prefix_enable_disable(
-            prefix="64:ff9b::/96", is_enable=True, tenant_id=tenant
+            table_id=0, prefix="64:ff9b::/96", is_enable=True, is_interpose=False, tenant_id=tenant
         )
         cls.vapi.vcdp_gateway_enable_disable(
             sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant
@@ -674,16 +695,15 @@ class TestVCDP(VppTestCase):
         # cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant, output_arc=True)
 
         # Catching IPv4 traffic on IPv4 output interface
-        cls.vapi.vcdp_gateway_enable_disable(
-            sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
-        )
+        # cls.vapi.vcdp_gateway_enable_disable(
+        #     sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
+        # )
 
-        # Catch inside traffic via DPO instead of as an ip4 input feature
-        # How to follow the 'real'
-        cls.vapi.vcdp_gateway_prefix_enable_disable(
-            prefix="0.0.0.0/0", is_enable=True, tenant_id=v4tenant
-        )
-
+        # # # Catch inside traffic via DPO instead of as an ip4 input feature
+        # # # How to follow the 'real' DPO? Store tenant in DPO index.
+        # cls.vapi.vcdp_gateway_prefix_enable_disable(
+        #     prefix=v4dpo_prefix, is_enable=True, tenant_id=v4tenant_dpo
+        # )
 
         cls.vapi.cli(f"ip route add 10.0.0.0/8 via {cls.pg0.remote_ip4}")
         cls.vapi.cli(f"ip route add ::/0 via {cls.pg0.remote_ip6}")
@@ -706,12 +726,12 @@ class TestVCDP(VppTestCase):
     def test_vcdp(self):
         """Run all the tests"""
         tests = Tests(self, self.pg0, self.pg1, self.pool)
-        test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
+        # test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
         # test_suites = [tests.nat44_tests]
         # test_suites = [tests.port_forwarding_tests]
-        test_suites = [tests.tcp_tests]
-        # test_suites = [tests.nat64_tests]
+        # test_suites = [tests.tcp_tests]
+        test_suites = [tests.nat64_tests]
         # test_suites = [tests.dhcp6_tests]
 
         for test_suite in test_suites:
@@ -733,9 +753,8 @@ class TestVCDP(VppTestCase):
             self.statistics["/vcdp/tenant/removed-sessions"],
         )
         print(self.vapi.cli("show errors"))
-        self.vapi.cli("ip route add 0.0.0.0/0 via pg0")
+        self.vapi.cli("ip route add 0.0.0.0/0 via pg1")
         print(self.vapi.cli("show ip fib 0.0.0.0/0 detail"))
-
 
     def test_vcdp_if_nat(self):
         """Run all the tests with interface NAT"""
@@ -767,6 +786,128 @@ class TestVCDP(VppTestCase):
         )
         print(self.vapi.cli("show errors"))
 
+    def test_via_interpose_dpo2(self):
+        '''Default route'''
+
+        # Try installing in different order.
+        # First install covering route, then our DPO
+        # Second install our DPO then the covering route
+        self.vapi.cli('set logging class fib level debug')
+        prefix = '0.0.0.0/0'
+        vcdprefix1 = '0.0.0.0/1'
+        vcdprefix2 = '128.0.0.0/1'
+        print(self.vapi.cli(f"show ip fib {prefix} detail"))
+
+        self.vapi.vcdp_gateway_prefix_enable_disable(
+            prefix=vcdprefix1, is_enable=True, is_interpose=True, tenant_id=self.v4tenant_dpo
+        )
+
+        self.vapi.vcdp_gateway_prefix_enable_disable(
+            prefix=vcdprefix2, is_enable=True, is_interpose=True, tenant_id=self.v4tenant_dpo
+        )
+        self.vapi.cli(f"ip route add {prefix} via pg1 {self.pg1.remote_ip4}")
+        self.vapi.cli(f"ip route del {prefix} via pg1 {self.pg1.remote_ip4}")
+        self.vapi.cli(f"ip route add {prefix} via pg1 {self.pg1.remote_ip4}")
+
+        print(self.vapi.cli(f"show ip fib {prefix} detail"))
+        # print(self.vapi.cli(f"show ip fib {vcdprefix1} detail"))
+        # print(self.vapi.cli(f"show ip fib {prefix} detail"))
+        print(self.vapi.cli('show log'))
+        # If interpose is enabled, will not install until there is a covering route
+
+
+        p = (Ether(src=self.pg3.remote_mac, dst=self.pg3.local_mac) /
+            IP(src=self.pg3.remote_ip4, dst='13.0.0.1') /
+            UDP(sport=1234, dport=80))
+        rx = self.send_and_expect(self.pg3, p, self.pg1)
+        rx[0].show2()
+        rx = self.send_and_expect(self.pg3, p, self.pg1)
+        rx[0].show2()
+
+        # What happens if I change the default route????
+        self.vapi.cli(f"ip route del {prefix} via pg1 {self.pg1.remote_ip4}")
+        p[IP].dst = '13.0.0.4'
+        self.send_and_assert_no_replies(self.pg3, p)
+        print(self.vapi.cli(f"show ip fib {prefix} detail"))
+        # print(self.vapi.cli(f"show ip fib {vcdprefix1} detail"))
+
+        self.vapi.cli(f"ip route add {prefix} via pg2 {self.pg2.remote_ip4}")
+        p[IP].dst = '13.0.0.5'
+        rx = self.send_and_expect(self.pg3, p, self.pg2)
+        rx[0].show2()
+        print(self.vapi.cli(f"show ip fib {prefix} detail"))
+
+
+    def test_via_interpose_dpo(self):
+        # Cases:
+        # More specific VCDP DPO. VCDP done based on that. Forwarding done on covering DPO.
+        # What if destination address is rewritten?
+        #
+
+        """Test that we can catch traffic via the interpose DPO"""
+        prefix = '0.0.0.0/0'
+        msrprefix = '12.0.0.0/24'
+        msrprefix2 = '13.0.0.0/24'
+
+        # Catch inside traffic via DPO instead of as an ip4 input feature
+        # How to follow the 'real' DPO? Store tenant in DPO index.
+        # self.vapi.vcdp_gateway_prefix_enable_disable(
+        #     prefix=prefix, is_enable=True, tenant_id=self.v4tenant_dpo
+        # )
+
+        # # More specific DPO without exact match
+        # self.vapi.vcdp_gateway_prefix_enable_disable(
+        #     prefix=msrprefix, is_enable=True, tenant_id=self.v4tenant_dpo
+        # )
+
+        # More specific DPO with exact match
+        self.vapi.vcdp_gateway_prefix_enable_disable(
+            table_id=0, prefix=msrprefix2, is_enable=True, is_interpose=False, tenant_id=self.v4tenant_dpo
+        )
+
+        print(self.vapi.cli(f"show ip fib {msrprefix} detail"))
+        print(self.vapi.cli(f"show ip fib {msrprefix2} detail"))
+
+        #
+        # Send via more specific2
+        #
+        # self.vapi.cli(f"ip route add {msrprefix2} via pg1 {self.pg1.remote_ip4}")
+        msrp2 = (Ether(src=self.pg3.remote_mac, dst=self.pg3.local_mac) /
+             IP(src=self.pg3.remote_ip4, dst='13.0.0.1') /
+             UDP(sport=1234, dport=80))
+        rx = self.send_and_expect(self.pg3, msrp2, self.pg1)
+        rx[0].show2()
+
+        # Remove route, should be forwarded via covering route
+        print(f'Forwarding via covering route {msrprefix2}')
+        # self.vapi.cli(f"ip route del {msrprefix2} via pg1 {self.pg1.remote_ip4}")
+        print(self.vapi.cli(f"show ip fib {msrprefix2} detail"))
+        rx = self.send_and_expect(self.pg3, msrp2, self.pg1)
+        rx[0].show2()
+
+        return
+
+        # Default route via pg1
+        self.vapi.cli(f"ip route add {prefix} via pg1 {self.pg1.remote_ip4}")
+        p = (Ether(src=self.pg3.remote_mac, dst=self.pg3.local_mac) /
+             IP(src=self.pg3.remote_ip4, dst='12.8.8.8') /
+             UDP(sport=1234, dport=80))
+        rx = self.send_and_expect(self.pg3, p, self.pg1)
+        rx[0].show2()
+
+        # Send via more specific
+        msrp = (Ether(src=self.pg3.remote_mac, dst=self.pg3.local_mac) /
+             IP(src=self.pg3.remote_ip4, dst='12.0.0.1') /
+             UDP(sport=1234, dport=80))
+        # rx = self.send_and_expect(self.pg3, msrp, self.pg1)
+        # rx[0].show2()
+
+        # Change nexthop to pg2
+        self.vapi.cli(f"ip route del {prefix} via pg1 {self.pg1.remote_ip4}")
+        self.vapi.cli(f"ip route add {prefix} via pg2 {self.pg2.remote_ip4}")
+        rx = self.send_and_expect(self.pg3, p, self.pg2)
+        rx[0].show2()
+
     @unittest.SkipTest
     def test_tcp_checksum(self):
         '''Test TCP checksum'''
@@ -788,7 +929,6 @@ class TestVCDP(VppTestCase):
             modified[IP].src = self.pool
             validate(self, p[1], modified[1])
 
-
         print('VALIDATE TCP CHECKSUM in REPLY packet')
         # print(self.vapi.cli("show vcdp session"))
         print(self.vapi.cli("show vcdp summary"))
@@ -796,7 +936,6 @@ class TestVCDP(VppTestCase):
         print('Awaiting to see if anything expires:')
         import time
         time.sleep(10)
-
 
 
 ###

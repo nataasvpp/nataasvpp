@@ -38,7 +38,10 @@
         "utility": "c",
         "vcdp_funcs.h": "c",
         "bihash_40_8.h": "c",
-        "tw_timer_1t_3w_1024sl_ov.h": "c"
+        "tw_timer_1t_3w_1024sl_ov.h": "c",
+        "vcdp_dpo.h": "c",
+        "gateway.h": "c",
+        "fib_table.h": "c"
     },
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
