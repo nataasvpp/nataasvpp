@@ -42,32 +42,6 @@ VCDP_SERVICE_DECLARE(drop)
 vcdp_main_t vcdp_main;
 vcdp_cfg_main_t vcdp_cfg_main;
 
-/*
- * Schedule sessions for garbage collection
- */
-static void
-vcdp_timer_expired(u32 *expired)
-{
-  uword thread_index = vlib_get_thread_index();
-  vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  int i;
-  for (i = 0; i < vec_len(expired); i++) {
-    u32 session_idx = expired[i];
-    if (pool_is_free_index(ptd->sessions, session_idx)) {
-      /* Session has already been deleted */
-      VCDP_DBG(1, "session %u already deleted", session_idx);
-      continue;
-    } else {
-      vcdp_session_t *session = pool_elt_at_index(ptd->sessions, session_idx);
-      session->timer.handle = VCDP_TIMER_HANDLE_INVALID;
-    }
-    vec_add1(ptd->expired_sessions, session_idx);
-  }
-}
-
-vcdp_cfg_main_t vcdp_cfg_main;
-
 clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
@@ -89,7 +63,6 @@ vcdp_init(vlib_main_t *vm)
   for (int i = 0; i <= vlib_num_workers(); i++) {
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, i);
     pool_init_fixed(ptd->sessions, vcdp_cfg_main.no_sessions_per_thread);
-    vcdp_tw_init(&ptd->wheel, vcdp_timer_expired, VCDP_TIMER_INTERVAL, ~0);
     ptd->session_id_template = (u64) epoch << (template_shift + log_n_thread);
     ptd->session_id_template |= (u64) i << template_shift;
   }
@@ -110,14 +83,6 @@ vcdp_init(vlib_main_t *vm)
   vcdp->frame_queue_icmp_index = vlib_frame_queue_main_init (vcdp_icmp_fwd_ip4_node.index, 0);
 
   return 0;
-}
-
-static void
-vcdp_tenant_init_timeouts(vcdp_tenant_t *tenant)
-{
-#define _(x, y, z) tenant->timeouts[VCDP_TIMEOUT_##x] = y;
-  foreach_vcdp_timeout
-#undef _
 }
 
 static u32 **simple_dir_entry_indices = 0;
@@ -190,7 +155,6 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 defaul
       tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS] = miss_bitmap;
       tenant->tenant_id = tenant_id;
       tenant->context_id = context_id;
-      vcdp_tenant_init_timeouts(tenant);
       kv.key = tenant_id;
       kv.value = tenant_idx;
       clib_bihash_add_del_8_8(&vcdp->tenant_idx_by_id, &kv, 1);
@@ -260,14 +224,9 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
 }
 
 clib_error_t *
-vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val)
+vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeout_idx, u32 timeout_val)
 {
-  clib_bihash_kv_8_8_t kv = {.key = tenant_id, .value = 0};
-  vcdp_tenant_t *tenant;
-  if (clib_bihash_search_inline_8_8(&vcdp->tenant_idx_by_id, &kv))
-    return clib_error_return(0, "Can't configure timeout: tenant id %d not found", tenant_id);
-  tenant = vcdp_tenant_at_index(vcdp, kv.value);
-  tenant->timeouts[timeout_idx] = timeout_val;
+  vcdp->timeouts[timeout_idx] = timeout_val;
   return 0;
 }
 
@@ -343,7 +302,6 @@ vcdp_session_clear (void)
 
   vec_foreach_index(thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    vec_reset_length(ptd->expired_sessions);
     pool_foreach(session, ptd->sessions) {
       if (session->state != VCDP_SESSION_STATE_STATIC) {
         vec_add1(to_delete, session - ptd->sessions);

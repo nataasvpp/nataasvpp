@@ -12,6 +12,7 @@
 #include <vcdp/vcdp_funcs.h>
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/vcdp.api_enum.h>
+#include "timer_lru.h"
 
 /*
  * Create a static VCDP session. (No timer)
@@ -117,9 +118,8 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   if (is_static) {
     session->state = VCDP_SESSION_STATE_STATIC;
   } else {
-    session->timer.handle = VCDP_TIMER_HANDLE_INVALID;
-    vcdp_session_timer_start(&ptd->wheel, &session->timer, session_idx, vlib_time_now(vlib_get_main()),
-                             tenant->timeouts[VCDP_TIMEOUT_EMBRYONIC]);
+    vcdp_session_timer_start(vcdp, session, thread_index, vlib_time_now(vlib_get_main()),
+                             VCDP_TIMEOUT_EMBRYONIC);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index, tenant_idx, 1);
   VCDP_DBG(3, "Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
@@ -191,14 +191,7 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   /* Stop timer if running */
   VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
   VCDP_DBG(2, "Stopping timer for session %u", session_index);
-  vcdp_session_timer_stop(&ptd->wheel, &session->timer);
-
-  // Is this session on the expiry queue?
-  u32 index = vec_search(ptd->expired_sessions, session_index);
-  if (index != ~0) {
-    VCDP_DBG(1, "WARNING: Found session to be removed on expired vector %u", session_index);
-    vec_del1(ptd->expired_sessions, index);
-  }
+  vcdp_session_timer_stop(vcdp, session, thread_index);
 
   if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_PRIMARY], 0, 0, &h)) {
     VCDP_DBG(1, "Failed to remove session key from table");
@@ -224,25 +217,6 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   pool_put_index(ptd->sessions, session_index);
 }
 
-void
-vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, u32 session_index)
-{
-  /* Session may have been removed already */
-  if (pool_is_free_index(ptd->sessions, session_index))
-    return;
-  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
-  f64 diff = (session->timer.next_expiration - (ptd->current_time + VCDP_TIMER_INTERVAL)) / VCDP_TIMER_INTERVAL;
-  if (diff > (f64) 1.) {
-    /* Rearm the timer accordingly */
-    VCDP_DBG(2, "Rearming timer for session %u Now: %.2f Ticks: %.2f %llx", session_index,
-             ptd->current_time, diff, session->session_id);
-    vcdp_session_timer_update_maybe_past(&ptd->wheel, &session->timer, session_index, ptd->current_time, diff);
-  } else {
-    VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
-    vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
-  }
-}
-
 /*
  * An existing TCP session is being reused for a new flow with the same 6-tuple.
  * Reset counters.
@@ -266,7 +240,8 @@ vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session
 bool
 vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
 {
-  return (session->state != VCDP_SESSION_STATE_STATIC && session->timer.next_expiration - time_now < 1);
+  return (session->state != VCDP_SESSION_STATE_STATIC &&
+          (vcdp_session_remaining_time(session, time_now) == 0));
 }
 
 int

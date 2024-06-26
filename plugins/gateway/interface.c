@@ -16,6 +16,8 @@
 #include "gateway.h"
 #include "vcdp_dpo.h"
 
+uword icmp_error_next_node_index;
+
 enum vcdp_input_next_e {
   VCDP_GW_NEXT_LOOKUP,
   VCDP_GW_NEXT_ICMP_ERROR,
@@ -70,6 +72,11 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
   current_next = next_indices;
 
   while (n_left) {
+    if (vcdp_buffer(b[0])->flags & VCDP_BUFFER_FLAG_BIT_VISITED) {
+      // Already run through VCDP.
+      // Skip to terminal node. May happen if VCDP ran as part of DPO or input feature arc.
+      goto next;
+    }
 
     if (is_dpo) {
       vcdp_dpo_t *dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
@@ -181,8 +188,11 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       vnet_buffer (b[0])->ip.fib_index = 0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
-      next[0] = VCDP_GW_NEXT_ICMP_ERROR;
+      clib_warning("Sending ICMP time exceeded");
+      next[0] = is_dpo ? icmp_error_next_node_index : VCDP_GW_NEXT_ICMP_ERROR;
+      clib_warning("Setting NEXT TO: %d", next[0]);
     } else {
+
       if (is_dpo) {
         // vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
         vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vcdp_buffer(b[0])->next_node);
@@ -191,7 +201,7 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
         u32 lbi = vcdp_dpo->dpo_parent.dpoi_index;
         load_balance_t *lb = load_balance_get (lbi);
     	  const dpo_id_t *dpo = load_balance_get_bucket_i (lb, 0);
-        next[0] = dpo->dpoi_next_node;
+        next[0] = dpo->dpoi_next_node; // From one of ip4-lookups nexts
         vnet_buffer (b[0])->ip.adj_index[VLIB_TX] = dpo->dpoi_index;
       } else {
         vnet_feature_next_u16(next, b[0]);
@@ -206,7 +216,7 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
     b++;
     next++;
     n_left--;
-  }
+    }
 
   vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
 
@@ -284,3 +294,18 @@ VCDP_SERVICE_DEFINE(ip6_lookup) = {
                               "vcdp-nat64-late-rewrite", "vcdp-nat64-early-rewrite"),
   .is_terminal = 1
 };
+
+extern vlib_node_registration_t vcdp_icmp_error_node;
+clib_error_t *
+vcdp_gw_init(vlib_main_t *vm)
+{
+  vlib_node_t *dpo_output = vlib_get_node_by_name (vm, (u8 *) "vcdp-output-dpo");
+  vlib_node_t *icmp_error = vlib_get_node_by_name (vm, (u8 *) "vcdp-icmp-error");
+  // icmp_error_next_node_index = vlib_node_add_next(vm, vcdp_output_dpo_node.index, vcdp_icmp_error_node.index);
+  icmp_error_next_node_index = vlib_node_add_next(vm, dpo_output->index, icmp_error->index);
+  clib_warning("Setting error icmp node index to %d", icmp_error_next_node_index);
+
+  return 0;
+}
+
+VLIB_INIT_FUNCTION(vcdp_gw_init);

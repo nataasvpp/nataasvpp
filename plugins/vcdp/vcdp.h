@@ -16,8 +16,8 @@
 #include <vppinfra/bihash_8_8.h>
 #include <vppinfra/bihash_40_8.h>
 
-#include <vppinfra/tw_timer_1t_3w_1024sl_ov.h>
 #include <vppinfra/format_table.h>
+#include <vppinfra/dlist.h>
 
 #include <vcdp/vcdp_counter.json.h>
 
@@ -45,7 +45,6 @@
  */
 
 
-// TODO: Needed?
 typedef enum {
   VCDP_SESSION_TYPE_IP4,
   VCDP_SESSION_TYPE_IP6,
@@ -92,8 +91,8 @@ typedef enum {
 // #define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
 // #define VCDP_SESSION_KEY_IP6 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
 
-#define VCDP_SESSION_KEY_IS_PRIMARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6)
-#define VCDP_SESSION_KEY_IS_SECONDARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
+// #define VCDP_SESSION_KEY_IS_PRIMARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6)
+// #define VCDP_SESSION_KEY_IS_SECONDARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
 
 enum {
   VCDP_SESSION_KEY_PRIMARY = 0,
@@ -142,13 +141,16 @@ typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
   u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
   u64 session_id;               // 8
-  vcdp_session_timer_t timer;   // 12
+  vcdp_session_timer_t timer;
   u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
   vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 72
 
   u64 bytes[VCDP_FLOW_F_B_N];   // 16
   u32 pkts[VCDP_FLOW_F_B_N];    // 8
   f64 created;                  // 8
+  /* Last heard timer */
+  f64 last_heard;               // 8
+
   session_version_t session_version;    // 2
   u16 tenant_idx;               // 2
   u8 state; /* see vcdp_session_state_t */ // 1
@@ -160,11 +162,13 @@ typedef struct {
 
 typedef struct {
   vcdp_session_t *sessions; /* fixed pool */
-  vcdp_tw_t wheel;
   f64 current_time;
   u64 session_id_ctr;
   u64 session_id_template;
-  u32 *expired_sessions;
+
+  /* LRU session list - head is stale, tail is fresh */
+  dlist_elt_t *lru_pool;
+  u32 lru_head_index[VCDP_N_TIMEOUT];
 } vcdp_per_thread_data_t;
 
 typedef struct {
@@ -172,7 +176,6 @@ typedef struct {
   u32 context_id;
   u32 bitmaps[VCDP_SERVICE_CHAIN_N];
   u32 tcp_bitmaps[VCDP_SERVICE_CHAIN_N];
-  u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_tenant_t;
 
 typedef struct {
@@ -197,6 +200,7 @@ typedef struct {
   vcdp_per_thread_data_t *per_thread_data;
   u16 msg_id_base;
 
+  u32 timeouts[VCDP_N_TIMEOUT];
 } vcdp_main_t;
 
 typedef struct {
@@ -313,7 +317,7 @@ vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
-clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 tenant_id, u32 timeout_idx, u32 timeout_val);
+clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeout_idx, u32 timeout_val);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
@@ -328,7 +332,6 @@ int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t
                                        u32 pseudo_flow_index, vcdp_session_key_t *key, u64 *h);
 void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
-void vcdp_session_remove_or_rearm(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, u32 session_index);
 bool vcdp_session_is_expired(vcdp_session_t *session, f64 time_now);
 void vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session);
 int vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v);

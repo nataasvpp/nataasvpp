@@ -5,6 +5,7 @@
 #include <vnet/plugin/plugin.h>
 #include <vnet/vnet.h>
 #include <vcdp/service.h>
+#include <vcdp/timer_lru.h>
 
 static clib_error_t *
 vcdp_tenant_add_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
@@ -94,7 +95,7 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d", &tenant_id))
+    if (0)
       ;
 #define _(x, y, z) else if (unformat(line_input, z " %d", &timeout_val)) timeout_idx = VCDP_TIMEOUT_##x;
     foreach_vcdp_timeout
@@ -114,7 +115,7 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     goto done;
   }
 
-  err = vcdp_set_timeout(vcdp, tenant_id, timeout_idx, timeout_val);
+  err = vcdp_set_timeout(vcdp, timeout_idx, timeout_val);
 done:
   unformat_free(line_input);
   return err;
@@ -196,7 +197,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
         continue;
 
-      f64 remaining_time = session->timer.next_expiration - now;
+      f64 remaining_time = vcdp_session_remaining_time(session, now);
       if (session->state == VCDP_SESSION_STATE_STATIC)
         remaining_time = 0;
 
@@ -245,7 +246,6 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
-    vlib_cli_output(vm, "Expired vector length: %d", vec_len(ptd->expired_sessions));
   }
   vcdp_tenant_t *tenant;
   pool_foreach(tenant, vcdp->tenants) {
@@ -349,7 +349,7 @@ VLIB_CLI_COMMAND(clear_vcdp_sessions, static) = {
 };
 
 VLIB_CLI_COMMAND(vcdp_set_timeout_command, static) = {.path = "set vcdp timeout",
-                                                      .short_help = "set vcdp timeout tenant <tenant-id>"
+                                                      .short_help = "set vcdp timeout"
                                                                     " <timeout-name> <timeout-value>",
                                                       .function = vcdp_set_timeout_command_fn};
 

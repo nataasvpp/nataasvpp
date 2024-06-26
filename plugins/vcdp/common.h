@@ -7,7 +7,9 @@
 #include <vnet/vnet.h>
 
 // TODO: Is this used?
-#define foreach_vcdp_buffer_flag _(REASSEMBLED, "reassembled")
+#define foreach_vcdp_buffer_flag \
+_(REASSEMBLED, "reassembled") \
+_(VISITED, "visited")
 
 enum {
 #define _(sym, str) VCDP_BUFFER_FLAG_BIT_##sym,

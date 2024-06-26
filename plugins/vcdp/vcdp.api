@@ -73,30 +73,11 @@ autoendian define vcdp_session_lookup_reply
   vl_api_vcdp_session_key_t secondary_key;
 };
 
-define vcdp_tenant_dump
-{
-  u32 client_index;
-  u32 context;
-};
-
-define vcdp_tenant_details
-{
-  u32 context;
-
-  u32 index;
-  u32 context_id;
-  u32 forward_bitmap;
-  u32 reverse_bitmap;
-  u32 n_timeout;
-  u32 timeout[n_timeout];
-};
-
 autoreply define vcdp_set_timeout
 {
   u32 client_index;
   u32 context;
 
-  u32 tenant_id;
   u32 timeout_id;
   u32 timeout_value;
 };

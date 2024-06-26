@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include "vcdp.h"
 #include "service.h"
+#include "timer_lru.h"
 
 /*
  * This file contains functions to export the VCDP session database to a CBOR file.
@@ -105,8 +106,7 @@ vcdp_session_to_cbor(vcdp_session_t *session)
   vcdp_tenant_t *tenant = vcdp_tenant_at_index(&vcdp_main, session->tenant_idx);
   cbor_item_t *s = cbor_new_definite_array(11);
 
-  f64 remaining_time = session->timer.next_expiration - vlib_time_now(vlib_get_main());
-
+  f64 remaining_time = vcdp_session_remaining_time(session, vlib_time_now(vlib_get_main()));
   cbor_array_push(s, cbor_move(cbor_build_uint32(tenant->tenant_id)));
   cbor_array_push(s, cbor_move(cbor_build_uint64(session->session_id)));
   cbor_array_push(s, cbor_move(cbor_build_session_state(session->state)));

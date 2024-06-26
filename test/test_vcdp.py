@@ -290,31 +290,37 @@ class Tests(Test):
                 expect_interface=self.inside,
             ),
         ]
+        random_outside_address = '8.8.8.8'
+
         # First fragment
-        fragment = IP(src=inside.remote_ip4, dst=outside.remote_ip4, flags="MF") / UDP(
+        fragment = IP(src=inside.remote_ip4, dst=random_outside_address, flags="MF") / UDP(
             sport=1235, dport=80
         )
         # Second fragment
         second_fragment = IP(
-            src=inside.remote_ip4, dst=outside.remote_ip4, flags="MF", frag=2
+            src=inside.remote_ip4, dst=random_outside_address, flags="MF", frag=2
         )
-
         self.nat44_tests = [
             Test(
-                name="UDP + reply",
-                send=(IP(src=inside.remote_ip4, dst=outside.remote_ip4) / udp),
-                reply=True,
+                name="Unidirectional UDP",
+                send=(IP(src=inside.remote_ip4, dst=random_outside_address) / udp),
                 npackets=2,
             ),
             Test(
+                name="UDP + reply",
+                send=(IP(src=inside.remote_ip4, dst=random_outside_address) / udp),
+                reply=True,
+                npackets=1,
+            ),
+            Test(
                 name="TCP SYN",
-                send=(IP(src=inside.remote_ip4, dst=outside.remote_ip4) / tcp),
+                send=(IP(src=inside.remote_ip4, dst=random_outside_address) / tcp),
                 reply=lambda pkt: fixup_tcp_flags(pkt, 'SA'),
             ),
             Test(
                 name="TCP ACK",
                 send=(
-                    IP(src=inside.remote_ip4, dst=outside.remote_ip4)
+                    IP(src=inside.remote_ip4, dst=random_outside_address)
                     / TCP(sport=1234, dport=80, flags="A")
                 ),
             ),
@@ -322,7 +328,7 @@ class Tests(Test):
                 name="UDP fragment",
                 send=(fragment),
                 expect=(
-                    IP(src=pool, dst=outside.remote_ip4, flags="MF", ttl=63, id=1)
+                    IP(src=pool, dst=random_outside_address, flags="MF", ttl=63, id=1)
                     / UDP(sport=1235, dport=80)
                 ),
             ),
@@ -334,22 +340,22 @@ class Tests(Test):
             Test(
                 name="Basic ICMP TTL=10 in2out",
                 send=(
-                    IP(src=inside.remote_ip4, dst=outside.remote_ip4, ttl=10)
+                    IP(src=inside.remote_ip4, dst=random_outside_address, ttl=10)
                     / ICMP(id=10)
                 ),
-                expect=(IP(src=pool, dst=outside.remote_ip4, ttl=9) / ICMP(id=10)),
+                expect=(IP(src=pool, dst=random_outside_address, ttl=9) / ICMP(id=10)),
             ),
             Test(
                 name="Basic ICMP TTL=1 in2out",
                 send=(
-                    IP(src=inside.remote_ip4, dst=outside.remote_ip4, ttl=1)
+                    IP(src=inside.remote_ip4, dst=random_outside_address, ttl=1)
                     / ICMP(id=10)
                 ),
                 expect_interface=self.inside,
             ),
             Test(
                 name="Truncated packet",
-                send=(IP(src=inside.remote_ip4, dst=outside.remote_ip4, proto=6)),
+                send=(IP(src=inside.remote_ip4, dst=random_outside_address, proto=6)),
                 no_expect=True,
             ),
             # Test(
@@ -548,7 +554,7 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=iftenant, nat_id=nat_id2, is_set=True)
         cls.vapi.vcdp_nat_bind_set_unset(tenant_id=portforwarding_tenant, nat_id=nat_id, is_set=True)
 
-        # Configure services
+        # Configure services for NAT64
         forward_services = "vcdp-l4-lifecycle vcdp-tcp-check-lite ip4-lookup"
         reverse_services = "vcdp-l4-lifecycle vcdp-tcp-check-lite ip6-lookup"
         miss_services = "vcdp-nat64-slowpath vcdp-drop"
@@ -578,7 +584,7 @@ class TestVCDP(VppTestCase):
         cls.vapi.vcdp_set_services(
             tenant_id=v4tenant_dpo,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
-            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output-dpo",
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output",
         )
         cls.vapi.vcdp_set_services(
             tenant_id=v4tenant_dpo,
@@ -723,6 +729,31 @@ class TestVCDP(VppTestCase):
         #         i.unconfig_ip4()
         #         i.admin_down()
 
+
+    def test_vcdp_dpo(self):
+        '''Run DPO tests'''
+        prefix = '0.0.0.0/0'
+        vcdprefix1 = '0.0.0.0/0'
+        # vcdprefix2 = '128.0.0.0/1'
+        self.vapi.cli(f"ip route add {prefix} via pg1 {self.pg1.remote_ip4}")
+
+        self.vapi.vcdp_gateway_prefix_enable_disable(
+            prefix=vcdprefix1, is_enable=True, is_interpose=True, tenant_id=self.v4tenant_dpo
+        )
+        # self.vapi.vcdp_gateway_prefix_enable_disable(
+        #     prefix=vcdprefix2, is_enable=True, is_interpose=True, tenant_id=self.v4tenant_dpo
+        # )
+
+        tests = Tests(self, self.pg3, self.pg1, self.pool)
+        test_suites = [tests.nat44_tests]
+        for test_suite in test_suites:
+            for t in test_suite:
+                print(f"Running: {t.name}")
+                tests.send(t)
+
+        print(self.vapi.cli("show vcdp session detail"))
+
+
     def test_vcdp(self):
         """Run all the tests"""
         tests = Tests(self, self.pg0, self.pg1, self.pool)
@@ -837,6 +868,7 @@ class TestVCDP(VppTestCase):
         rx[0].show2()
         print(self.vapi.cli(f"show ip fib {prefix} detail"))
 
+        print(self.vapi.cli('show vcdp session detail'))
 
     def test_via_interpose_dpo(self):
         # Cases:

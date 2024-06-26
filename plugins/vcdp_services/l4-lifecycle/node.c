@@ -5,7 +5,7 @@
 #include <vcdp/vcdp.h>
 #include <vcdp/service.h>
 #include <vcdp_services/l4-lifecycle/l4_lifecycle.api_enum.h>
-
+#include <vcdp/timer_lru.h>
 typedef struct {
   u32 flow_id;
   u8 new_state;
@@ -37,13 +37,10 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
   u32 n_left = frame->n_vectors;
 
   vlib_get_buffers(vm, from, bufs, n_left);
-  f64 time_now = vlib_time_now(vm);
 
   while (n_left) {
     u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
     vcdp_session_t *session = vcdp_session_at_index(ptd, session_idx);
-    vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
     u8 direction = vcdp_direction_from_flow_index(b[0]->flow_id);
     /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
      */
@@ -52,8 +49,7 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
       session->state = VCDP_SESSION_STATE_ESTABLISHED;
 
     if (session->state == VCDP_SESSION_STATE_ESTABLISHED) {
-      vcdp_session_timer_update(&ptd->wheel, &session->timer, time_now,
-                                tenant->timeouts[VCDP_TIMEOUT_ESTABLISHED]);
+      vcdp_session_timer_update_timeout_type(vcdp, session, thread_index, VCDP_TIMEOUT_ESTABLISHED);
     }
 
     vcdp_next(b[0], to_next);

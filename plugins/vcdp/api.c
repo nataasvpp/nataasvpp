@@ -12,6 +12,7 @@
 #include <vcdp/vcdp_types_funcs.h>
 #include <vnet/mfib/mfib_table.h>
 #include "vcdp.h"
+#include "timer_lru.h"
 
 #define REPLY_MSG_ID_BASE vcdp->msg_id_base
 #include <vlibapi/api_helper_macros.h>
@@ -84,10 +85,9 @@ static void
 vl_api_vcdp_set_timeout_t_handler(vl_api_vcdp_set_timeout_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  u32 tenant_id = clib_net_to_host_u32(mp->tenant_id);
   u32 timeout_id = clib_net_to_host_u32(mp->timeout_id);
   u32 timeout_value = clib_net_to_host_u32(mp->timeout_value);
-  clib_error_t *err = vcdp_set_timeout(vcdp, tenant_id, timeout_id, timeout_value);
+  clib_error_t *err = vcdp_set_timeout(vcdp, timeout_id, timeout_value);
   vl_api_vcdp_set_timeout_reply_t *rmp;
   int rv = err ? -1 : 0;
   REPLY_MACRO(VL_API_VCDP_SET_TIMEOUT_REPLY);
@@ -183,54 +183,12 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
     rmp->session_type = vcdp_session_type_encode(session->type);
     rmp->protocol = ip_proto_encode(session->proto);
     rmp->state = vcdp_session_state_encode(session->state);
-    rmp->remaining_time = session->timer.next_expiration - now;
+    rmp->remaining_time = vcdp_session_remaining_time(session, now);
     rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
     rmp->reverse_bitmap = session->bitmaps[VCDP_FLOW_REVERSE];
     vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
     vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
   }}));
-}
-
-static void
-vcdp_send_tenant_details(vl_api_registration_t *rp, u32 context, u16 tenant_index, vcdp_tenant_t *tenant)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  vl_api_vcdp_tenant_details_t *mp;
-
-  size_t msg_size;
-  msg_size = sizeof(*mp) + VCDP_N_TIMEOUT * sizeof(mp->timeout[0]);
-
-  mp = vl_msg_api_alloc_zero(msg_size);
-  mp->_vl_msg_id = ntohs(VL_API_VCDP_TENANT_DETAILS + vcdp->msg_id_base);
-
-  /* fill in the message */
-  mp->context = context;
-  mp->context_id = clib_host_to_net_u32(tenant->context_id);
-  mp->index = clib_host_to_net_u32(tenant_index);
-  mp->forward_bitmap = clib_host_to_net_u32(tenant->bitmaps[VCDP_FLOW_FORWARD]);
-  mp->reverse_bitmap = clib_host_to_net_u32(tenant->bitmaps[VCDP_FLOW_REVERSE]);
-  mp->n_timeout = clib_host_to_net_u32(VCDP_N_TIMEOUT);
-#define _(name, y, z) mp->timeout[VCDP_TIMEOUT_##name] = clib_host_to_net_u32(tenant->timeouts[VCDP_TIMEOUT_##name]);
-  foreach_vcdp_timeout
-#undef _
-    vl_api_send_msg(rp, (u8 *) mp);
-}
-
-static void
-vl_api_vcdp_tenant_dump_t_handler(vl_api_vcdp_tenant_dump_t *mp)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_tenant_t *tenant;
-  u16 tenant_index;
-  vl_api_registration_t *rp;
-  rp = vl_api_client_index_to_registration(mp->client_index);
-  if (rp == 0)
-    return;
-
-  pool_foreach_index (tenant_index, vcdp->tenants) {
-    tenant = vcdp_tenant_at_index(vcdp, tenant_index);
-    vcdp_send_tenant_details(rp, mp->context, tenant_index, tenant);
-  }
 }
 
 static void

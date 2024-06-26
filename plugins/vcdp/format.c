@@ -7,6 +7,7 @@
 #include <vcdp/vcdp.h>
 #include <vppinfra/format_table.h>
 #include <vcdp/timer.h>
+#include <vcdp/timer_lru.h>
 
 u8 *
 format_vcdp_session_state(u8 *s, va_list *args)
@@ -88,7 +89,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   f64 now = va_arg(*args, f64);
   vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
 
-  f64 remaining_time = session->timer.next_expiration - now;
+  f64 remaining_time = vcdp_session_remaining_time(session, now);
   u64 session_net = clib_host_to_net_u64(session->session_id);
   uword thread_index = ptd - vcdp_main.per_thread_data;
   vcdp_session_key_t *skey;
@@ -104,8 +105,6 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   if (session->state != VCDP_SESSION_STATE_STATIC)
     s = format(s, "  expires after: %fs\n", remaining_time);
-  s = format(s, "  timer state: %s\n",
-             vcdp_session_timer_running(&ptd->wheel, &session->timer) ? "running" : "stopped");
   s = format(s, "  forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
   s = format(s, "  reverse service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_REVERSE]);
   s = format(s, "  counters:\n");
@@ -162,7 +161,7 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
   u32 indent = format_get_indent(s);
   vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
   u32 tenant_idx = va_arg(*args, u32);
-  vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
+  __clib_unused vcdp_tenant_t *tenant = va_arg(*args, vcdp_tenant_t *);
 
   counter_t ctr;
   vlib_counter_t ctr2;
@@ -180,12 +179,7 @@ format_vcdp_tenant_extra(u8 *s, va_list *args)
   s = format(s, "%Utx: %llu packets\n", format_white_space, indent + 2, ctr2.packets);
   s = format(s, "%U  %llu bytes\n", format_white_space, indent + strlen("tx") + 2, ctr2.bytes);
 
-  s = format(s, "%U%s\n", format_white_space, indent-2, "Configured Timeout:");
-#define _(x, y, z)                                                                                                     \
-  s = format(s, "%U%s: %d seconds\n", format_white_space, indent + 2, z, tenant->timeouts[VCDP_TIMEOUT_##x]);
-  foreach_vcdp_timeout
-#undef _
-    return s;
+  return s;
 }
 
 uword

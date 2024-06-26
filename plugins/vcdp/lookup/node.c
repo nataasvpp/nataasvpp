@@ -1,3 +1,7 @@
+TODO:
+ - update timer when forwarding pcap_add_packet
+ - Delete session when creating a new session / check for full session table
+
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
 
@@ -115,8 +119,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   b = bufs;
   ptd->current_time = time_now;
 
-  vcdp_expire_timers(&ptd->wheel, time_now);
-
   // Calculate key and hash
   while (n_left) {
       vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, lookup_mode);
@@ -192,6 +194,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
       session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
+      session->last_heard = time_now;
 
     } else {
       /* known flow which belongs to remote thread */
@@ -413,68 +416,6 @@ format_vcdp_handoff_trace(u8 *s, va_list *args)
              t->next_index, t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward");
   return s;
 }
-
-/*
- * Deleting sessions is done as a pre-input node to ensure it's run at the beginning of a scheduler iteration.
- * This is to ensure that the session is removed before any other nodes are run and buffers are in flight using a
- * removed session.
- */
-VLIB_NODE_FN(vcdp_session_expire_node)
-(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  u32 session_index;
-
-  for (int i=0; vec_len(ptd->expired_sessions) > 0 && i < 256; i++) {
-    session_index = vec_pop(ptd->expired_sessions);
-    VCDP_DBG(2, "Timer fired for session %u", session_index);
-    vcdp_session_remove_or_rearm(vcdp, ptd, thread_index, session_index);
-  }
-  if (vec_len(ptd->expired_sessions) > 0)
-    VCDP_DBG(2, "Expired sessions after cleanup: %d", vec_len(ptd->expired_sessions));
-
-#ifdef VCDP_SESSION_TABLE_SCANNER
-#define MAX_THREADS 16
-#define VCDP_SESSION_LEAK_EXPIRY 100.0
-
-  static f64 last_run = 0;
-
-  // Walk session table and remove leaked sessions if found
-  // This should not be needed. Add an error counter.
-  // Use a cursor here, so we don't have to scan a large table in one go.
-  vcdp_session_t *session;
-  f64 now = vlib_time_now(vm);
-  if ((now - last_run) < 1)
-    return 0;
-  last_run = now;
-  static u32 cursor_ptd[MAX_THREADS];
-  u32 cursor = cursor_ptd[thread_index];
-  if (cursor == ~0)
-    cursor = 0;
-  if (pool_is_free_index(ptd->sessions, cursor))
-    cursor = pool_next_index(ptd->sessions, cursor);
-
-  int i = 0;
-  while (cursor != ~0 && i++ < 256) {
-    session = pool_elt_at_index(ptd->sessions, cursor);
-    if (session->state != VCDP_SESSION_STATE_STATIC &&
-        (session->timer.next_expiration - now) < -VCDP_SESSION_LEAK_EXPIRY) {
-      VCDP_DBG(0, "Session %llx has leaked, removing %.2f", session->session_id, session->timer.next_expiration - now);
-      vcdp_session_remove(vcdp, ptd, session, thread_index, cursor);
-    }
-    cursor = pool_next_index(ptd->sessions, cursor);
-  }
-#endif
-  return 0;
-}
-
-VLIB_REGISTER_NODE (vcdp_session_expire_node) =
-{
-  .type = VLIB_NODE_TYPE_PRE_INPUT,
-  .name = "vcdp-session-expire",
-};
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_node) = {
   .name = "vcdp-lookup-ip4",
