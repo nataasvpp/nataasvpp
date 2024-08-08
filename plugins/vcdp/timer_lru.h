@@ -4,19 +4,6 @@
 #include <vlib/vlib.h>
 #include <vppinfra/dlist.h>
 
-static_always_inline int
-vcdp_timer_lru_insert(vcdp_per_thread_data_t *ptd, vcdp_session_t *s, f64 now, vcdp_timeout_type_t timeout)
-{
-  dlist_elt_t *lru_list_elt;
-  pool_get(ptd->lru_pool, lru_list_elt);
-  s->timer.lru_index = lru_list_elt - ptd->lru_pool;
-  s->timer.lru_head_index = ptd->lru_head_index[timeout];
-  clib_dlist_addtail(ptd->lru_pool, s->timer.lru_head_index, s->timer.lru_index);
-  lru_list_elt->value = s - ptd->sessions;
-  s->timer.last_lru_update = now;
-  return 1;
-}
-
 #if 0
 static_always_inline int
 vcdp_timer_lru_free_one_with_head(vcdp_main_t *vcdp, int thread_index, f64 now, u32 head_index)
@@ -90,7 +77,13 @@ always_inline void
 vcdp_session_timer_start(vcdp_main_t *vcdp, vcdp_session_t *s, u32 thread_index, f64 now, vcdp_timeout_type_t timeout)
 {
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  vcdp_timer_lru_insert(ptd, s, now, timeout);
+  dlist_elt_t *lru_list_elt;
+  pool_get(ptd->lru_pool, lru_list_elt);
+  s->timer.lru_index = lru_list_elt - ptd->lru_pool;
+  s->timer.lru_head_index = ptd->lru_head_index[timeout];
+  clib_dlist_addtail(ptd->lru_pool, s->timer.lru_head_index, s->timer.lru_index);
+  lru_list_elt->value = s - ptd->sessions;
+  s->timer.last_lru_update = now;
 }
 
 always_inline void

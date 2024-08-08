@@ -1,7 +1,3 @@
-TODO:
- - update timer when forwarding pcap_add_packet
- - Delete session when creating a new session / check for full session table
-
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
 

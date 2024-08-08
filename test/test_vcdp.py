@@ -514,7 +514,7 @@ class TestVCDP(VppTestCase):
             i.resolve_arp()
             i.config_ip6()
             i.resolve_ndp()
-
+        '''
         tenant = 0
         v4tenant = 1
         iftenant = 2
@@ -650,7 +650,6 @@ class TestVCDP(VppTestCase):
             services="vcdp-nat-port-forwarding vcdp-drop",
         )
 
-        '''
         cls.vapi.vcdp_set_services(
             tenant_id=portforwarding_tenant,
             dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
@@ -666,7 +665,6 @@ class TestVCDP(VppTestCase):
             dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
             services="vcdp-nat-port-forwarding vcdp-nat-slowpath vcdp-drop",
         )
-        '''
 
         # Add static sessions for DHCP
         cls.vapi.vcdp_session_add(bypass_tenant, 0, '0.0.0.0', '255.255.255.255', 17, 68, 67)
@@ -698,12 +696,12 @@ class TestVCDP(VppTestCase):
             sw_if_index=cls.pg2.sw_if_index, is_enable=True, tenant_id=iftenant
         )
 
-        # cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant, output_arc=True)
+        cls.vapi.vcdp_gateway_enable_disable(sw_if_index=cls.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant, output_arc=False)
 
         # Catching IPv4 traffic on IPv4 output interface
-        # cls.vapi.vcdp_gateway_enable_disable(
-        #     sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
-        # )
+        cls.vapi.vcdp_gateway_enable_disable(
+            sw_if_index=cls.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
+        )
 
         # # # Catch inside traffic via DPO instead of as an ip4 input feature
         # # # How to follow the 'real' DPO? Store tenant in DPO index.
@@ -719,6 +717,7 @@ class TestVCDP(VppTestCase):
 
         cls.nat_id = nat_id
         cls.tenant = tenant
+        '''
 
     @classmethod
     def tearDownClass(cls):
@@ -756,13 +755,55 @@ class TestVCDP(VppTestCase):
 
     def test_vcdp(self):
         """Run all the tests"""
+        v4tenant = 0
+        outside_tenant = 1000
+        services_flags = VppEnum.vl_api_vcdp_service_chain_t
+
+        # NATs
+        nat_id = "nat-instance-1"
+        self.pool = "222.1.1.1"
+        self.vapi.vcdp_nat_add(nat_id=nat_id, addr=[self.pool], n_addr=len([self.pool]))
+
+        # Tenants
+        self.vapi.vcdp_tenant_add_del(tenant_id=v4tenant, context_id=0, is_add=True)
+        self.vapi.vcdp_tenant_add_del(tenant_id=outside_tenant, context_id=0, is_add=True)
+
+        # Bind tenant to nat
+        self.vapi.vcdp_nat_bind_set_unset(tenant_id=v4tenant, nat_id=nat_id, is_set=True)
+
+        # Configure services for NAT44
+        self.vapi.vcdp_set_services(
+            tenant_id=v4tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output"
+        )
+        self.vapi.vcdp_set_services(
+            tenant_id=v4tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE,
+            services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output"
+        )
+        self.vapi.vcdp_set_services(
+            tenant_id=v4tenant,
+            dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS,
+            services="vcdp-nat-slowpath vcdp-drop"
+        )
+
+        self.vapi.vcdp_gateway_enable_disable(
+            sw_if_index=self.pg0.sw_if_index, is_enable=True, tenant_id=v4tenant
+        )
+        self.vapi.vcdp_gateway_enable_disable(
+            sw_if_index=self.pg1.sw_if_index, is_enable=True, tenant_id=outside_tenant
+        )
+
+        self.vapi.cli(f"ip route add 0.0.0.0/0 via pg1 {self.pg1.remote_ip4}")
+
         tests = Tests(self, self.pg0, self.pg1, self.pool)
         # test_suites = [tests.nat64_tests, tests.nat44_tests, tests.icmp_error_tests, tests.port_forwarding_tests]
         # test_suites = [tests.icmp_error_tests]
-        # test_suites = [tests.nat44_tests]
+        test_suites = [tests.nat44_tests]
         # test_suites = [tests.port_forwarding_tests]
         # test_suites = [tests.tcp_tests]
-        test_suites = [tests.nat64_tests]
+        # test_suites = [tests.nat64_tests]
         # test_suites = [tests.dhcp6_tests]
 
         for test_suite in test_suites:

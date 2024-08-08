@@ -61,11 +61,20 @@ vcdp_init(vlib_main_t *vm)
   /* initialize per-thread data */
   vec_validate(vcdp->per_thread_data, vlib_num_workers());
   for (int i = 0; i <= vlib_num_workers(); i++) {
+    dlist_elt_t *head;
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, i);
     pool_init_fixed(ptd->sessions, vcdp_cfg_main.no_sessions_per_thread);
     ptd->session_id_template = (u64) epoch << (template_shift + log_n_thread);
     ptd->session_id_template |= (u64) i << template_shift;
+
+    /* Initialise LRU lists per timer type */
+    for (int i; i < VCDP_N_TIMEOUT; i++) {
+      pool_get (ptd->lru_pool, head);
+      ptd->lru_head_index[i] = head - ptd->lru_pool;
+      clib_dlist_init (ptd->lru_pool, ptd->lru_head_index[i]);
+    }
   }
+
   pool_init_fixed(vcdp->tenants, vcdp_cfg_main.no_tenants);
   vcdp_tenant_init_counters_simple(vcdp->tenant_simple_ctr);
   vcdp_tenant_init_counters_combined(vcdp->tenant_combined_ctr);

@@ -15,18 +15,18 @@
  * This file contains functions to export the VCDP session database to a CBOR file.
  * Future improvement is to send request to worker threads and have the snapshot
  * generated locally by each worker.
-*/
+ */
 
 static cbor_item_t *
 cbor_build_ip4(u32 addr)
 {
-  return cbor_build_tag(52, cbor_build_bytestring((const unsigned char *)&addr, 4));
+  return cbor_build_tag(52, cbor_build_bytestring((const unsigned char *) &addr, 4));
 }
 
 static cbor_item_t *
 cbor_build_ip6(ip6_address_t *addr)
 {
-  return cbor_build_tag(54, cbor_build_bytestring((const unsigned char *)addr, 16));
+  return cbor_build_tag(54, cbor_build_bytestring((const unsigned char *) addr, 16));
 }
 
 static cbor_item_t *
@@ -36,9 +36,13 @@ cbor_build_bitmap(u32 bitmap)
   int i;
   int n = count_set_bits(bitmap);
   cbor_item_t *b = cbor_new_definite_array(n);
-  vec_foreach_index(i, sm->services) {
+  vec_foreach_index (i, sm->services) {
     if (bitmap & sm->services[i]->service_mask[0]) {
-      cbor_array_push(b, cbor_build_string(sm->services[i]->node_name));
+      if (!cbor_array_push(b, cbor_build_string(sm->services[i]->node_name))) {
+        cbor_decref(&b);
+        b = 0;
+        break;
+      }
     }
   }
   return b;
@@ -50,22 +54,28 @@ cbor_build_session_key(vcdp_session_key_t *key)
   if (key->is_ip6) {
     vcdp_session_ip6_key_t *k = &key->ip6;
     cbor_item_t *cbor = cbor_new_definite_array(6);
-    cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->src)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport))));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->dst)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport))));
+    if (cbor && (!cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->src))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport)))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->dst))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport)))))) {
+      cbor_decref(&cbor);
+      cbor = 0;
+    }
     return cbor;
   } else {
     vcdp_session_ip4_key_t *k = &key->ip4;
     cbor_item_t *cbor = cbor_new_definite_array(6);
-    cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->src)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport))));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto)));
-    cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->dst)));
-    cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport))));
+    if (cbor && (!cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->src))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport)))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->dst))) ||
+                 !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport)))))) {
+      cbor_decref(&cbor);
+      cbor = 0;
+    }
     return cbor;
   }
   return 0;
@@ -76,20 +86,25 @@ cbor_build_counters(vcdp_session_t *session)
 {
   cbor_item_t *counters = cbor_new_definite_array(6);
 
-  for (int i=0; i < VCDP_FLOW_F_B_N; i++) {
-    cbor_array_push(counters, cbor_move(cbor_build_uint64(session->bytes[i])));
-    cbor_array_push(counters, cbor_move(cbor_build_uint32(session->pkts[i])));
+  for (int i = 0; i < VCDP_FLOW_F_B_N; i++) {
+    if (!cbor_array_push(counters, cbor_move(cbor_build_uint64(session->bytes[i]))) ||
+        !cbor_array_push(counters, cbor_move(cbor_build_uint32(session->pkts[i])))) {
+      cbor_decref(&counters);
+      counters = 0;
+      break;
+    }
   }
   return counters;
 }
 
 static cbor_item_t *session_states[4];
 static void
-init_session_states(void) {
-    session_states[VCDP_SESSION_STATE_FSOL] = cbor_build_string("FSOL");
-    session_states[VCDP_SESSION_STATE_ESTABLISHED] = cbor_build_string("ESTABLISHED");
-    session_states[VCDP_SESSION_STATE_TIME_WAIT] = cbor_build_string("TIME_WAIT");
-    session_states[VCDP_SESSION_STATE_STATIC] = cbor_build_string("STATIC");
+init_session_states(void)
+{
+  session_states[VCDP_SESSION_STATE_FSOL] = cbor_build_string("FSOL");
+  session_states[VCDP_SESSION_STATE_ESTABLISHED] = cbor_build_string("ESTABLISHED");
+  session_states[VCDP_SESSION_STATE_TIME_WAIT] = cbor_build_string("TIME_WAIT");
+  session_states[VCDP_SESSION_STATE_STATIC] = cbor_build_string("STATIC");
 }
 
 static cbor_item_t *
@@ -107,17 +122,20 @@ vcdp_session_to_cbor(vcdp_session_t *session)
   cbor_item_t *s = cbor_new_definite_array(11);
 
   f64 remaining_time = vcdp_session_remaining_time(session, vlib_time_now(vlib_get_main()));
-  cbor_array_push(s, cbor_move(cbor_build_uint32(tenant->tenant_id)));
-  cbor_array_push(s, cbor_move(cbor_build_uint64(session->session_id)));
-  cbor_array_push(s, cbor_move(cbor_build_session_state(session->state)));
-  cbor_array_push(s, cbor_move(cbor_build_uint32(session->rx_id)));
-  cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_PRIMARY])));
-  cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_SECONDARY])));
-  cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(session->created))));
-  cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(remaining_time))));
-  cbor_array_push(s, cbor_move(cbor_build_bitmap(session->bitmaps[VCDP_FLOW_FORWARD])));
-  cbor_array_push(s, cbor_move(cbor_build_bitmap(session->bitmaps[VCDP_FLOW_REVERSE])));
-  cbor_array_push(s, cbor_move(cbor_build_counters(session)));
+  if (!cbor_array_push(s, cbor_move(cbor_build_uint32(tenant->tenant_id))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_uint64(session->session_id))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_session_state(session->state))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_uint32(session->rx_id))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_PRIMARY]))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_session_key(&session->keys[VCDP_SESSION_KEY_SECONDARY]))) ||
+      !cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(session->created)))) ||
+      !cbor_array_push(s, cbor_build_tag(1, cbor_move(cbor_build_float8(remaining_time)))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_bitmap(session->bitmaps[VCDP_FLOW_FORWARD]))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_bitmap(session->bitmaps[VCDP_FLOW_REVERSE]))) ||
+      !cbor_array_push(s, cbor_move(cbor_build_counters(session)))) {
+    cbor_decref(&s);
+    s = 0;
+  }
   return s;
 }
 
@@ -144,43 +162,49 @@ vcdp_sessions_to_file(const char *filename)
       tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
         continue;
-      cbor_array_push(spt, vcdp_session_to_cbor(session));
-
+      if (!cbor_array_push(spt, vcdp_session_to_cbor(session))) {
+        cbor_decref(&spt);
+        cbor_decref(&root);
+        return -1;
+      }
     }
     struct cbor_pair pair;
     pair.key = cbor_move(cbor_build_uint32(thread_index));
     pair.value = cbor_move(spt);
-    cbor_map_add(root, pair);
+    if (!cbor_map_add(root, pair)) {
+      cbor_decref(&root);
+      return -1;
+    }
   }
 
-      // Encode the CBOR array into a byte buffer
-    unsigned char *buffer;
-    size_t buffer_size, length = cbor_serialize_alloc(root, &buffer, &buffer_size);
+  // Encode the CBOR array into a byte buffer
+  unsigned char *buffer;
+  size_t buffer_size, length = cbor_serialize_alloc(root, &buffer, &buffer_size);
 
-    // Write the CBOR byte buffer to the file
-    FILE *fp = fopen(filename, "wb");
-    if (fp == NULL) {
-        cbor_decref(&root);
-        free(buffer);
-        return -1; // Failed to open file
-    }
-
-    size_t written = fwrite(buffer, sizeof(unsigned char), length, fp);
-    fclose(fp);
-
-    // Clean up CBOR object and buffer
+  // Write the CBOR byte buffer to the file
+  FILE *fp = fopen(filename, "wb");
+  if (fp == NULL) {
     cbor_decref(&root);
-    if (root) {
-      clib_warning("Dangling reference somwhere %d", cbor_refcount(root));
-    }
     free(buffer);
-    clib_warning("written %d bytes per session: %d", written, written/no_sessions);
-    if (written == length) {
-        return 0; // Success
-    } else {
-        return -2; // Failed to write all bytes
-    }
-    return 0;
+    return -1; // Failed to open file
+  }
+
+  size_t written = fwrite(buffer, sizeof(unsigned char), length, fp);
+  fclose(fp);
+
+  // Clean up CBOR object and buffer
+  cbor_decref(&root);
+  if (root) {
+    clib_warning("Dangling reference somwhere %d", cbor_refcount(root));
+  }
+  free(buffer);
+  clib_warning("written %d bytes per session: %d", written, written / no_sessions);
+  if (written == length) {
+    return 0; // Success
+  } else {
+    return -2; // Failed to write all bytes
+  }
+  return 0;
 }
 
 static clib_error_t *
