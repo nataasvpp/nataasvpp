@@ -359,4 +359,5 @@ nat_init(vlib_main_t *vm)
 
   return 0;
 }
-VLIB_INIT_FUNCTION(nat_init);
+
+VLIB_MAIN_LOOP_ENTER_FUNCTION(nat_init) = {.runs_after = VLIB_INITS("start_workers")};
