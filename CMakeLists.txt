@@ -29,6 +29,13 @@ set(VCDP_SANITIZE_ADDR_OPTIONS
 )
 add_compile_options(-Werror -Wall)
 
+# Add this line to find the CBOR library
+include(FetchContent)
+
+# Find libcbor using pkg-config
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBCBOR REQUIRED libcbor)
+
 if (VCDP_SANITIZE_ADDR)
   add_compile_options(-fsanitize=address -fsanitize=undefined)
   add_compile_definitions(CLIB_SANITIZE_ADDR)

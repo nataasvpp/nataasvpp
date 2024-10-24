@@ -24,6 +24,10 @@ class EntryTypeEnum(str, Enum):
     '''Counter entry type'''
     SIMPLE = 'simple'
     COMBINED = 'combined'
+
+    def __str__(self):
+        return self.value
+
 class UnitTypeEnum(str, Enum):
     '''Counter unit type'''
     PKTS = 'pkts'
@@ -142,7 +146,9 @@ class CountersModel(BaseModel):
 
     def gen_headers(self, header_name):
         '''Generate headers'''
-        s = f'#ifndef included_{header_name}_h\n'
+        s = '/* SPDX-License-Identifier: Apache-2.0 */\n'
+        s += '/* Auto-generated do not change. */\n'
+        s += f'#ifndef included_{header_name}_h\n'
         for counter in self.counters:
             s += counter.gen_headers()
         s += '#endif\n'
@@ -150,7 +156,9 @@ class CountersModel(BaseModel):
 
     def gen_c(self, includepath):
         '''Generate init functions'''
-        s = '#include <vlib/vlib.h>\n'
+        s = '/* SPDX-License-Identifier: Apache-2.0 */\n'
+        s += '/* Auto-generated do not change. */\n'
+        s += '#include <vlib/vlib.h>\n'
         s += '#include <vlib/stats/stats.h>\n'
         s += f'#include <{includepath}>\n'
         for counter in self.counters:
