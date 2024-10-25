@@ -73,6 +73,20 @@ autoendian define vcdp_session_lookup_reply
   vl_api_vcdp_session_key_t secondary_key;
 };
 
+autoendian define vcdp_sessions_cbor
+{
+  u32 client_index;
+  u32 context;
+};
+autoendian define vcdp_sessions_cbor_reply
+{
+  u32 context;
+  i32 retval;
+  u32 client_index;
+  u32 len;
+  u8 cbor_data[len];
+};
+
 autoreply define vcdp_set_timeout
 {
   u32 client_index;

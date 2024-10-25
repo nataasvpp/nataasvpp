@@ -138,11 +138,17 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
   }
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
+  if (tenant_idx == (u16)~0) {
+    clib_warning("Tenant ID %u not found", mp->tenant_id);
+    rv = -1;
+    goto done;
+  }
   u32 flow_index;
   vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, true, &flow_index);
   if (!session)
     rv = -1;
 
+  done:
   REPLY_MACRO_END(VL_API_VCDP_SESSION_ADD_REPLY);
 }
 
@@ -201,6 +207,25 @@ vl_api_vcdp_session_clear_t_handler(vl_api_vcdp_session_clear_t *mp)
   vcdp_session_clear();
 
   REPLY_MACRO_END(VL_API_VCDP_SESSION_CLEAR_REPLY);
+}
+
+size_t vcdp_sessions_serialize(unsigned char **buffer, u32 *no_sessions);
+static void
+vl_api_vcdp_sessions_cbor_t_handler(vl_api_vcdp_sessions_cbor_t *mp)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  int rv = 0;
+  vl_api_vcdp_sessions_cbor_reply_t *rmp;
+
+  unsigned char *buffer;
+  u32 no_sessions;
+  u32 len = vcdp_sessions_serialize(&buffer, &no_sessions);
+
+  REPLY_MACRO3_END(VL_API_VCDP_SESSIONS_CBOR_REPLY, len, ({
+    clib_memcpy(&rmp->cbor_data, buffer, len);
+    rmp->len = len;
+    free(buffer); // Use VPP allocator instead
+  }));
 }
 
 static void
