@@ -12,6 +12,9 @@
 
 gw_main_t gateway_main;
 
+/*
+ * Note, do not try to enable the same feature multiple times.
+*/
 int
 gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool output_arc, bool is_enable)
 {
@@ -19,17 +22,20 @@ gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool output_ar
   u16 *config;
   u16 tenant_idx;
 
+  int dir = output_arc ? VLIB_TX : VLIB_RX;
+
   if (is_enable) {
     vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
     if (!tenant)
       return -1;
 
-    vec_validate(gm->tenant_idx_by_sw_if_idx, sw_if_index);
-    config = gm->tenant_idx_by_sw_if_idx + sw_if_index;
+    vec_validate_init_empty(gm->tenant_idx_by_sw_if_idx[dir], sw_if_index, 0xFFFF);
+
+    config = vec_elt_at_index(gm->tenant_idx_by_sw_if_idx[dir], sw_if_index);
     config[0] = tenant_idx;
   }
   if (output_arc)
-    return vnet_feature_enable_disable("ip4-output", "vcdp-input", sw_if_index, is_enable, 0, 0);
+    return vnet_feature_enable_disable("ip4-output", "vcdp-input-out", sw_if_index, is_enable, 0, 0);
   else
     return vnet_feature_enable_disable("ip4-unicast", "vcdp-input", sw_if_index, is_enable, 0, 0);
 }

@@ -11,6 +11,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include "lookup_inlines.h"
+#include <vcdp/timer_lru.h>
 #include <vcdp/vcdp.api_enum.h>
 
 typedef struct
@@ -146,6 +147,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           u16 tenant_idx = vcdp_buffer(b[0])->tenant_index;
           vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
           vcdp_buffer(b[0])->service_bitmap = sb[0] = tenant->bitmaps[VCDP_SERVICE_CHAIN_MISS];
+
+          // Set error, that can be reset by the miss chain if it likes
+          b[0]->error = node->errors[VCDP_LOOKUP_ERROR_MISS];
         }
       }
       vcdp_next(b[0], current_next);
@@ -173,8 +177,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k,
-                     session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
+        VCDP_DBG(2, "Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
+                     vcdp_session_remaining_time(session, time_now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
       }
@@ -189,7 +193,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       current_next += 1;
       n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
-      session->bytes[vcdp_direction_from_flow_index(flow_index)] += vlib_buffer_length_in_chain (vm, b[0]);
+      session->bytes[vcdp_direction_from_flow_index(flow_index)] += vcdp_get_l3_length(vm, b[0]);
       session->last_heard = time_now;
 
     } else {

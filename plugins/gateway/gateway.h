@@ -15,7 +15,7 @@
 typedef struct {
   u16 msg_id_base;
 
-  u16 *tenant_idx_by_sw_if_idx; /* vec */
+  u16 *tenant_idx_by_sw_if_idx[VLIB_N_DIR];
 } gw_main_t;
 
 extern gw_main_t gateway_main;

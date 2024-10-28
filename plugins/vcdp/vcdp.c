@@ -31,8 +31,6 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 
-
-
 #include <vcdp/vcdp.h>
 
 #define VCDP_DEFAULT_BITMAP VCDP_SERVICE_MASK(drop)
@@ -74,6 +72,10 @@ vcdp_init(vlib_main_t *vm)
       clib_dlist_init (ptd->lru_pool, ptd->lru_head_index[i]);
     }
   }
+
+#define _(x, y, z) vcdp->timeouts[VCDP_TIMEOUT_##x] = y;
+  foreach_vcdp_timeout
+#undef _
 
   pool_init_fixed(vcdp->tenants, vcdp_cfg_main.no_tenants);
   vcdp_tenant_init_counters_simple(vcdp->tenant_simple_ctr);
@@ -341,6 +343,7 @@ vcdp_config(vlib_main_t *vm, unformat_input_t *input)
   vcdp_cfg_main.no_sessions_per_thread = 128000;    //1 << 20;                            // 1M
   vcdp_cfg_main.no_tenants = 1 << 10; // 1024
   vcdp_cfg_main.no_tunnels = 0; //1 << 20; // 1M;
+
 
   while (unformat_check_input(input) != UNFORMAT_END_OF_INPUT) {
     if (unformat(input, "tenants %d", &tenants))

@@ -112,7 +112,6 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   }
 
   /* Assign service chain */
-  // TODO. Set service chain based on traffic type!!!!
   vcdp_set_service_chain(tenant, session->proto, session->bitmaps);
 
   if (is_static) {

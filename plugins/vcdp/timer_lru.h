@@ -60,6 +60,7 @@ vcdp_session_timer_update_timeout_type(vcdp_main_t *vcdp, vcdp_session_t *s, u32
 {
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   s->timer.lru_head_index = ptd->lru_head_index[timeout];
+  s->timer.type = timeout;
   clib_dlist_remove (ptd->lru_pool, s->timer.lru_index);
   clib_dlist_addtail (ptd->lru_pool, s->timer.lru_head_index, s->timer.lru_index);
 }
@@ -84,6 +85,7 @@ vcdp_session_timer_start(vcdp_main_t *vcdp, vcdp_session_t *s, u32 thread_index,
   clib_dlist_addtail(ptd->lru_pool, s->timer.lru_head_index, s->timer.lru_index);
   lru_list_elt->value = s - ptd->sessions;
   s->timer.last_lru_update = now;
+  s->timer.type = timeout;
 }
 
 always_inline void

@@ -19,6 +19,7 @@
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
 #include <vcdp/lookup/lookup_inlines.h>
+#include <vcdp/timer_lru.h>
 #include <vcdp/vcdp.api_enum.h>
 
 typedef struct
@@ -142,8 +143,8 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       session = vcdp_session_at_index(ptd, session_index);
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U %.02f %.02f (%.02f)", session_index, format_vcdp_session_key, k,
-                     session->timer.next_expiration, time_now, session->timer.next_expiration - time_now);
+        VCDP_DBG(2, "Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
+                     vcdp_session_remaining_time(session, time_now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
         goto next;

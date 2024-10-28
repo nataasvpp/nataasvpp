@@ -53,7 +53,8 @@ format_vcdp_output_trace(u8 *s, va_list *args)
 // This node assumes that the tenant has been configured for the given FIB table
 // before being enabled.
 static inline uword
-vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame, bool is_dpo)
+vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame,
+                        bool is_dpo, bool is_output)
 {
 
   // use VRF ID as tenant ID
@@ -83,8 +84,9 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
       tenant_idx[0] = dpo->tenant_idx;
       vcdp_buffer(b[0])->next_node = vnet_buffer(b[0])->ip.adj_index[VLIB_TX]; // May be overwritten
     } else {
-      u32 rx_sw_if_index = vnet_buffer(b[0])->sw_if_index[VLIB_RX];
-      tenant_idx[0] = gw->tenant_idx_by_sw_if_idx[rx_sw_if_index];
+      int dir = is_output ? VLIB_TX : VLIB_RX;
+      u32 sw_if_index = vnet_buffer(b[0])->sw_if_index[dir];
+      tenant_idx[0] = vec_elt_at_index(gw->tenant_idx_by_sw_if_idx[dir], sw_if_index)[0];
       if ((u32) tenant_idx[0] == ~0) {
         vnet_feature_next_u16(current_next, b[0]);
         goto next;
@@ -123,12 +125,17 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
 VLIB_NODE_FN(vcdp_input_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  return vcdp_input_node_inline(vm, node, frame, false);
+  return vcdp_input_node_inline(vm, node, frame, false, false);
 }
 VLIB_NODE_FN(vcdp_input_dpo_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-  return vcdp_input_node_inline(vm, node, frame, true);
+  return vcdp_input_node_inline(vm, node, frame, true, false);
+}
+VLIB_NODE_FN(vcdp_input_out_node)
+(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
+{
+  return vcdp_input_node_inline(vm, node, frame, false, true);
 }
 
 VLIB_REGISTER_NODE(vcdp_input_node) = {
@@ -153,15 +160,29 @@ VLIB_REGISTER_NODE(vcdp_input_dpo_node) = {
   .sibling_of = "vcdp-input",
 };
 
+VLIB_REGISTER_NODE(vcdp_input_out_node) = {
+  .name = "vcdp-input-out",
+  .vector_size = sizeof(u32),
+  .format_trace = format_vcdp_input_trace,
+  .type = VLIB_NODE_TYPE_INTERNAL,
+  .sibling_of = "vcdp-input",
+};
+
 VNET_FEATURE_INIT(vcdp_input_feat, static) = {
   .arc_name = "ip4-unicast",
   .node_name = "vcdp-input",
   .runs_after = VNET_FEATURES("ip4-dhcp-client-detect"),
 };
 
+VNET_FEATURE_INIT(vcdp_input_out_feat, static) = {
+  .arc_name = "ip4-output",
+  .node_name = "vcdp-input-out",
+  .runs_after = VNET_FEATURES("ip4-dhcp-client-detect"),
+};
+
 VNET_FEATURE_INIT(vcdp_output_feat, static) = {
   .arc_name = "ip4-output",
-  .node_name = "vcdp-input",
+  .node_name = "vcdp-output",
 };
 
 static inline uword

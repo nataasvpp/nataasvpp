@@ -179,6 +179,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
 
   nat_session[0].nat_idx = nat_session[1].nat_idx = nat_idx;
+
 end_of_packet:
   return;
 }
@@ -252,7 +253,6 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
       vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
       goto next;
     }
-
     session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
     if (!session) {
       error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
@@ -267,6 +267,11 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
     nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx, session_idx,
                               nat_rewrites, session, &error, b);
+
+    /* Update counters here, since packet is hitting the miss path do not reach the counter in lookup/node.c */
+    /* TODO: Use IP length instead of buffer length */
+    session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
+    session->bytes[vcdp_direction_from_flow_index(flow_index)] += vcdp_get_l3_length(vm, b[0]);
 
   next:
     if (error) {
