@@ -103,6 +103,10 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   session->tenant_idx = tenant_idx;
   session->rx_id = ~0; // TODO: Set rx_ID into sessions!!!!
   session->created = unix_time_now();
+  session->pkts[VCDP_FLOW_FORWARD] = 0;
+  session->pkts[VCDP_FLOW_REVERSE] = 0;
+  session->bytes[VCDP_FLOW_FORWARD] = 0;
+  session->bytes[VCDP_FLOW_REVERSE] = 0;
 
   clib_bihash_kv_8_8_t kv2;
   kv2.key = session_id;
@@ -190,7 +194,7 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   /* Stop timer if running */
   VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
   VCDP_DBG(2, "Stopping timer for session %u", session_index);
-  vcdp_session_timer_stop(vcdp, session, thread_index);
+  // vcdp_session_timer_stop(vcdp, session, thread_index);
 
   if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_PRIMARY], 0, 0, &h)) {
     VCDP_DBG(1, "Failed to remove session key from table");
@@ -262,4 +266,33 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
     session->key_flags |= key->is_ip6 ? VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 : VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
   }
   return rv;
+}
+
+/*
+ * vcdp_session_clear. Delete all sessions.
+ * This requires to be called within a barrier.
+ */
+void
+vcdp_session_clear (void)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd;
+  u32 thread_index;
+  u32 *to_delete = 0;
+  u32 *session_index;
+  vcdp_session_t *session;
+
+  vec_foreach_index(thread_index, vcdp->per_thread_data) {
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    pool_foreach(session, ptd->sessions) {
+      if (session->state != VCDP_SESSION_STATE_STATIC) {
+        vec_add1(to_delete, session - ptd->sessions);
+      }
+    }
+    vec_foreach(session_index, to_delete) {
+      session = vcdp_session_at_index(ptd, *session_index);
+      vcdp_session_remove(vcdp, ptd, session, thread_index, *session_index);
+    }
+    vec_reset_length(to_delete);
+  }
 }

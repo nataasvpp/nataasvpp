@@ -465,6 +465,36 @@ VLIB_CLI_COMMAND(set_vcdp_session_command, static) = {
   .function = set_vcdp_session_command_fn,
 };
 
+static clib_error_t *
+vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  vcdp_per_thread_data_t *ptd;
+  u32 thread_index;
+  // dlist_elt_t *lru_entry;
+  // u32 n_threads = vlib_num_workers();
+
+
+  vec_foreach_index (thread_index, vcdp->per_thread_data) {
+    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+    vlib_cli_output(vm, "Elements in LRU list %d", pool_elts(ptd->lru_pool));
+    // pool_foreach(lru_entry, ptd->lru_pool) {
+    //   vlib_cli_output(vm, "  %U", format_vcdp_lru_entry, lru_entry);
+    // }
+    for (int i = 0; i < VCDP_N_TIMEOUT; i++) {
+      vlib_cli_output(vm, "Head index: %d", ptd->lru_head_index[i]);
+    }
+  }
+  return 0;
+}
+
+
+VLIB_CLI_COMMAND(show_vcdp_lru, static) = {
+  .path = "show vcdp lru",
+  .short_help = "show vcdp lru",
+  .function = vcdp_show_lru_command_fn,
+};
+
 #if 0
 static int
 vcdp_session_table_walk_ip6_cb (clib_bihash_kv_40_8_t *kvp, void *arg)

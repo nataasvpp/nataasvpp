@@ -107,14 +107,14 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   u16 local_next_indices[VLIB_FRAME_SIZE];
   vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k= keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
-  f64 time_now = vlib_time_now(vm);
+  f64 now = vlib_time_now(vm);
   bool hits[VLIB_FRAME_SIZE], *hit = hits;
   u32 session_indices[VLIB_FRAME_SIZE], *si = session_indices;
   u32 service_bitmaps[VLIB_FRAME_SIZE], *sb = service_bitmaps;
 
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
-  ptd->current_time = time_now;
+  ptd->current_time = now;
 
   // Calculate key and hash
   while (n_left) {
@@ -151,6 +151,9 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           // Set error, that can be reset by the miss chain if it likes
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_MISS];
         }
+
+        /* See if we can expire some sessions. */
+        vcdp_timer_lru_free_one(vcdp, thread_index, now);
       }
       vcdp_next(b[0], current_next);
       to_local[n_local] = bi[0];
@@ -175,10 +178,10 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       session = vcdp_session_at_index(ptd, session_index);
 
-      if (vcdp_session_is_expired(session, time_now)) {
+      if (vcdp_session_is_expired(session, now)) {
         // Received a packet against an expired session. Recycle the session.
         VCDP_DBG(2, "Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
-                     vcdp_session_remaining_time(session, time_now));
+                     vcdp_session_remaining_time(session, now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
       }
@@ -194,7 +197,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       n_local++;
       session->pkts[vcdp_direction_from_flow_index(flow_index)]++;
       session->bytes[vcdp_direction_from_flow_index(flow_index)] += vcdp_get_l3_length(vm, b[0]);
-      session->last_heard = time_now;
+      session->last_heard = now;
+      vcdp_session_timer_update(vcdp, session, thread_index);
 
     } else {
       /* known flow which belongs to remote thread */
