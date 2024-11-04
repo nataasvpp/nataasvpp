@@ -82,7 +82,6 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
     if (is_dpo) {
       vcdp_dpo_t *dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
       tenant_idx[0] = dpo->tenant_idx;
-      vcdp_buffer(b[0])->next_node = vnet_buffer(b[0])->ip.adj_index[VLIB_TX]; // May be overwritten
     } else {
       int dir = is_output ? VLIB_TX : VLIB_RX;
       u32 sw_if_index = vnet_buffer(b[0])->sw_if_index[dir];
@@ -92,6 +91,7 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
         goto next;
       }
     }
+
     vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx[0]);
     vcdp_buffer(b[0])->context_id = tenant->context_id;
     vcdp_buffer(b[0])->tenant_index = tenant_idx[0];
@@ -197,7 +197,6 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
   b = bufs;
 
   while (n_left > 0) {
-
     /*
      * If the ttl drops below 1 when forwarding, generate
      * an ICMP response.
@@ -209,14 +208,11 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       vnet_buffer (b[0])->ip.fib_index = 0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
-      clib_warning("Sending ICMP time exceeded");
       next[0] = is_dpo ? icmp_error_next_node_index : VCDP_GW_NEXT_ICMP_ERROR;
-      clib_warning("Setting NEXT TO: %d", next[0]);
     } else {
 
       if (is_dpo) {
-        // vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
-        vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vcdp_buffer(b[0])->next_node);
+        vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
 
         // TODO: Should this have been cached in the original DPO?
         u32 lbi = vcdp_dpo->dpo_parent.dpoi_index;
@@ -227,9 +223,11 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
       } else {
         vnet_feature_next_u16(next, b[0]);
         if (next[0] > node->n_next_nodes) {
-          clib_warning("next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
+          VCDP_DBG(2, "next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
           next[0] = VCDP_GW_NEXT_DROP;
         }
+        /* Reset error in case it's been set elsewhere in the chain. */
+        b[0]->error = 0;
       }
     }
 
@@ -324,7 +322,6 @@ vcdp_gw_init(vlib_main_t *vm)
   vlib_node_t *icmp_error = vlib_get_node_by_name (vm, (u8 *) "vcdp-icmp-error");
   // icmp_error_next_node_index = vlib_node_add_next(vm, vcdp_output_dpo_node.index, vcdp_icmp_error_node.index);
   icmp_error_next_node_index = vlib_node_add_next(vm, dpo_output->index, icmp_error->index);
-  clib_warning("Setting error icmp node index to %d", icmp_error_next_node_index);
 
   return 0;
 }

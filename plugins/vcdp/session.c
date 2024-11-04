@@ -184,8 +184,8 @@ vcdp_lookup_session(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip
 }
 
 void
-vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
-                    u32 session_index)
+vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+                         u32 session_index, bool stop_timer)
 {
   u64 h;
   clib_bihash_kv_8_8_t kv2 = {0};
@@ -193,9 +193,10 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
 
   /* Stop timer if running */
   VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
-  VCDP_DBG(2, "Stopping timer for session %u", session_index);
-  // vcdp_session_timer_stop(vcdp, session, thread_index);
-
+  if (stop_timer) {
+    VCDP_DBG(2, "Stopping timer for session %u", session_index);
+    vcdp_session_timer_stop(vcdp, session, thread_index);
+  }
   if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_PRIMARY], 0, 0, &h)) {
     VCDP_DBG(1, "Failed to remove session key from table");
   }
@@ -218,6 +219,19 @@ vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session
   vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], thread_index,
                                   session->tenant_idx, session->pkts[VCDP_FLOW_REVERSE], session->bytes[VCDP_FLOW_REVERSE]);
   pool_put_index(ptd->sessions, session_index);
+}
+
+void
+vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+                         u32 session_index)
+{
+  vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, true);
+}
+void
+vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+                         u32 session_index)
+{
+  vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, false);
 }
 
 /*

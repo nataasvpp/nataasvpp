@@ -332,6 +332,8 @@ int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t
                                        u32 pseudo_flow_index, vcdp_session_key_t *key, u64 *h);
 void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
+void vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+                         u32 session_index);
 bool vcdp_session_is_expired(vcdp_session_t *session, f64 time_now);
 void vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session);
 int vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v);

@@ -175,7 +175,7 @@ static const fib_node_vft_t vcdp_fib_node_vft = {
 clib_error_t *
 vcdp_dpo_module_init (vlib_main_t *vm)
 {
-
+  return 0;
   // ip_pmtu_adj_delegate_type =
   //   adj_delegate_register_new_type (&ip_path_adj_delegate_vft);
 

@@ -24,13 +24,13 @@ enum {
 };
 
 typedef struct {
+  u32 pad[2];		/* do not overlay w/ ip.adj_index[0,1] */
   u32 service_bitmap;
   u32 context_id;
   u32 rx_id;
   u16 tenant_index;
-  u16 next_node;
   u8 flags;
-  u8 tcp_flags;
+  u8 pad8;
 } vcdp_buffer_opaque_t;
 
 STATIC_ASSERT(sizeof(vcdp_buffer_opaque_t) <= sizeof(vnet_buffer((vlib_buffer_t *) 0)->unused),

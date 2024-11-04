@@ -37,20 +37,21 @@ static_always_inline void
 vcdp_session_ip4_key_encode(vcdp_session_ip4_key_t *skey, vl_api_vcdp_session_key_t *out)
 {
   out->context_id = clib_host_to_net_u32(skey->context_id);
-  ip4_address_encode2((ip4_address_t *)&skey->src, &out->init_addr);
-  ip4_address_encode2((ip4_address_t *)&skey->dst, &out->resp_addr);
-  out->init_port = clib_host_to_net_u16(skey->sport);
-  out->resp_port = clib_host_to_net_u16(skey->dport);
+  ip4_address_encode2((ip4_address_t *)&skey->src, &out->src);
+  ip4_address_encode2((ip4_address_t *)&skey->dst, &out->dst);
+  out->sport = clib_host_to_net_u16(skey->sport);
+  out->dport = clib_host_to_net_u16(skey->dport);
 }
 
 static_always_inline void
 vcdp_session_ip6_key_encode(vcdp_session_ip6_key_t *skey, vl_api_vcdp_session_key_t *out)
 {
   out->context_id = clib_host_to_net_u32(skey->context_id);
-  ip6_address_encode2 (&skey->src, &out->init_addr);
-  ip6_address_encode2 (&skey->dst, &out->resp_addr);
-  out->init_port = clib_host_to_net_u16(skey->sport);
-  out->resp_port = clib_host_to_net_u16(skey->dport);
+  ip6_address_encode2 (&skey->src, &out->src);
+  ip6_address_encode2 (&skey->dst, &out->dst);
+  out->sport = clib_host_to_net_u16(skey->sport);
+  out->dport = clib_host_to_net_u16(skey->dport);
+  out->proto = skey->proto;
 }
 
 static_always_inline void
@@ -60,6 +61,34 @@ vcdp_session_key_encode(vcdp_session_key_t *skey, vl_api_vcdp_session_key_t *out
     return vcdp_session_ip6_key_encode(&skey->ip6, out);
   else
     return vcdp_session_ip4_key_encode(&skey->ip4, out);
+}
+
+static_always_inline void
+vcdp_session_key_decode(vl_api_vcdp_session_key_t *in, vcdp_session_key_t *out)
+{
+  ip_address_t src, dst;
+  ip_address_decode2(&in->src, &src);
+  ip_address_decode2(&in->dst, &dst);
+
+  if (src.version ==  AF_IP6) {
+    vcdp_session_ip6_key_t *out6 = &out->ip6;
+    out6->context_id = in->context_id;
+    out6->src = src.ip.ip6;
+    out6->dst = dst.ip.ip6;
+    out6->sport = clib_host_to_net_u16(in->sport);
+    out6->dport = clib_host_to_net_u16(in->dport);
+    out6->proto = in->proto;
+    out->is_ip6 = true;
+  } else {
+    vcdp_session_ip4_key_t *out4 = &out->ip4;
+    out4->context_id = in->context_id;
+    out4->src = src.ip.ip4.as_u32;
+    out4->dst = dst.ip.ip4.as_u32;
+    out4->sport = clib_host_to_net_u16(in->sport);
+    out4->dport = clib_host_to_net_u16(in->dport);
+    out4->proto = in->proto;
+    out->is_ip6 = false;
+  }
 }
 
 #endif /*__included_vcdp_types_funcs_h__*/

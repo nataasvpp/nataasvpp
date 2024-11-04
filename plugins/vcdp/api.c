@@ -114,28 +114,10 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
   vcdp_main_t *vcdp = &vcdp_main;
   vl_api_vcdp_session_add_reply_t *rmp;
   int rv = 0;
-  ip_address_t src, dst;
-  ip_address_decode2(&mp->src, &src);
-  ip_address_decode2(&mp->dst, &dst);
 
-  vcdp_session_key_t k;
-  if (src.version ==  AF_IP6) {
-    k.ip6.context_id = mp->context_id;
-    k.ip6.src = src.ip.ip6;
-    k.ip6.dst = dst.ip.ip6;
-    k.ip6.sport = clib_host_to_net_u16(mp->sport);
-    k.ip6.dport = clib_host_to_net_u16(mp->dport);
-    k.ip6.proto = mp->protocol;
-    k.is_ip6 = true;
-  } else {
-    k.ip4.context_id = mp->context_id;
-    k.ip4.src = src.ip.ip4.as_u32;
-    k.ip4.dst = dst.ip.ip4.as_u32;
-    k.ip4.sport = clib_host_to_net_u16(mp->sport);
-    k.ip4.dport = clib_host_to_net_u16(mp->dport);
-    k.ip4.proto = mp->protocol;
-    k.is_ip6 = false;
-  }
+  vcdp_session_key_t primary_key, secondary_key;
+  vcdp_session_key_decode(&mp->primary_key, &primary_key);
+  vcdp_session_key_decode(&mp->secondary_key, &secondary_key);
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
   if (tenant_idx == (u16)~0) {
@@ -144,7 +126,8 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
     goto done;
   }
   u32 flow_index;
-  vcdp_session_t *session = vcdp_create_session(tenant_idx, &k, 0, true, &flow_index);
+  vcdp_session_t *session = vcdp_create_session(tenant_idx, &primary_key, &secondary_key,
+                                                true, &flow_index);
   if (!session)
     rv = -1;
 
@@ -172,7 +155,7 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
   ip_address_decode2(&mp->src, &src);
   ip_address_decode2(&mp->dst, &dst);
 
-  session = vcdp_lookup_session(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->protocol, &dst,
+  session = vcdp_lookup_session(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->proto, &dst,
                                 clib_host_to_net_u16(mp->dport));
   if (!session)
     rv = -1;
@@ -187,13 +170,17 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
     rmp->tenant_id = mp->tenant_id;
     rmp->session_idx = 0; //session_index;
     rmp->session_type = vcdp_session_type_encode(session->type);
-    rmp->protocol = ip_proto_encode(session->proto);
+    rmp->proto = ip_proto_encode(session->proto);
     rmp->state = vcdp_session_state_encode(session->state);
     rmp->remaining_time = vcdp_session_remaining_time(session, now);
     rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
     rmp->reverse_bitmap = session->bitmaps[VCDP_FLOW_REVERSE];
     vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_PRIMARY], &rmp->primary_key);
     vcdp_session_key_encode(&session->keys[VCDP_SESSION_KEY_SECONDARY], &rmp->secondary_key);
+    rmp->bytes[0] = session->bytes[0];
+    rmp->bytes[1] = session->bytes[1];
+    rmp->pkts[0] = session->pkts[0];
+    rmp->pkts[1] = session->pkts[1];
   }}));
 }
 

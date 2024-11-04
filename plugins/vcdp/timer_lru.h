@@ -24,7 +24,7 @@ vcdp_timer_lru_free_one_with_head(vcdp_main_t *vcdp, int thread_index, f64 now, 
 
     sess_timeout_time = s->last_heard + (f64) vcdp_session_get_timeout(vcdp, s);
     if (now >= sess_timeout_time) {
-      vcdp_session_remove(vcdp, ptd, s, thread_index, oldest_elt->value);
+      vcdp_session_remove_no_timer(vcdp, ptd, s, thread_index, oldest_elt->value);
       return 1;
     } else {
       clib_dlist_addhead(ptd->lru_pool, head_index, oldest_index);
@@ -49,6 +49,9 @@ vcdp_timer_lru_free_one(vcdp_main_t *vcdp, u32 thread_index, f64 now)
 always_inline void
 vcdp_session_timer_update(vcdp_main_t *vcdp, vcdp_session_t *s, u32 thread_index)
 {
+  if (s->state == VCDP_SESSION_STATE_STATIC) {
+    return;
+  }
   /* don't update too often - timeout is in magnitude of seconds anyway */
   if (s->last_heard > s->timer.last_lru_update + 1) {
     clib_dlist_remove(vcdp->per_thread_data[thread_index].lru_pool, s->timer.lru_index);

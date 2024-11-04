@@ -203,7 +203,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
 
       u64 session_net = clib_host_to_net_u64(session->session_id);
       if (detail) {
-        vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
+        vlib_cli_output(vm, "%U\n", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
       } else {
         // if (session->state == VCDP_SESSION_STATE_STATIC)
         //   vlib_cli_output(vm, "0x%U %6d %6d %5U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
@@ -258,6 +258,36 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
     counter_t removed = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], idx);
     counter_t reused = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], idx);
     vlib_cli_output(vm, "Tenant: %d created %ld expired %ld reused %ld", idx, created, removed, reused);
+  }
+
+  return 0;
+}
+
+static clib_error_t *
+vcdp_show_interface_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  gw_main_t *gm = &gateway_main;
+  u32 sw_if_index;
+  u32 inside_tenant_id, outside_tenant_id = ~0;
+  vec_foreach_index (sw_if_index, gm->tenant_idx_by_sw_if_idx[VLIB_RX]) {
+    // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
+    if (sw_if_index == ~0)
+      continue;
+    u16 *config = vec_elt_at_index(gm->tenant_idx_by_sw_if_idx[VLIB_RX], sw_if_index);
+    if (config[0] == 0xFFFF)
+      continue;
+    inside_tenant_id = vcdp_tenant_at_index(vcdp, config[0])->tenant_id;
+
+    if (sw_if_index <= vec_len(gm->tenant_idx_by_sw_if_idx[VLIB_TX])) {
+      config = vec_elt_at_index(gm->tenant_idx_by_sw_if_idx[VLIB_TX], sw_if_index);
+      if (config[0] != 0xFFFF)
+        outside_tenant_id = vcdp_tenant_at_index(vcdp, config[0])->tenant_id;
+    }
+
+    vlib_cli_output(vm, "%U: tenant: rx %d tx: %d", format_vnet_sw_if_index_name, vnet_get_main(),
+                    sw_if_index, inside_tenant_id, outside_tenant_id);
+
   }
 
   return 0;
@@ -340,6 +370,12 @@ VLIB_CLI_COMMAND(show_vcdp_summary, static) = {
   .path = "show vcdp summary",
   .short_help = "show vcdp summary",
   .function = vcdp_show_summary_command_fn,
+};
+
+VLIB_CLI_COMMAND(show_vcdp_interface, static) = {
+  .path = "show vcdp interface",
+  .short_help = "show vcdp interface",
+  .function = vcdp_show_interface_command_fn,
 };
 
 VLIB_CLI_COMMAND(clear_vcdp_sessions, static) = {
@@ -465,24 +501,42 @@ VLIB_CLI_COMMAND(set_vcdp_session_command, static) = {
   .function = set_vcdp_session_command_fn,
 };
 
+u8 *
+format_vcdp_lru_entry(u8 *s, va_list *args)
+{
+  dlist_elt_t *lru_entry = va_arg(*args, dlist_elt_t *);
+  vcdp_per_thread_data_t *ptd = va_arg(*args, vcdp_per_thread_data_t *);
+
+  u32 session_index = lru_entry->value;
+  vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
+  if (session) {
+    s = format(s, "%d %.2f", session_index, session->last_heard);
+  } else {
+    s = format(s, "No sessions");
+  }
+  return s;
+}
+
 static clib_error_t *
 vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd;
   u32 thread_index;
-  // dlist_elt_t *lru_entry;
-  // u32 n_threads = vlib_num_workers();
-
 
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vlib_cli_output(vm, "Elements in LRU list %d", pool_elts(ptd->lru_pool));
-    // pool_foreach(lru_entry, ptd->lru_pool) {
-    //   vlib_cli_output(vm, "  %U", format_vcdp_lru_entry, lru_entry);
-    // }
     for (int i = 0; i < VCDP_N_TIMEOUT; i++) {
       vlib_cli_output(vm, "Head index: %d", ptd->lru_head_index[i]);
+      dlist_elt_t *lru_entry = pool_elt_at_index(ptd->lru_pool, ptd->lru_head_index[i]);
+      while (lru_entry) {
+        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, ptd,
+        lru_entry->next, lru_entry->prev, lru_entry->value);
+        if (lru_entry->next == ~0 || lru_entry->next == ptd->lru_head_index[i])
+          break;
+        lru_entry = pool_elt_at_index(ptd->lru_pool, lru_entry->next);
+      }
     }
   }
   return 0;

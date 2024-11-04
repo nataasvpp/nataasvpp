@@ -31,12 +31,8 @@ autoreply autoendian define vcdp_session_add
   u32 context;
 
   u32 tenant_id;
-  u32 context_id;
-  vl_api_address_t src;
-  vl_api_address_t dst;
-  u8 protocol;
-  u16 sport;
-  u16 dport;
+  vl_api_vcdp_session_key_t primary_key;
+  vl_api_vcdp_session_key_t secondary_key;
 };
 
 autoendian define vcdp_session_lookup
@@ -47,7 +43,7 @@ autoendian define vcdp_session_lookup
   u32 tenant_id;
   vl_api_address_t src;
   vl_api_address_t dst;
-  u8 protocol;
+  u8 proto;
   u16 sport;
   u16 dport;
 };
@@ -63,7 +59,7 @@ autoendian define vcdp_session_lookup_reply
   u32 tenant_id;
   u32 session_idx;
   vl_api_vcdp_session_type_t session_type;
-  vl_api_ip_proto_t protocol;
+  vl_api_ip_proto_t proto;
   vl_api_vcdp_session_state_t state;
   f64 remaining_time;
 /* Avoid service strings to keep it compact */
@@ -71,6 +67,8 @@ autoendian define vcdp_session_lookup_reply
   u32 reverse_bitmap;
   vl_api_vcdp_session_key_t primary_key;
   vl_api_vcdp_session_key_t secondary_key;
+  u64 bytes[2];
+  u64 pkts[2];
 };
 
 autoendian define vcdp_sessions_cbor

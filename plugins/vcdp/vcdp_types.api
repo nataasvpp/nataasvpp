@@ -25,8 +25,9 @@ enum vcdp_session_type : u8
 typedef vcdp_session_key
 {
   u32 context_id;
-  vl_api_address_t init_addr;
-  u16 init_port;
-  vl_api_address_t resp_addr;
-  u16 resp_port;
+  vl_api_address_t src;
+  vl_api_address_t dst;
+  u16 sport;
+  u16 dport;
+  u8 proto;
 };

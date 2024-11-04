@@ -101,7 +101,8 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
   s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);
   skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-  s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
+    s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   if (session->state != VCDP_SESSION_STATE_STATIC)
     s = format(s, "  expires after: %fs\n", remaining_time);

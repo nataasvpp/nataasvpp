@@ -75,7 +75,7 @@ vcdp_nat_remove_counters_per_instance(nat_instance_t *instance, u16 nat_idx)
 /*
  * Call this if the pool address isn't already in the FIB
  */
-static void
+/*static */void
 vcdp_nat_dpo_no_entry(ip4_address_t address, u16 nat_idx, bool is_if) {
     // Create DPO for the pool
   dpo_id_t dpo_v4 = DPO_INVALID;
@@ -118,7 +118,7 @@ vcdp_nat_add(char *nat_id, u32 context_id, ip4_address_t *addrs, bool is_if)
   hash_set_mem(nat->uuid_hash, instance->nat_id, nat_idx);
 
   // Create DPO for the pool
-  vcdp_nat_dpo_no_entry(addrs[0], nat_idx, is_if);
+  //TODO DPO: vcdp_nat_dpo_no_entry(addrs[0], nat_idx, is_if);
 
   // Initialise counters. Single dimension.
   vcdp_nat_init_counters_per_instance(instance, nat_idx);
@@ -434,7 +434,7 @@ nat_init(vlib_main_t *vm)
   }
 
   // Create a FIB entry for the NAT pool addresses.
-  vcdp_nat_dpo_module_init();
+  // TODO DPO: vcdp_nat_dpo_module_init(); // Only for pool addresses not for interface addresses?
 
   vcdp_nat_init_counters();
 

@@ -18,10 +18,14 @@ vcdp_get_ip6_header(vlib_buffer_t *b)
   return vlib_buffer_get_current(b) + vnet_buffer(b)->ip.save_rewrite_length;
 }
 
+/* TODO: Fix this so it works in all cases */
 static inline u16
 vcdp_get_l3_length (vlib_main_t *vm, vlib_buffer_t *b)
 {
-  u16 len = vlib_buffer_length_in_chain (vm, b);
-  return len - (vnet_buffer(b)->l3_hdr_offset - b->current_data);
+  // int l3_offset = (void *)b->data - vlib_buffer_get_current(b) + vnet_buffer(b)->ip.save_rewrite_length;
+  // return vlib_buffer_length_in_chain(vm, b) - l3_offset;
+  // return vlib_buffer_length_in_chain(vm, b) - (vnet_buffer(b)->l3_hdr_offset - b->current_data);
+  return vlib_buffer_length_in_chain(vm, b);
 }
+
 #endif
