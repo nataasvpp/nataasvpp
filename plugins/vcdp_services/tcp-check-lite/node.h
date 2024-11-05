@@ -73,11 +73,10 @@ vcdp_tcp_state_to_timeout (vcdp_tcp_check_lite_tcp_state_t state)
 
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
-update_state_one_pkt(vcdp_main_t *vcdp, u32 thread_index, vcdp_tenant_t *tenant,
+update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, vcdp_tenant_t *tenant,
                      vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
                      f64 current_time, u8 dir, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   tcp_header_t *tcp = (tcp_header_t *) (b[0]->data + vnet_buffer(b[0])->l4_hdr_offset);
 
 #if 0
@@ -188,7 +187,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
       VCDP_DBG(0, "Fragment ignored");
       goto next;
     }
-    update_state_one_pkt(vcdp, thread_index, tenant, tcp_session, session, session_idx, current_time,
+    update_state_one_pkt(vcdp, ptd, thread_index, tenant, tcp_session, session, session_idx, current_time,
                          vcdp_direction_from_flow_index(b[0]->flow_id), b, sf, nsf);
   next:
     vcdp_next(b[0], to_next);
