@@ -7,6 +7,11 @@
 static inline int
 vcdp_session_get_timeout(vcdp_main_t *vcdp, vcdp_session_t *s)
 {
+  // Only do for debug
+  if (s->timer.type >= VCDP_N_TIMEOUT) {
+    clib_warning("TIMEOUT TYPE ERROR %d %d", s->timer.type, vcdp->timeouts[s->timer.type]);
+    return 0;
+  }
   return vcdp->timeouts[s->timer.type];
 }
 static_always_inline int

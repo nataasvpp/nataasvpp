@@ -151,9 +151,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
           // Set error, that can be reset by the miss chain if it likes
           b[0]->error = node->errors[VCDP_LOOKUP_ERROR_MISS];
         }
-
-        /* See if we can expire some sessions. */
-        vcdp_timer_lru_free_one(vcdp, thread_index, now);
       }
       vcdp_next(b[0], current_next);
       to_local[n_local] = bi[0];
@@ -321,9 +318,9 @@ VLIB_NODE_FN(vcdp_handoff_node)
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
-  f64 time_now = vlib_time_now(vm);
+  f64 now = vlib_time_now(vm);
 
-  ptd->current_time = time_now;
+  ptd->current_time = now;
 
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
@@ -341,7 +338,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
     }
 
     // Check if session has expired. If so send it back to the lookup node to be created.
-    if (vcdp_session_is_expired(session, time_now)) {
+    if (vcdp_session_is_expired(session, now)) {
       VCDP_DBG(2, "Forwarding against expired handoff session, deleting and recreating %d", session_index);
       vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
 
@@ -351,6 +348,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
       goto next;
     }
 
+    session->last_heard = now;
     u32 pbmp = session->bitmaps[vcdp_direction_from_flow_index(flow_index)];
     vcdp_buffer(b[0])->service_bitmap = pbmp;
   next:

@@ -40,7 +40,7 @@ autoendian define vcdp_session_lookup
   u32 client_index;
   u32 context;
 
-  u32 tenant_id;
+  u32 context_id;
   vl_api_address_t src;
   vl_api_address_t dst;
   u8 proto;
@@ -56,7 +56,7 @@ autoendian define vcdp_session_lookup_reply
 
   u64 session_id;
   u32 thread_index;
-  u32 tenant_id;
+  u32 context_id;
   u32 session_idx;
   vl_api_vcdp_session_type_t session_type;
   vl_api_ip_proto_t proto;
@@ -85,13 +85,16 @@ autoendian define vcdp_sessions_cbor_reply
   u8 cbor_data[len];
 };
 
-autoreply define vcdp_set_timeout
+autoendian autoreply define vcdp_set_timeout
 {
   u32 client_index;
   u32 context;
 
-  u32 timeout_id;
-  u32 timeout_value;
+  u32 embryonic;
+  u32 established;
+  u32 tcp_transitory;
+  u32 tcp_established;
+  u32 security;
 };
 
 autoendian autoreply define vcdp_session_clear

@@ -64,6 +64,12 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     VCDP_DBG(0, "Unknown tenant %d", tenant_idx);
     return 0;
   }
+
+
+  /* See if we can expire some sessions. */
+  f64 now = vlib_time_now(vlib_get_main());
+  vcdp_timer_lru_free_one(vcdp, thread_index, now);
+
   u64 h;
   vcdp_session_t *session;
   pool_get(ptd->sessions, session);
@@ -131,7 +137,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
 }
 
 vcdp_session_t *
-vcdp_lookup_session(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
+vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst, u16 dport)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u64 value;
@@ -139,11 +145,6 @@ vcdp_lookup_session(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip
     return 0;
   if (src->version != dst->version)
     return 0;
-
-  u16 tenant_idx;
-  vcdp_tenant_t *tenant = vcdp_tenant_get_by_id(tenant_id, &tenant_idx);
-  if (!tenant) return 0;
-  u32 context_id = tenant->context_id;
 
   if (src->version == AF_IP6) {
 

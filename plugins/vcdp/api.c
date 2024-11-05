@@ -85,12 +85,11 @@ static void
 vl_api_vcdp_set_timeout_t_handler(vl_api_vcdp_set_timeout_t *mp)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  u32 timeout_id = clib_net_to_host_u32(mp->timeout_id);
-  u32 timeout_value = clib_net_to_host_u32(mp->timeout_value);
-  clib_error_t *err = vcdp_set_timeout(vcdp, timeout_id, timeout_value);
+  u32 timeouts[VCDP_N_TIMEOUT] = {mp->embryonic, mp->established, mp->tcp_transitory, mp->tcp_established, mp->security};
+  clib_error_t *err = vcdp_set_timeout(vcdp, timeouts);
   vl_api_vcdp_set_timeout_reply_t *rmp;
   int rv = err ? -1 : 0;
-  REPLY_MACRO(VL_API_VCDP_SET_TIMEOUT_REPLY);
+  REPLY_MACRO_END(VL_API_VCDP_SET_TIMEOUT_REPLY);
 }
 
 static vl_api_vcdp_session_state_t
@@ -155,7 +154,7 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
   ip_address_decode2(&mp->src, &src);
   ip_address_decode2(&mp->dst, &dst);
 
-  session = vcdp_lookup_session(mp->tenant_id, &src, clib_host_to_net_u16(mp->sport), mp->proto, &dst,
+  session = vcdp_lookup_session(mp->context_id, &src, clib_host_to_net_u16(mp->sport), mp->proto, &dst,
                                 clib_host_to_net_u16(mp->dport));
   if (!session)
     rv = -1;
@@ -167,7 +166,7 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
   if (session) {
     rmp->session_id = session->session_id;
     rmp->thread_index = 0; //thread_index;
-    rmp->tenant_id = mp->tenant_id;
+    rmp->context_id = mp->context_id;
     rmp->session_idx = 0; //session_index;
     rmp->session_type = vcdp_session_type_encode(session->type);
     rmp->proto = ip_proto_encode(session->proto);

@@ -26,21 +26,22 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e looku
                  u64 *h)
 {
   ip4_header_t *ip = vcdp_get_ip4_header(b);
+  udp_header_t *udp = (udp_header_t *) (ip+1);
+  b->flags |= VNET_BUFFER_F_L4_HDR_OFFSET_VALID;
+  vnet_buffer(b)->l4_hdr_offset = (u8 *) udp - b->data;
+
   skey->proto = ip->protocol;
   skey->context_id = context_id;
   skey->src = ip->src_address.as_u32;
   skey->dst = ip->dst_address.as_u32;
 
   if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
-    udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
     skey->dport = udp->dst_port;
-    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)udp - (void *)ip;
   } else if (ip->protocol == IP_PROTOCOL_ICMP) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip4_next_header(ip);
     icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
     skey->sport = skey->dport = echo->identifier;
-    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)icmp - (void *)ip;
   } else {
     skey->sport = skey->dport = 0;
   }
@@ -72,21 +73,22 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e looku
                  u64 *h)
 {
   ip6_header_t *ip = vcdp_get_ip6_header(b);
+  udp_header_t *udp = (udp_header_t *) (ip+1);
+  b->flags |= VNET_BUFFER_F_L4_HDR_OFFSET_VALID;
+  vnet_buffer(b)->l4_hdr_offset = (u8 *) udp - b->data;
+
   skey->proto = ip->protocol;
   skey->context_id = context_id;
   skey->src = ip->src_address;
   skey->dst = ip->dst_address;
 
   if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
-    udp_header_t *udp = (udp_header_t *) (ip+1);
     skey->sport = udp->src_port;
     skey->dport = udp->dst_port;
-    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)udp - (void *)ip;
   } else if (ip->protocol == IP_PROTOCOL_ICMP6) {
     icmp46_header_t *icmp = (icmp46_header_t *) ip6_next_header(ip);
     icmp_echo_header_t *echo = (icmp_echo_header_t *) (icmp + 1);
     skey->sport = skey->dport = echo->identifier;
-    vnet_buffer(b)->l4_hdr_offset = b->current_data + (void *)icmp - (void *)ip;
   } else {
     skey->sport = skey->dport = 0;
   }

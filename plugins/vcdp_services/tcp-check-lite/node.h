@@ -23,6 +23,7 @@ typedef struct {
   u32 new_state;
 } vcdp_tcp_check_lite_trace_t;
 format_function_t format_vcdp_tcp_check_session_flags;
+format_function_t format_vcdp_tcp_check_lite_state;
 
 u8 *
 format_vcdp_tcp_check_lite_trace(u8 *s, va_list *args)
@@ -35,9 +36,9 @@ format_vcdp_tcp_check_lite_trace(u8 *s, va_list *args)
   s = format(s, "vcdp-tcp-check-lite: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
              t->flow_id & 0x1 ? "reverse" : "forward");
   if (t->old_state != t->new_state) {
-    s = format(s, "  session state changed from: %d to: %d\n", t->old_state, t->new_state);
+    s = format(s, "  session state changed from: %U to: %U\n", format_vcdp_tcp_check_lite_state, t->old_state, format_vcdp_tcp_check_lite_state, t->new_state);
   } else {
-    s = format(s, "  session state: %d\n", t->old_state);
+    s = format(s, "  session state: %U\n", format_vcdp_tcp_check_lite_state, t->old_state);
   }
   return s;
 }
@@ -76,7 +77,8 @@ update_state_one_pkt(vcdp_main_t *vcdp, u32 thread_index, vcdp_tenant_t *tenant,
                      vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
                      f64 current_time, u8 dir, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
-  tcp_header_t *tcp = (tcp_header_t *) (b[0]->data + vnet_buffer (b[0])->l4_hdr_offset);
+  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
+  tcp_header_t *tcp = (tcp_header_t *) (b[0]->data + vnet_buffer(b[0])->l4_hdr_offset);
 
 #if 0
   /* Ignore non first fragments */
@@ -89,7 +91,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, u32 thread_index, vcdp_tenant_t *tenant,
 
   /* Note: We don't care about SYNs apart from reopening sessions */
   u8 flags = tcp->flags & (TCP_FLAG_SYN | TCP_FLAG_ACK | TCP_FLAG_FIN | TCP_FLAG_RST);
-  u32 next_timeout = vcdp->timeouts[vcdp_tcp_state_to_timeout(tcp_session->state)];
+  u32 next_timeout = vcdp_tcp_state_to_timeout(tcp_session->state);
   if (PREDICT_FALSE(tcp_session->version != session->session_version)) {
     tcp_session->version = session->session_version;
     tcp_session->state = VCDP_TCP_CHECK_LITE_STATE_CLOSED;
@@ -132,7 +134,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, u32 thread_index, vcdp_tenant_t *tenant,
     // If we see a SYN, we reopen session. It will have the same session id.
     // Otherwise we will just forward against the session until it expires.
     if (tcp_session->flags[VCDP_FLOW_FORWARD] & TCP_FLAG_SYN) {
-      // VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
+      VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
       u32 thread_index = vlib_get_thread_index();
       vcdp_session_reopen(vcdp, thread_index, session);
       next_timeout = VCDP_TIMEOUT_EMBRYONIC;
@@ -184,12 +186,10 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
     /* Ignore IP fragments */
     if (vnet_buffer(b[0])->ip.reass.is_non_first_fragment) {
       VCDP_DBG(0, "Fragment ignored");
-      clib_warning("OLE OLE OLE OLE ");
       goto next;
-    } else {
-      update_state_one_pkt(vcdp, thread_index, tenant, tcp_session, session, session_idx, current_time,
-                           vcdp_direction_from_flow_index(b[0]->flow_id), b, sf, nsf);
     }
+    update_state_one_pkt(vcdp, thread_index, tenant, tcp_session, session, session_idx, current_time,
+                         vcdp_direction_from_flow_index(b[0]->flow_id), b, sf, nsf);
   next:
     vcdp_next(b[0], to_next);
     n_left -= 1;

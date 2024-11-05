@@ -235,9 +235,15 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
 }
 
 clib_error_t *
-vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeout_idx, u32 timeout_val)
+vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeouts[])
 {
-  vcdp->timeouts[timeout_idx] = timeout_val;
+#define _(name, val, str)                                                                                              \
+  if (timeouts[VCDP_TIMEOUT_##name] > 0) {                                                                           \
+    vcdp->timeouts[VCDP_TIMEOUT_##name] = timeouts[VCDP_TIMEOUT_##name];                                                 \
+  }
+    foreach_vcdp_timeout
+#undef _
+
   return 0;
 }
 

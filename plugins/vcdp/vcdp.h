@@ -317,7 +317,7 @@ vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add);
 clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
-clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeout_idx, u32 timeout_val);
+clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeouts[]);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
 int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
@@ -325,7 +325,7 @@ u32 vcdp_calc_bihash_buckets (u32 n_elts);
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 vcdp_session_t *vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_key_t *secondary,
                                     bool is_static, u32 *flow_index);
-vcdp_session_t *vcdp_lookup_session(u32 tenant_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
+vcdp_session_t *vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
                                     u16 dport);
 void vcdp_session_clear(void);
 int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,

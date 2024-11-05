@@ -89,15 +89,14 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = ~0;
-  u32 timeout_idx = ~0;
-  u32 timeout_val = ~0;
-
+  u32 timeouts[VCDP_N_TIMEOUT] = {0};
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
     if (0)
       ;
-#define _(x, y, z) else if (unformat(line_input, z " %d", &timeout_val)) timeout_idx = VCDP_TIMEOUT_##x;
+#define _(x, y, z)                                                                                                     \
+  else if (unformat(line_input, z " %d", &timeouts[VCDP_TIMEOUT_##x]));                                                \
     foreach_vcdp_timeout
 #undef _
       else
@@ -110,12 +109,8 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     err = clib_error_return(0, "missing tenant id");
     goto done;
   }
-  if (timeout_idx == ~0) {
-    err = clib_error_return(0, "missing timeout");
-    goto done;
-  }
 
-  err = vcdp_set_timeout(vcdp, timeout_idx, timeout_val);
+  err = vcdp_set_timeout(vcdp, timeouts);
 done:
   unformat_free(line_input);
   return err;
@@ -198,8 +193,10 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         continue;
 
       f64 remaining_time = vcdp_session_remaining_time(session, now);
-      if (session->state == VCDP_SESSION_STATE_STATIC)
-        remaining_time = 0;
+      if (remaining_time <= 0 && session->state != VCDP_SESSION_STATE_STATIC)
+        continue;
+      // if (session->state == VCDP_SESSION_STATE_STATIC)
+      //   remaining_time = 0;
 
       u64 session_net = clib_host_to_net_u64(session->session_id);
       if (detail) {
@@ -218,7 +215,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
           s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
-        vlib_cli_output(vm, "%s", s);
+        vlib_cli_output(vm, "%v", s);
         vec_reset_length(s);
       }
     }
