@@ -88,15 +88,15 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-  u32 tenant_id = ~0;
-  u32 timeouts[VCDP_N_TIMEOUT] = {0};
+   u32 timeouts[VCDP_N_TIMEOUT] = {0};
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
     if (0)
       ;
-#define _(x, y, z)                                                                                                     \
-  else if (unformat(line_input, z " %d", &timeouts[VCDP_TIMEOUT_##x]));                                                \
+#define _(x, y, z) \
+  else if (unformat(line_input, z " %d", &timeouts[VCDP_TIMEOUT_##x])) \
+    ;
     foreach_vcdp_timeout
 #undef _
       else
@@ -104,10 +104,6 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
       err = unformat_parse_error(line_input);
       goto done;
     }
-  }
-  if (tenant_id == ~0) {
-    err = clib_error_return(0, "missing tenant id");
-    goto done;
   }
 
   err = vcdp_set_timeout(vcdp, timeouts);
@@ -239,8 +235,14 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
 
   vlib_cli_output(vm, "Threads: %d", vec_len(vcdp->per_thread_data));
   vlib_cli_output(vm, "Active tenants: %d", pool_elts(vcdp->tenants));
+  vlib_cli_output(vm, "Timers:");
 
-  vec_foreach_index (thread_index, vcdp->per_thread_data) {
+#define _(x, y, z)                                                                                                     \
+  vlib_cli_output(vm, "  " z ": %d", vcdp->timeouts[VCDP_TIMEOUT_##x]);
+  foreach_vcdp_timeout
+#undef _
+
+    vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
   }
