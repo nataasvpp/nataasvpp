@@ -17,7 +17,7 @@ static u8 *
 format_vcdp_nat_rewrite_SPORT(u8 *s, va_list *args)
 {
   nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
-  s = format(s, "%u", clib_net_to_host_u16(rewrite->rewrite.sport));
+  s = format(s, "%u", (unsigned int)clib_net_to_host_u16(rewrite->rewrite.sport));
   return s;
 }
 
@@ -32,7 +32,7 @@ static u8 *
 format_vcdp_nat_rewrite_DPORT(u8 *s, va_list *args)
 {
   nat_rewrite_data_t *rewrite = va_arg(*args, nat_rewrite_data_t *);
-  s = format(s, "%u", clib_net_to_host_u16(rewrite->rewrite.dport));
+  s = format(s, "%u", (unsigned int)clib_net_to_host_u16(rewrite->rewrite.dport));
   return s;
 }
 static u8 *
