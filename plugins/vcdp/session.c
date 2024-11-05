@@ -65,7 +65,6 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     return 0;
   }
 
-
   /* See if we can expire some sessions. */
   f64 now = vlib_time_now(vlib_get_main());
   vcdp_timer_lru_free_one(vcdp, thread_index, now);
@@ -101,6 +100,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   }
 
   // session->type = VCDP_SESSION_TYPE_IP4;
+  session->state = VCDP_SESSION_STATE_FSOL;
 
   session->session_version += 1;
   u64 session_id = (ptd->session_id_ctr & (vcdp->session_id_ctr_mask)) | ptd->session_id_template;
