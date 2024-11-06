@@ -16,7 +16,7 @@ from vpp_ip import DpoProto
 from vpp_ip_route import FibPathProto, VppIpRoute, VppRoutePath
 from vpp_papi import VppEnum
 
-from scapy.all import Ether, IP, IPOption_RR, UDP, TCP
+from scapy.all import Ether, IP, IPOption_RR, UDP, TCP, ICMP
 
 """
 Tests for VCDP Multi-homing.
@@ -219,12 +219,9 @@ class TestVCDPMH(VppTestCase):
         print('Enabled IPIP tunnel address:', rv)
 
         # # Send test packet
-        # p = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/
-        #     IP(src='1.2.3.4', dst='10.0.0.2')/ICMP())
-        # rx = self.send_and_expect(self.pg0, p, self.pg1)
-        # for p in rx:
-        #     p.show2()
-        #     print(p.summary())
+        p = (Ether(src=self.pg0.remote_mac, dst=self.pg0.local_mac)/
+            IP(src='1.2.3.4', dst='10.0.0.2')/ICMP())
+        rx = self.send_and_expect(self.pg0, p, self.pg1)
 
         # Add static session for IPIP tunnel
         primary_key = {'context_id': 0, 'src': dst, 'dst': src, 'sport': 0, 'dport': 0, 'proto': 4}
@@ -399,6 +396,68 @@ class TestVCDPMH(VppTestCase):
         # Test IPIP tunnel
         self.send_i2o_tunnel('10.0.0.2', self.pg1)
         self.send_o2i_tunnel(self.pg1)
+
+    def test_icmp_error_ttl(self):
+        # Create session with ttl=1
+        nat = self.nat1
+
+        p = (Ether(src=nat.in_if.remote_mac, dst=nat.in_if.local_mac)/
+             IP(src=nat.in_if.remote_ip4, dst=nat.out_if.remote_ip4, ttl=1)/
+             UDP(dport=1234))
+        rx = self.send_and_expect(nat.in_if, p, nat.in_if)
+        rx[0].show2()
+
+        # Assert on ICMP error
+
+    def test_icmp_error(self):
+        # Test handshake
+        # for i, nat in enumerate(self.nats):
+        #     self.tcp_handshake(nat, 12000+i, 80)
+        nat = self.nat1
+
+        # Create session
+        p = (Ether(src=nat.in_if.remote_mac, dst=nat.in_if.local_mac)/
+             IP(src=nat.in_if.remote_ip4, dst=nat.out_if.remote_ip4)/
+             UDP(dport=1234))
+        rx = self.send_and_expect(nat.in_if, p, nat.out_if)
+        print('CREATE SESSION INSIDE TO OUTSIDE - REPLY')
+        rx[0].show2()
+        outside_packet = rx[0].copy()
+
+        # Send ICMP error from outside to inside.
+        # Created for a packet sent inside to outside.
+        icmp_error = (Ether(src=nat.out_if.remote_mac, dst=nat.out_if.local_mac)/
+                      IP(src='1.2.3.4', dst=rx[0][IP].src)/ICMP(type=3, code=1)/
+                      rx[0][IP])
+        icmp_error.show2()
+        rx = self.send_and_expect(nat.out_if, icmp_error, nat.in_if)
+        rx[0].show2()
+        assert str(rx[0][IP].src) == '1.2.3.4'
+        assert rx[0][IP].dst == nat.in_if.remote_ip4
+        inner_ip = rx[0][3]
+        inner_ip.show2()
+        assert inner_ip.src == nat.in_if.remote_ip4
+        assert inner_ip.dst == nat.out_if.remote_ip4
+
+        # print(f'SESSION TABLE:\n{self.vapi.cli("show vcdp session detail")}')
+
+        # Send ICMP error from inside to outside.
+        # Created for a packet sent outside to inside (a reply).
+        reply_packet = self.make_reply(outside_packet)
+        rx = self.send_and_expect(nat.out_if, reply_packet, nat.in_if)
+        print('INNER REPLY PACKET')
+        rx[0].show2()
+
+        icmp_error = (Ether(src=nat.in_if.remote_mac, dst=nat.in_if.local_mac)/
+                        IP(src=nat.in_if.remote_ip4, dst=nat.out_if.remote_ip4)/ICMP(type=3, code=1)/
+                        rx[0][IP])
+
+        icmp_error.show2()
+        rx = self.send_and_expect(nat.in_if, icmp_error, nat.out_if)
+
+        # ICMP error on the outside of the NAT
+        print('THE ICMP error message on the outside of the NAT')
+        rx[0].show2()
 
     def test_vcdp_mh(self):
         '''VCDP Multi-homing tests'''

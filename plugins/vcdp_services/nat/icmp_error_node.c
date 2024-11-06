@@ -36,7 +36,8 @@ VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
 nat_icmp_error_process_one(vlib_node_runtime_t * node, nat_rewrite_data_t *nat_rewrites, vcdp_session_t *session, u16 *to_next, vlib_buffer_t **b)
 {
-  ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+  ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
+
   icmp46_header_t *icmp;
   icmp_echo_header_t *echo;
 
