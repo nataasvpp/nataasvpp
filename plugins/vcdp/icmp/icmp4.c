@@ -7,6 +7,7 @@
 #include <vnet/ip/ip_sas.h>
 #include <vnet/buffer.h>
 #include <vcdp/vcdp.api_enum.h>
+#include <vcdp/vcdp_funcs.h>
 
 /* This is shamelessly copied from vnet/ip/icmp4.c to avoid having to add custom next node hooks there. */
 /* This node is used to generate ICMP error messages */
@@ -54,7 +55,11 @@ VLIB_NODE_FN(vcdp_icmp_error_node)
   while (n_left > 0) {
     // next[0] = VCDP_BYPASS_NEXT_LOOKUP;
 
+    /* May have an L2 header */
+    vlib_buffer_advance(b[0], vnet_buffer(b[0])->ip.save_rewrite_length);
+    vnet_buffer(b[0])->ip.save_rewrite_length = 0;
     ip4_header_t *ip = vlib_buffer_get_current(b[0]);
+    clib_warning("PAYLOAD PACKET: %U %d", format_ip4_header, ip, 40, vnet_buffer(b[0])->ip.save_rewrite_length);
     u32 src = ip->src_address.as_u32;
 
     /*

@@ -202,15 +202,15 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
      * an ICMP response.
      */
     // TODO: IPV6
+    bool is_output_mode = vnet_buffer(b[0])->ip.save_rewrite_length > 0;
     ip4_header_t *ip = vcdp_get_ip4_header(b[0]);
-    if (PREDICT_FALSE(ip->ttl <= 1)) {
+    if (PREDICT_FALSE(ip->ttl <= 1) && !is_output_mode) {
       // b[0]->error = VCDP_TUNNEL_OUTPUT_ERROR_TIME_EXPIRED;
       vnet_buffer(b[0])->sw_if_index[VLIB_TX] = (u32) ~0;
       vnet_buffer (b[0])->ip.fib_index = 0;
       icmp4_error_set_vnet_buffer(b[0], ICMP4_time_exceeded, ICMP4_time_exceeded_ttl_exceeded_in_transit, 0);
       next[0] = is_dpo ? icmp_error_next_node_index : VCDP_GW_NEXT_ICMP_ERROR;
     } else {
-
       if (is_dpo) {
         vcdp_dpo_t *vcdp_dpo = vcdp_dpo_get(vnet_buffer(b[0])->ip.adj_index[VLIB_TX]);
 

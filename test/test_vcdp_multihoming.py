@@ -73,7 +73,7 @@ class TestVCDPMH(VppTestCase):
     def setUpClass(cls):
         """Initialise tests"""
         super(TestVCDPMH, cls).setUpClass()
-        cls.create_pg_interfaces(range(5))
+        cls.create_pg_interfaces(range(7))
         cls.interfaces = list(cls.pg_interfaces)
         for i in cls.interfaces:
             i.admin_up()
@@ -122,6 +122,7 @@ class TestVCDPMH(VppTestCase):
         tenant2 = 1
         tenant3 = 2
         tenant4 = 3
+        tenant5 = 4
         self.tenant1 = tenant1
         outside_tenant = 1000
         bypass_tenant = 2000
@@ -129,6 +130,7 @@ class TestVCDPMH(VppTestCase):
         nat_id2 = "nat-instance-pg2"
         nat_id3 = "nat-instance-ipip0"
         nat_id4 = "nat-instance-rxmode"
+        nat_id5 = "nat_instance-pool"
 
         services_flags = VppEnum.vl_api_vcdp_service_chain_t
 
@@ -137,6 +139,7 @@ class TestVCDPMH(VppTestCase):
         self.vapi.vcdp_tenant_add_del(tenant_id=tenant2, context_id=0, is_add=True)
         self.vapi.vcdp_tenant_add_del(tenant_id=tenant3, context_id=0, is_add=True)
         self.vapi.vcdp_tenant_add_del(tenant_id=tenant4, context_id=0, is_add=True)
+        self.vapi.vcdp_tenant_add_del(tenant_id=tenant5, context_id=0, is_add=True)
         self.vapi.vcdp_tenant_add_del(tenant_id=outside_tenant, context_id=0, is_add=True)
         self.vapi.vcdp_tenant_add_del(tenant_id=bypass_tenant, context_id=0, is_add=True)
 
@@ -156,6 +159,10 @@ class TestVCDPMH(VppTestCase):
         self.vapi.vcdp_set_services(tenant_id=tenant4, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD, services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output")
         self.vapi.vcdp_set_services(tenant_id=tenant4, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE, services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output")
         self.vapi.vcdp_set_services(tenant_id=tenant4, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS, services="vcdp-nat-slowpath vcdp-drop")
+
+        self.vapi.vcdp_set_services(tenant_id=tenant5, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD, services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output")
+        self.vapi.vcdp_set_services(tenant_id=tenant5, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE, services="vcdp-l4-lifecycle vcdp-tcp-check-lite vcdp-output")
+        self.vapi.vcdp_set_services(tenant_id=tenant5, dir=services_flags.VCDP_API_SERVICE_CHAIN_MISS, services="vcdp-nat-slowpath vcdp-drop")
 
         self.vapi.vcdp_set_services(tenant_id=bypass_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_FORWARD, services="vcdp-output")
         self.vapi.vcdp_set_services(tenant_id=bypass_tenant, dir=services_flags.VCDP_API_SERVICE_CHAIN_REVERSE, services="vcdp-output")
@@ -177,16 +184,20 @@ class TestVCDPMH(VppTestCase):
         self.vapi.vcdp_nat_if_add(nat_id=nat_id3, sw_if_index=ipip_sw_if_index)
         self.vapi.vcdp_nat_if_add(nat_id=nat_id4, sw_if_index=self.pg4.sw_if_index)
 
+        self.vapi.vcdp_nat_add(nat_id=nat_id5, addr=['4.0.0.1'], n_addr=1)
+
         # Bind tenant to nat
         self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant1, nat_id=nat_id1, is_set=True)
         self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant2, nat_id=nat_id2, is_set=True)
         self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant3, nat_id=nat_id3, is_set=True)
         self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant4, nat_id=nat_id4, is_set=True)
+        self.vapi.vcdp_nat_bind_set_unset(tenant_id=tenant5, nat_id=nat_id5, is_set=True)
 
 
         # Enable outside interface using interface NAT
         self.enable_interface(self.pg1.sw_if_index, inside_tenant=outside_tenant, outside_tenant=tenant1)
         self.enable_interface(self.pg2.sw_if_index, inside_tenant=outside_tenant, outside_tenant=tenant2)
+        self.enable_interface(self.pg6.sw_if_index, inside_tenant=outside_tenant, outside_tenant=tenant5)
         self.enable_interface(self.pg3.sw_if_index, inside_tenant=tenant4)
         self.enable_interface(self.pg4.sw_if_index, inside_tenant=outside_tenant)
         self.enable_interface(ipip_sw_if_index, inside_tenant=outside_tenant, outside_tenant=tenant3)
@@ -195,7 +206,8 @@ class TestVCDPMH(VppTestCase):
         self.nat2 = NAT(self.pg0, self.pg2)
         self.nat3 = NAT(self.pg0, self.pg1, '10.0.0.123', tunnel=True)
         self.nat4 = NAT(self.pg3, self.pg4)
-        self.nats = [self.nat1, self.nat2, self.nat3, self.nat4]
+        self.nat5 = NAT(self.pg5, self.pg6)
+        self.nats = [self.nat1, self.nat2, self.nat3, self.nat4, self.nat5]
 
     def ipip_add_tunnel(self, tenant, src, dst, sport, dport, proto, table_id=0, dscp=0x0, flags=0):
         """Add a IPIP tunnel"""
@@ -321,6 +333,7 @@ class TestVCDPMH(VppTestCase):
 
     def make_reply_ip(self, pkt, i):
         pkt[i].src, pkt[i].dst = pkt[i].dst, pkt[i].src
+        pkt[i].chksum = None
         if pkt[i].proto == 6 or pkt[i].proto == 17:
             pkt[i+1].sport, pkt[i+1].dport = pkt[i+1].dport, pkt[i+1].sport
         return pkt
@@ -397,18 +410,45 @@ class TestVCDPMH(VppTestCase):
         self.send_i2o_tunnel('10.0.0.2', self.pg1)
         self.send_o2i_tunnel(self.pg1)
 
+    def packet(self, inside, outside, dport):
+        return (Ether(src=inside.remote_mac, dst=inside.local_mac)/
+                IP(src=inside.remote_ip4, dst=outside.remote_ip4)/
+                UDP(dport=dport))
+
     def test_icmp_error_ttl(self):
         # Create session with ttl=1
-        nat = self.nat1
+        nat = self.nat5
 
-        p = (Ether(src=nat.in_if.remote_mac, dst=nat.in_if.local_mac)/
-             IP(src=nat.in_if.remote_ip4, dst=nat.out_if.remote_ip4, ttl=1)/
-             UDP(dport=1234))
+        # Send from inside to outside
+        p = self.packet(nat.in_if, nat.out_if, 1234)
+        p[IP].ttl = 2
+        rx = self.send_and_expect(nat.in_if, p, nat.out_if)
+        rx[0].show2()
+        p[IP].ttl = 0
+        rx = self.send_and_expect(nat.in_if, p, nat.in_if)
+        rx[0].show2()
+        p[IP].ttl = 1
         rx = self.send_and_expect(nat.in_if, p, nat.in_if)
         rx[0].show2()
 
-        # Assert on ICMP error
+        # Send from outside to inside
+        # Create session
+        p = self.packet(nat.in_if, nat.out_if, 1234)
+        rx = self.send_and_expect(nat.in_if, p, nat.out_if)
+        rx[0].show2()
+        print(f'SESSION TABLE:\n{self.vapi.cli("show vcdp session detail")}')
+        print(f'SESSION TABLE:\n{self.vapi.cli("show vcdp session")}')
 
+        print('SENT OUT2IN PACKET')
+        reply = self.make_reply(rx[0])
+        reply[IP].ttl = 0
+        reply.show2()
+
+        # TODO for now ICMP generated from the outside will not work
+        self.send_and_assert_no_replies(nat.out_if, reply)
+        # rx = self.send_and_expect(nat.out_if, reply, nat.out_if)
+        # print('RECEIVED ICMP ERROR:')
+        # rx[0].show2()
     def test_icmp_error(self):
         # Test handshake
         # for i, nat in enumerate(self.nats):
