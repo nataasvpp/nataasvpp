@@ -21,14 +21,18 @@
 
 #include <vcdp/vcdp_counter.json.h>
 
-#define VCDP_DEBUG  10
-#if VCDP_DEBUG > 0
-#define VCDP_DBG(_lvl, _fmt, _args...)   \
-  if (_lvl <= VCDP_DEBUG)                \
-    clib_warning (_fmt, ##_args)
-#else
-#define VCDP_DBG(_lvl, _fmt, _args...)
-#endif
+/* logging */
+#define vcdp_log_err(...) \
+  vlib_log(VLIB_LOG_LEVEL_ERR, vcdp_main.log_class, __VA_ARGS__)
+#define vcdp_log_warn(...) \
+  vlib_log(VLIB_LOG_LEVEL_WARNING, vcdp_main.log_class, __VA_ARGS__)
+#define vcdp_log_notice(...) \
+  vlib_log(VLIB_LOG_LEVEL_NOTICE, vcdp_main.log_class, __VA_ARGS__)
+#define vcdp_log_info(...) \
+  vlib_log(VLIB_LOG_LEVEL_INFO, vcdp_main.log_class, __VA_ARGS__)
+#define vcdp_log_debug(...)\
+  vlib_log(VLIB_LOG_LEVEL_DEBUG, vcdp_main.log_class, __VA_ARGS__)
+
 
 #include <vcdp/timer.h>
 
@@ -133,7 +137,7 @@ typedef struct {
     vcdp_session_ip4_key_t ip4;
   };
   u8 pad[23];
-  bool is_ip6;
+  bool is_ip6; // REMOVE?
 } vcdp_session_key_t;
 _Static_assert(sizeof(vcdp_session_key_t) == 64, "Size of vcdp_session_key_t should be 64");
 
@@ -201,6 +205,9 @@ typedef struct {
   u16 msg_id_base;
 
   u32 timeouts[VCDP_N_TIMEOUT];
+
+    /* log class */
+  vlib_log_class_t log_class;
 } vcdp_main_t;
 
 typedef struct {

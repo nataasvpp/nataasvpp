@@ -2,6 +2,7 @@
 // Copyright(c) 2022 Cisco Systems, Inc.
 
 #include <vcdp/vcdp.h>
+#include <string.h> // Add this include for memcmp
 
 #include <vlibapi/api.h>
 #include <vlibmemory/api.h>
@@ -114,9 +115,16 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
   vl_api_vcdp_session_add_reply_t *rmp;
   int rv = 0;
 
-  vcdp_session_key_t primary_key, secondary_key;
+  vcdp_session_key_t primary_key, secondary_key, *secondary_keyp, zero_key = {0};
   vcdp_session_key_decode(&mp->primary_key, &primary_key);
   vcdp_session_key_decode(&mp->secondary_key, &secondary_key);
+
+  // Check if the optional secondary_key is set (all zeroes)
+  if (clib_memcmp(&secondary_key, &zero_key, sizeof(vcdp_session_key_t)) == 0) {
+    secondary_keyp = 0;
+  } else {
+    secondary_keyp = &secondary_key;
+  }
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(mp->tenant_id);
   if (tenant_idx == (u16)~0) {
@@ -125,7 +133,7 @@ vl_api_vcdp_session_add_t_handler(vl_api_vcdp_session_add_t *mp)
     goto done;
   }
   u32 flow_index;
-  vcdp_session_t *session = vcdp_create_session(tenant_idx, &primary_key, &secondary_key,
+  vcdp_session_t *session = vcdp_create_session(tenant_idx, &primary_key, secondary_keyp,
                                                 true, &flow_index);
   if (!session)
     rv = -1;

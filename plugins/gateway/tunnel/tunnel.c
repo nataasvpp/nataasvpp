@@ -265,7 +265,6 @@ vcdp_tunnel_init(vlib_main_t *vm)
   if (vcdp_cfg_main.no_tunnels == 0)
     return 0;
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
-  tm->log_default = vlib_log_register_class("vcdp", 0);
   tm->uuid_hash = hash_create_string(0, sizeof(uword));
   u32 tunnel_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tunnels);
   clib_bihash_init_16_8(&tm->tunnels_hash, "vcdp ipv4 static session table", tunnel_buckets, 0);

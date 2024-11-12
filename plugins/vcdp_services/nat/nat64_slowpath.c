@@ -137,7 +137,7 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   nat_session[1].version = session->session_version;
   nat_session[1].ops |= NAT64_REWRITE_OP_HDR_46;
 
-  VCDP_DBG(3, "Creating a mapping between %U and %U", format_ip4_header, &nat_session[0].ip4, sizeof(ip4_header_t),
+  vcdp_log_debug("Creating a mapping between %U and %U", format_ip4_header, &nat_session[0].ip4, sizeof(ip4_header_t),
            format_ip6_header, &nat_session[1].ip6, sizeof(ip6_header_t));
 
   vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
@@ -206,10 +206,10 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
     u64 value;
     if (vcdp_lookup_with_hash(h, &k, true, &value) == 0) {
       // ASSERT THAT THIS SESSION IS ON THE SAME THREAD
-      VCDP_DBG(3, "Session already exists for %U sending to fast-path", format_vcdp_session_key, &k);
+      vcdp_log_debug("Session already exists for %U sending to fast-path", format_vcdp_session_key, &k);
       u32 flow_thread_index = vcdp_thread_index_from_lookup(value);
       if (flow_thread_index != thread_index) {
-        VCDP_DBG(0, "ERROR: Session %U already exists on thread %d", format_vcdp_session_key, &k, flow_thread_index);
+        vcdp_log_debug("ERROR: Session %U already exists on thread %d", format_vcdp_session_key, &k, flow_thread_index);
         error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
         goto next;
       }

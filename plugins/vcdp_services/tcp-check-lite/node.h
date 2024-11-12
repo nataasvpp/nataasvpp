@@ -83,7 +83,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_
   /* Ignore non first fragments */
   if (ip4_get_fragment_offset(ip4) > 0) {
     vcdp_next(b[0], to_next);
-    VCDP_DBG(0, "Fragment ignored");
+    vcdp_log_debug("Fragment ignored");
     return;
   }
 #endif
@@ -133,7 +133,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_
     // If we see a SYN, we reopen session. It will have the same session id.
     // Otherwise we will just forward against the session until it expires.
     if (tcp_session->flags[VCDP_FLOW_FORWARD] & TCP_FLAG_SYN) {
-      VCDP_DBG(2, "Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
+      vcdp_log_debug("Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
       u32 thread_index = vlib_get_thread_index();
       vcdp_session_reopen(vcdp, thread_index, session);
       next_timeout = VCDP_TIMEOUT_EMBRYONIC;
@@ -145,7 +145,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_
     break;
 
     default:
-      VCDP_DBG(0, "Unknown state %d", old_state);
+      vcdp_log_err("Unknown state %d", old_state);
   }
 
 out:
@@ -184,7 +184,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
 
     /* Ignore IP fragments */
     if (vnet_buffer(b[0])->ip.reass.is_non_first_fragment) {
-      VCDP_DBG(0, "Fragment ignored");
+      vcdp_log_err("Fragment ignored");
       goto next;
     }
     update_state_one_pkt(vcdp, ptd, thread_index, tenant, tcp_session, session, session_idx, current_time,

@@ -158,6 +158,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       current_next++;
       b[0]->flow_id = ~0; // No session
       hit[0] = false;
+      vcdp_log_debug("Miss lookup: %U", format_vcdp_session_key, k);
       goto next;
     }
 
@@ -177,7 +178,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
       if (vcdp_session_is_expired(session, now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
+        vcdp_log_debug("Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
                      vcdp_session_remaining_time(session, now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
@@ -339,7 +340,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
 
     // Check if session has expired. If so send it back to the lookup node to be created.
     if (vcdp_session_is_expired(session, now)) {
-      VCDP_DBG(2, "Forwarding against expired handoff session, deleting and recreating %d", session_index);
+      vcdp_log_debug("Forwarding against expired handoff session, deleting and recreating %d", session_index);
       vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
 
       // TODO: NOT YET IMPLEMENTED. DROP FOR NOW

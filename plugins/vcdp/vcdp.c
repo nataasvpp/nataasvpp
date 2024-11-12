@@ -44,6 +44,7 @@ clib_error_t *
 vcdp_init(vlib_main_t *vm)
 {
   vcdp_main_t *vcdp = &vcdp_main;
+  vcdp->log_class = vlib_log_register_class("vcdp", 0);
 
   vlib_call_init_function(vm, vcdp_service_init);
   vcdp_service_next_indices_init(vm, vcdp_lookup_ip4_node.index);
@@ -228,8 +229,8 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   // Special case l4_lifecycle for now for TCP services which should use tcp-check(-lite)
   tenant->tcp_bitmaps[direction]  &= ~VCDP_SERVICE_MASK(l4_lifecycle);
 
-  VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, gen_bitmap);
-  VCDP_DBG(3, "Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, tcp_bitmap);
+  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, gen_bitmap);
+  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, tcp_bitmap);
 
   return 0;
 }

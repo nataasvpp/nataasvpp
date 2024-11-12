@@ -61,7 +61,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
   if (!tenant) {
-    VCDP_DBG(0, "Unknown tenant %d", tenant_idx);
+    vcdp_log_err("Unknown tenant %d", tenant_idx);
     return 0;
   }
 
@@ -79,7 +79,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
 
   if (vcdp_session_add_del_key(primary, 2, value, &h)) {
     /* already exists */
-    VCDP_DBG(0, "session already exists");
+    vcdp_log_err("session already exists %U", format_vcdp_session_key, primary);
     pool_put(ptd->sessions, session);
     return 0;
   }
@@ -90,7 +90,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   if (secondary) {
     if (vcdp_session_add_del_key(secondary, 2, value | 0x1, &h)) {
       /* already exists */
-      VCDP_DBG(0, "session already exists");
+      vcdp_log_err("session already exists %U", format_vcdp_session_key, secondary);
       pool_put(ptd->sessions, session);
       return 0;
     }
@@ -118,7 +118,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   kv2.key = session_id;
   kv2.value = value;
   if (clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 1)) {
-    VCDP_DBG(0, "cannot add: %lx session already exists", session_id);
+    vcdp_log_err("cannot add: %lx session already exists", session_id);
   }
 
   /* Assign service chain */
@@ -131,7 +131,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
                              VCDP_TIMEOUT_EMBRYONIC);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index, tenant_idx, 1);
-  VCDP_DBG(3, "Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
+  vcdp_log_debug("Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
 
   return session;
 }
@@ -193,23 +193,23 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_se
   kv2.key = session->session_id;
 
   /* Stop timer if running */
-  VCDP_DBG(2, "Removing session %u %llx", session_index, session->session_id);
+  vcdp_log_debug("Removing session %u %llx", session_index, session->session_id);
   if (stop_timer) {
-    VCDP_DBG(2, "Stopping timer for session %u", session_index);
+    vcdp_log_debug("Stopping timer for session %u", session_index);
     vcdp_session_timer_stop(vcdp, session, thread_index);
   }
   if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_PRIMARY], 0, 0, &h)) {
-    VCDP_DBG(1, "Failed to remove session key from table");
+    vcdp_log_err("Failed to remove session key from table");
   }
 
   if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4|VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)) {
     if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_SECONDARY], 0, 0, &h)) {
-      VCDP_DBG(1, "Failed to remove session from table4 - secondary");
+      vcdp_log_err("Failed to remove session from table4 - secondary");
     }
   }
 
   if (clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0)) {
-    VCDP_DBG(1, "Removing %lx failed", session->session_id);
+    vcdp_log_err("Removing %lx failed", session->session_id);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
                                 session->tenant_idx, 1);

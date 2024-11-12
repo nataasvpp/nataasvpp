@@ -67,7 +67,7 @@ vcdp_create_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
     // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
 
     rv = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6);
-    VCDP_DBG(0, "Creating session for: %U", format_vcdp_session_key, k);
+    vcdp_log_debug("Creating session for: %U", format_vcdp_session_key, k);
 
     if (rv != 0) {
       b[0]->error = node->errors[VCDP_CREATE_ERROR_NO_KEY];

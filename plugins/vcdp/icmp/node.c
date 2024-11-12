@@ -76,6 +76,7 @@ icmp_service_chain(u32 pbmp)
 
 
 VCDP_SERVICE_DECLARE(drop);
+VCDP_SERVICE_DECLARE(output);
 u32 icmp_service_chain(u32 pbmp);
 
 static_always_inline uword
@@ -123,11 +124,20 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     u32 error = 0;
     b[0]->error = 0;
     u64 value;
-    VCDP_DBG(5, "ICMP %s fwd Looking up: %U (%d)", is_ip6 ? "ip6": "ip4", format_vcdp_session_key, k, rv[0]);
+    vcdp_log_debug("ICMP %s fwd Looking up: %U (%d)", is_ip6 ? "ip6": "ip4", format_vcdp_session_key, k, rv[0]);
     if ((rv[0] < 0) || vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
       // DROP PACKET
-      b[0]->flow_id = ~0; // No session
-      error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
+      if (b[0]->flags & VNET_BUFFER_F_LOCALLY_ORIGINATED) {
+        // Locally originated ICMP errors. Try to bypass and forward
+        b[0]->flow_id = ~0; // No session
+        sb[0] = 0;
+        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(output);
+        vcdp_log_debug("ICMP fwd: locally originated ICMP error, bypassing %U", format_vcdp_session_key, k);
+      } else {
+        b[0]->flow_id = ~0; // No session
+        sb[0] = 0;
+        error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
+      }
       goto next;
     }
 
@@ -143,7 +153,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       session = vcdp_session_at_index(ptd, session_index);
       if (vcdp_session_is_expired(session, time_now)) {
         // Received a packet against an expired session. Recycle the session.
-        VCDP_DBG(2, "Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
+        vcdp_log_debug("Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
                      vcdp_session_remaining_time(session, time_now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
@@ -153,7 +163,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
       //   ICMP chain
       // Calculate the service chain for this packet, based on direction...
       u32 nbmp = icmp_service_chain(session->bitmaps[vcdp_direction_from_flow_index(flow_index)]);
-      VCDP_DBG(5, "ICMP Service Chain: %U", format_vcdp_bitmap, nbmp);
+      vcdp_log_debug("ICMP Service Chain: %U", format_vcdp_bitmap, nbmp);
       vcdp_buffer(b[0])->service_bitmap = sb[0] = nbmp;
 
       /* The tenant of the buffer is the tenant of the session */
@@ -176,7 +186,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     u32 bmp = vcdp_buffer(b[0])->service_bitmap;
     u8 first = __builtin_ffs(bmp);
     if (first == 0) {
-      clib_warning("ICMP fwd: no service chain");
+      vcdp_log_err("ICMP fwd: no service chain %U", format_vcdp_session_key, k);
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
     }
     vcdp_next(b[0], next);
@@ -281,7 +291,7 @@ VLIB_NODE_FN(vcdp_icmp_handoff_node)
 
     // Check if session has expired. If so send it back to the icmp_fwd node to be created.
     if (vcdp_session_is_expired(session, time_now)) {
-      VCDP_DBG(2, "Forwarding against expired handoff session, deleting and recreating %d", session_index);
+      vcdp_log_debug("Forwarding against expired handoff session, deleting and recreating %d", session_index);
       vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
       b[0]->error = node->errors[VCDP_HANDOFF_ERROR_NO_SESSION];

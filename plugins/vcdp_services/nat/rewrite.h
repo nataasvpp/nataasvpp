@@ -213,7 +213,7 @@ nat64_rewrite(vlib_buffer_t *b, nat64_rewrite_data_t *rewrite)
     icmp46_header_t *icmp = ulp;
     ip6_header_t *inner_ip6;
     if (icmp6_to_icmp_header(icmp, &inner_ip6)) {
-      VCDP_DBG(1, "icmp6_to_icmp_header failed %U", format_ip6_header, ip6, 40);
+      vcdp_log_info("icmp6_to_icmp_header failed %U", format_ip6_header, ip6, 40);
       return;
     }
     if (rewrite->ops & NAT64_REWRITE_OP_SPORT) {
@@ -232,7 +232,7 @@ nat64_rewrite(vlib_buffer_t *b, nat64_rewrite_data_t *rewrite)
     icmp46_header_t *icmp = ulp;
     ip4_header_t *inner_ip4;
     if (icmp_to_icmp6_header(icmp, &inner_ip4)) {
-      VCDP_DBG(1, "icmp_to_icmp6_header failed %U", format_ip4_header, ip4, 20);
+      vcdp_log_info("icmp_to_icmp6_header failed %U", format_ip4_header, ip4, 20);
       return;
     }
     if (rewrite->ops & NAT64_REWRITE_OP_DPORT) {

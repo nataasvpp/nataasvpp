@@ -69,7 +69,7 @@ vcdp_session_key_decode(vl_api_vcdp_session_key_t *in, vcdp_session_key_t *out)
   ip_address_t src, dst;
   ip_address_decode2(&in->src, &src);
   ip_address_decode2(&in->dst, &dst);
-
+  clib_memset(out, 0, sizeof(*out));
   if (src.version ==  AF_IP6) {
     vcdp_session_ip6_key_t *out6 = &out->ip6;
     out6->context_id = in->context_id;

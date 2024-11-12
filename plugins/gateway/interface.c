@@ -223,7 +223,7 @@ vcdp_output_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
       } else {
         vnet_feature_next_u16(next, b[0]);
         if (next[0] > node->n_next_nodes) {
-          VCDP_DBG(2, "next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
+          vcdp_log_err("next index %d invalid %U", next[0], format_ip4_header, ip, sizeof(ip4_header_t));
           next[0] = VCDP_GW_NEXT_DROP;
         }
         /* Reset error in case it's been set elsewhere in the chain. */
