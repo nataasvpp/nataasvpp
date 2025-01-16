@@ -82,13 +82,6 @@ typedef enum {
 } vcdp_session_direction_t;
 
 typedef enum {
-  VCDP_SERVICE_CHAIN_FORWARD = 0,
-  VCDP_SERVICE_CHAIN_REVERSE = 1,
-  VCDP_SERVICE_CHAIN_MISS = 2,
-  VCDP_SERVICE_CHAIN_N = 3,
-} vcdp_service_chain_t;
-
-typedef enum {
   VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 = 1 << 0,
   VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 = 1 << 1,
   VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 = 1 << 2,

@@ -5,9 +5,10 @@ import "vnet/ip/ip_types.api";
 
 enum vcdp_service_chain : u8
 {
-  VCDP_API_SERVICE_CHAIN_FORWARD = 0,
-  VCDP_API_SERVICE_CHAIN_REVERSE = 1,
-  VCDP_API_SERVICE_CHAIN_MISS = 2,
+  VCDP_SERVICE_CHAIN_FORWARD = 0,
+  VCDP_SERVICE_CHAIN_REVERSE = 1,
+  VCDP_SERVICE_CHAIN_MISS = 2,
+  VCDP_SERVICE_CHAIN_N = 3,
 };
 
 enum vcdp_session_state : u8
