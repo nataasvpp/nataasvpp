@@ -67,7 +67,7 @@ vcdp_init(vlib_main_t *vm)
     ptd->session_id_template |= (u64) i << template_shift;
 
     /* Initialise LRU lists per timer type */
-    for (int i; i < VCDP_N_TIMEOUT; i++) {
+    for (int i = 0; i < VCDP_N_TIMEOUT; i++) {
       pool_get (ptd->lru_pool, head);
       ptd->lru_head_index[i] = head - ptd->lru_pool;
       clib_dlist_init (ptd->lru_pool, ptd->lru_head_index[i]);
@@ -196,7 +196,7 @@ vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 defaul
 
 VCDP_SERVICE_DECLARE(l4_lifecycle)
 clib_error_t *
-vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction)
+vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vl_api_vcdp_service_chain_t service_chain)
 {
   u32 gen_bitmap = 0, tcp_bitmap = 0;
   u16 tenant_idx;
@@ -223,14 +223,14 @@ vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_dir
   if (!terminates) {
     return clib_error_return(0, "Service chain does not terminate. %U", format_vcdp_bitmap, bitmap);
   }
-  tenant->bitmaps[direction] = gen_bitmap;
-  tenant->tcp_bitmaps[direction] = tcp_bitmap;
+  tenant->bitmaps[service_chain] = gen_bitmap;
+  tenant->tcp_bitmaps[service_chain] = tcp_bitmap;
 
   // Special case l4_lifecycle for now for TCP services which should use tcp-check(-lite)
-  tenant->tcp_bitmaps[direction]  &= ~VCDP_SERVICE_MASK(l4_lifecycle);
+  tenant->tcp_bitmaps[service_chain]  &= ~VCDP_SERVICE_MASK(l4_lifecycle);
 
-  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, gen_bitmap);
-  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, direction, format_vcdp_bitmap, tcp_bitmap);
+  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, service_chain, format_vcdp_bitmap, gen_bitmap);
+  vcdp_log_debug("Set services for tenant %d, dir: %d: %U", tenant_id, service_chain, format_vcdp_bitmap, tcp_bitmap);
 
   return 0;
 }

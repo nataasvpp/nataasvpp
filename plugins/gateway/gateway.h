@@ -20,6 +20,15 @@ typedef struct {
 
 extern gw_main_t gateway_main;
 
+static inline u16
+gw_tenant_idx_from_sw_if_index(u32 sw_if_index, u32 dir)
+{
+  gw_main_t *gw = &gateway_main;
+  if (sw_if_index >= vec_len(gw->tenant_idx_by_sw_if_idx[dir]))
+    return UINT16_MAX;
+  return vec_elt(gw->tenant_idx_by_sw_if_idx[dir], sw_if_index);
+}
+
 int gw_interface_input_enable_disable(u32 sw_if_index, u32 tenant_id, bool output_arc, bool is_enable);
 int gw_prefix_input_enable_disable(u32 fib_prefix, ip_prefix_t *prefix, u32 tenant_id, bool is_forward, bool is_enable);
 

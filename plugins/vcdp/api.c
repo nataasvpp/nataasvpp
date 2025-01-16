@@ -245,7 +245,7 @@ vl_api_ip_multicast_group_join_t_handler (vl_api_ip_multicast_group_join_t *mp)
   ip_address_decode(&mp->grp_address, &pfx.fp_grp_addr);
   // mfib_table_lock(mfib_table->mft_index, FIB_PROTOCOL_IP6, src);
 
-  mfib_table_entry_path_update(fib_index, &pfx, MFIB_SOURCE_SPECIAL, MFIB_ENTRY_ACCEPT_ALL_ITF, &path_for_us);
+  mfib_table_entry_path_update(fib_index, &pfx, MFIB_SOURCE_SPECIAL, MFIB_ENTRY_FLAG_ACCEPT_ALL_ITF, &path_for_us);
   mfib_table_entry_update(fib_index, &pfx, MFIB_SOURCE_SPECIAL, MFIB_RPF_ID_NONE,
                          MFIB_ENTRY_FLAG_ACCEPT_ALL_ITF);
   mfib_table_lock(fib_index, FIB_PROTOCOL_IP6, MFIB_SOURCE_DHCP);

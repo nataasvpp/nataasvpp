@@ -21,6 +21,8 @@
 
 #include <vcdp/vcdp_counter.json.h>
 
+#include <vcdp/vcdp_types.api_types.h> /* Generated from vcdp_types.api */
+
 /* logging */
 #define vcdp_log_err(...) \
   vlib_log(VLIB_LOG_LEVEL_ERR, vcdp_main.log_class, __VA_ARGS__)
@@ -48,6 +50,7 @@
  * Reverse direction always uses secondary key.
  */
 
+#define VCDP_TENANT_INVALID_IDX (65535)
 
 typedef enum {
   VCDP_SESSION_TYPE_IP4,
@@ -323,7 +326,7 @@ vcdp_tenant_at_index(vcdp_main_t *vcdpm, u32 idx)
 vcdp_tenant_t *vcdp_tenant_get_by_id(u32 tenant_id, u16 *tenant_idx);
 
 clib_error_t *vcdp_tenant_add_del(vcdp_main_t *vcdp, u32 tenant_id, u32 context_id, u32 default_tenant_id, bool is_add);
-clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vcdp_session_direction_t direction);
+clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vl_api_vcdp_service_chain_t direction);
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeouts[]);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);

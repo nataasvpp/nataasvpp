@@ -59,7 +59,6 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
 
   // use VRF ID as tenant ID
   vcdp_main_t *vcdp = &vcdp_main;
-  gw_main_t *gw = &gateway_main;
 
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u16 tenant_indicies[VLIB_FRAME_SIZE] = {0},
@@ -71,8 +70,10 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
   current_next = next_indices;
-
+  node->flags |= VLIB_NODE_FLAG_TRACE;
   while (n_left) {
+    b[0]->flags |= VLIB_BUFFER_IS_TRACED;
+
     if (vcdp_buffer(b[0])->flags & VCDP_BUFFER_FLAG_BIT_VISITED) {
       // Already run through VCDP.
       // Skip to terminal node. May happen if VCDP ran as part of DPO or input feature arc.
@@ -84,9 +85,10 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
       tenant_idx[0] = dpo->tenant_idx;
     } else {
       int dir = is_output ? VLIB_TX : VLIB_RX;
+
       u32 sw_if_index = vnet_buffer(b[0])->sw_if_index[dir];
-      tenant_idx[0] = vec_elt_at_index(gw->tenant_idx_by_sw_if_idx[dir], sw_if_index)[0];
-      if ((u32) tenant_idx[0] == ~0) {
+      tenant_idx[0] = gw_tenant_idx_from_sw_if_index(sw_if_index, dir);
+      if (tenant_idx[0] == UINT16_MAX) {
         vnet_feature_next_u16(current_next, b[0]);
         goto next;
       }
@@ -96,7 +98,6 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
     vcdp_buffer(b[0])->context_id = tenant->context_id;
     vcdp_buffer(b[0])->tenant_index = tenant_idx[0];
     current_next[0] = VCDP_GW_NEXT_LOOKUP;
-
   next:
     b += 1;
     current_next += 1;
@@ -106,12 +107,15 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
 
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
+    clib_warning("Adding trace is enabled");
+
     int i;
     b = bufs;
     tenant_idx = tenant_indicies;
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
         vcdp_input_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
+        clib_warning("Adding trace for this buffer");
         t->tenant_index = tenant_idx[0];
         b++;
         tenant_idx++;
@@ -150,6 +154,7 @@ VLIB_REGISTER_NODE(vcdp_input_node) = {
       [VCDP_GW_NEXT_ICMP_ERROR] = "vcdp-icmp-error",
       [VCDP_GW_NEXT_DROP] = "error-drop",
     },
+  .flags = VLIB_NODE_FLAG_TRACE_SUPPORTED,
 };
 
 VLIB_REGISTER_NODE(vcdp_input_dpo_node) = {

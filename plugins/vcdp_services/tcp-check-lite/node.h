@@ -32,13 +32,19 @@ format_vcdp_tcp_check_lite_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_tcp_check_lite_trace_t *t = va_arg(*args, vcdp_tcp_check_lite_trace_t *);
   u32 indent = format_get_indent(s);
-  indent += 2;
-  s = format(s, "vcdp-tcp-check-lite: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
-             t->flow_id & 0x1 ? "reverse" : "forward");
+  s = format(s, "%Uvcdp-tcp-check-lite: flow-id %u (session %u, %s)\n",
+            format_white_space, indent,
+            t->flow_id, t->flow_id >> 1,
+            t->flow_id & 0x1 ? "reverse" : "forward");
   if (t->old_state != t->new_state) {
-    s = format(s, "  session state changed from: %U to: %U\n", format_vcdp_tcp_check_lite_state, t->old_state, format_vcdp_tcp_check_lite_state, t->new_state);
+    s = format(s, "%U  session state changed from: %U to: %U\n",
+              format_white_space, indent,
+              format_vcdp_tcp_check_lite_state, t->old_state,
+              format_vcdp_tcp_check_lite_state, t->new_state);
   } else {
-    s = format(s, "  session state: %U\n", format_vcdp_tcp_check_lite_state, t->old_state);
+    s = format(s, "%U  session state: %U\n",
+              format_white_space, indent,
+              format_vcdp_tcp_check_lite_state, t->old_state);
   }
   return s;
 }

@@ -30,8 +30,8 @@ vl_api_vcdp_tunnel_add_t_handler(vl_api_vcdp_tunnel_add_t *mp)
   mac_address_decode (mp->src_mac, &smac);
   mac_address_decode (mp->dst_mac, &dmac);
 
-  int rv = vcdp_tunnel_add((char *) mp->tunnel_id, mp->tenant_id, mp->method, &src, &dst, mp->sport, mp->dport, mp->mtu,
-                           &smac, &dmac);
+  int rv = vcdp_tunnel_add((char *) mp->tunnel_id, mp->tenant_id, mp->method, &src, &dst, mp->sport,
+                           mp->dport, mp->mtu, &smac, &dmac);
 
   REPLY_MACRO_END(VL_API_VCDP_TUNNEL_ADD_REPLY);
 }

@@ -152,11 +152,11 @@ VLIB_CLI_COMMAND(vcdp_tunnel_enable_command, static) = {
 static uword
 unformat_vcdp_tunnel_method(unformat_input_t *input, va_list *args)
 {
-  vcdp_tunnel_method_t *m = va_arg(*args, vcdp_tunnel_method_t *);
+  vl_api_vcdp_tunnel_method_t *m = va_arg(*args, vl_api_vcdp_tunnel_method_t *);
   if (unformat(input, "vxlan-dummy-l2"))
-    *m = VCDP_TUNNEL_VXLAN_DUMMY_L2;
+    *m = VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2;
   else if (unformat(input, "geneve-l3"))
-    *m = VCDP_TUNNEL_GENEVE_L3;
+    *m = VL_API_VCDP_TUNNEL_GENEVE_L3;
   else
     return 0;
   return 1;

@@ -53,5 +53,5 @@
         "editor.defaultFormatter": null
     },
     "python.formatting.provider": "none",
-    "workbench.colorTheme": "Solarized Light",
+    "workbench.colorTheme": "Default Dark Modern",
 }

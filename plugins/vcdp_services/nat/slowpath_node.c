@@ -332,6 +332,8 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   vcdp_session_key_t k;
   u64 h;
   vcdp_session_key_t reverse_k;
+  u32 flow_index = ~0;
+
   rv = vcdp_calc_key_slow(b[0], vcdp_buffer(b[0])->context_id, &k, &h, false);
   if (rv != 0)
     goto error;
@@ -344,7 +346,6 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   reverse_k.ip4.context_id = 0;
   reverse_k.is_ip6 = false;
 
-  u32 flow_index = ~0;
   vcdp_session_t *full_session = vcdp_create_session(tenant_idx, &k, &reverse_k, false, &flow_index);
   if (!full_session)
     goto error;

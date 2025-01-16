@@ -88,7 +88,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   vcdp_session_t *session;
   u32 session_index;
-  u32 *bi, *from = vlib_frame_vector_args(frame);
+  u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
   u16 nexts[VLIB_FRAME_SIZE], *next = nexts;
   vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k = keys;
@@ -116,7 +116,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   h = hashes;
   k = keys;
   b = bufs;
-  bi = from;
   n_left = frame->n_vectors;
   rv = rvs;
 
@@ -197,7 +196,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     n_left -= 1;
     h += 1;
     k += 1;
-    bi += 1;
     hit += 1;
     si += 1;
     sb += 1;
@@ -208,7 +206,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
     int i;
     b = bufs;
-    bi = from;
     h = hashes;
     si = session_indices;
     hit = hits;
@@ -231,7 +228,6 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
           t->error = 0;
         }
         clib_memcpy(&t->k4, &keys[i], sizeof(t->k4));
-        bi++;
         b++;
         h++;
         hit++;

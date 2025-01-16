@@ -143,7 +143,7 @@ vcdp_tunnel_counter_unlock (void)
 }
 
 int
-vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
+vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vl_api_vcdp_tunnel_method_t method, ip_address_t *src, ip_address_t *dst,
                 u16 sport, u16 dport, u16 mtu, mac_address_t *src_mac, mac_address_t *dst_mac)
 {
   vcdp_tunnel_main_t *tm = &vcdp_tunnel_main;
@@ -201,10 +201,10 @@ vcdp_tunnel_add(char *tunnel_id, u32 tenant_id, vcdp_tunnel_method_t method, ip_
   }
 
   switch (method) {
-  case VCDP_TUNNEL_VXLAN_DUMMY_L2:
+  case VL_API_VCDP_TUNNEL_VXLAN_DUMMY_L2:
     t->rewrite = vcdp_tunnel_vxlan_dummy_l2_build_rewrite(t, &t->encap_size);
     break;
-  case VCDP_TUNNEL_GENEVE_L3:
+  case VL_API_VCDP_TUNNEL_GENEVE_L3:
     t->rewrite = vcdp_tunnel_geneve_l3_build_rewrite(t, &t->encap_size);
     break;
   default:

@@ -67,6 +67,9 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-mss/tcp_mss.c
   vcdp_services/tcp-mss/node.c
 
+  # Unit tests
+  unittest/vcdp_unittest.c
+
   # vcdp_services/stats/api.c
   # vcdp_services/stats/stats.c
   # vcdp_services/stats/node.c

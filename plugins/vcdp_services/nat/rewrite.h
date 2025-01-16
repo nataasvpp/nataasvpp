@@ -140,7 +140,7 @@ nat64_icmp_set_cb (ip6_header_t * ip6, ip4_header_t * ip4, void *arg)
 static inline void
 nat64_rewrite(vlib_buffer_t *b, nat64_rewrite_data_t *rewrite)
 {
-  u8 protocol;
+  u8 protocol = 0;
   void *ulp;
   ip6_header_t *ip6;
   ip4_header_t *ip4;

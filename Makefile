@@ -10,6 +10,8 @@ common_flags =-g -fstack-protector -fno-common -Wall -Werror
 debug_flags = -O0 $(common_flags) -DCLIB_DEBUG
 release_flags =-O3 $(common_flags)
 
+CFLAGS += -I./_build/debug/plugins
+
 define configure
 	@mkdir -p $($(1)_build_dir)
 	@cd $($(1)_build_dir) && cmake -G Ninja \

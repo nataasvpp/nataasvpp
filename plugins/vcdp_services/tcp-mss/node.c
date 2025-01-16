@@ -92,7 +92,7 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u16 nexts[VLIB_FRAME_SIZE], *next;
   u32 n_left, *from;
-  u32 pkts_clamped = 0;
+  // u32 pkts_clamped = 0;
   u16 org_mss4 = 0;
 
   from = vlib_frame_vector_args(frame);
@@ -116,7 +116,7 @@ vcdp_tcp_mss_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fr
       goto done;
 
     clamped = vcdp_tcp_mss_fixup(tcp, max_mss4, &org_mss4);
-    pkts_clamped += clamped;
+    // pkts_clamped += clamped;
 
     if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE) && (b[0]->flags & VLIB_BUFFER_IS_TRACED))) {
       vcdp_tcp_mss_trace_t *t;

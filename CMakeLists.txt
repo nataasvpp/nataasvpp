@@ -62,3 +62,5 @@ set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION})
 set(CPACK_PACKAGE_CONTACT "otroan@employees.org")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Ole Troan")
 include(CPack)
+
+include_directories(${CMAKE_BINARY_DIR}/plugins)
