@@ -107,15 +107,12 @@ vcdp_input_node_inline (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
 
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
-    clib_warning("Adding trace is enabled");
-
     int i;
     b = bufs;
     tenant_idx = tenant_indicies;
     for (i = 0; i < frame->n_vectors; i++) {
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
         vcdp_input_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
-        clib_warning("Adding trace for this buffer");
         t->tenant_index = tenant_idx[0];
         b++;
         tenant_idx++;

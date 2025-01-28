@@ -13,6 +13,7 @@
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/vcdp.api_enum.h>
 #include "timer_lru.h"
+#include "session.h"
 
 /*
  * Create a static VCDP session. (No timer)
@@ -68,6 +69,11 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   /* See if we can expire some sessions. */
   f64 now = vlib_time_now(vlib_get_main());
   vcdp_timer_lru_free_one(vcdp, thread_index, now);
+
+  if (pool_free_elts(ptd->sessions) == 0) {
+    vcdp_log_debug("No free sessions %U", format_vcdp_session_key, primary);
+    return 0;
+  }
 
   u64 h;
   vcdp_session_t *session;
@@ -175,13 +181,8 @@ vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, i
       return 0;
     value = kv.value;
   }
-  // Figure out if this is local or remote thread
-  u32 thread_index = vcdp_thread_index_from_lookup(value);
-  /* known flow which belongs to this thread */
-  u32 flow_index = value & (~(u32) 0);
-  u32 session_index = vcdp_session_from_flow_index(flow_index);
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  return pool_elt_at_index(ptd->sessions, session_index);
+  u32 thread_index, session_index;
+  return vcdp_session_from_lookup_value(vcdp, value, &thread_index, &session_index);
 }
 
 void
@@ -236,7 +237,7 @@ vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcd
 }
 
 /*
- * An existing TCP session is being reused for a new flow with the same 6-tuple.
+ * An existing session is being reused for a new flow with the same 6-tuple.
  * Reset counters.
  */
 void
@@ -262,21 +263,29 @@ vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
           (vcdp_session_remaining_time(session, time_now) == 0));
 }
 
+bool
+vcdp_session_is_expired_session_idx(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 session_index)
+{
+  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
+  return vcdp_session_is_expired(session, vlib_time_now(vlib_get_main()));
+}
+
 int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                   u32 pseudo_flow_index, vcdp_session_key_t *key, u64 *h)
+                                   u32 pseudo_flow_index, vcdp_session_key_t *key)
 {
   int rv;
   u64 value;
   vcdp_session_t *session;
   u32 session_index;
+  u64 h;
 
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
   session_index = vcdp_session_from_flow_index(pseudo_flow_index);
   session = vcdp_session_at_index(ptd, session_index);
   clib_memcpy(&session->keys[VCDP_SESSION_KEY_SECONDARY], key, sizeof(*key));
 
-  rv = vcdp_session_add_del_key(key, 2, value, h);
+  rv = vcdp_session_add_del_key(key, 2, value, &h);
   if (rv == 0) {
     session->key_flags |= key->is_ip6 ? VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 : VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
   }

@@ -7,6 +7,14 @@ include_directories(${CMAKE_BINARY_DIR})
 include(cmake/counter.cmake)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+# Install scapy in the virtual environment
+message(STATUS "Python executable: ${Python3_EXECUTABLE}")
+message(STATUS "Python libraries: ${Python3_LIBRARIES}")
+execute_process(COMMAND ${Python3_EXECUTABLE} -m pip install scapy)
+include_directories(${Python3_INCLUDE_DIRS})
+
+# Print out the path to the Python executable
+
 add_vpp_plugin(vcdp
   VAT_AUTO_TEST OFF
 
@@ -69,6 +77,7 @@ add_vpp_plugin(vcdp
 
   # Unit tests
   unittest/vcdp_unittest.c
+  unittest/scapy.c
 
   # vcdp_services/stats/api.c
   # vcdp_services/stats/stats.c
@@ -86,7 +95,7 @@ add_vpp_plugin(vcdp
   vcdp_services/stats/stats.api
 
   LINK_LIBRARIES cbor
-
+  LINK_LIBRARIES ${Python3_LIBRARIES}
   INSTALL_HEADERS
   vcdp/vcdp.h
   vcdp/service.h

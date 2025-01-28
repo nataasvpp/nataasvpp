@@ -124,7 +124,7 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
     b[0]->error = 0;
     u64 value;
     vcdp_log_debug("ICMP %s fwd Looking up: %U (%d)", is_ip6 ? "ip6": "ip4", format_vcdp_session_key, k, rv[0]);
-    if ((rv[0] < 0) || vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
+    if ((rv[0] < 0) || vcdp_lookup_with_hash(h[0], k, &value)) {
       // DROP PACKET
       if (b[0]->flags & VNET_BUFFER_F_LOCALLY_ORIGINATED) {
         // Locally originated ICMP errors. Try to bypass and forward
@@ -137,8 +137,10 @@ vcdp_icmp_error_fwd_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fram
         sb[0] = 0;
         error = VCDP_ICMP_FWD_ERROR_NO_SESSION;
       }
+      hit[0] = false;
       goto next;
     }
+    hit[0] = true;
 
     // Figure out if this is local or remote thread
     u32 flow_thread_index = vcdp_thread_index_from_lookup(value);

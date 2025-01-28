@@ -20,6 +20,7 @@
 		"symlink_prefix": "/vcdp/nats",
 		"counter": [
 			"port-alloc-retries",
+			"port-alloc-expired",
 			"port-alloc-failures"
 		]
 	}

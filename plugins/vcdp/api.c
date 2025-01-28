@@ -68,7 +68,7 @@ vl_api_vcdp_set_services_t_handler(vl_api_vcdp_set_services_t *mp)
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_id = mp->tenant_id;
   u32 bitmap = 0;
-  int rv;
+  int rv = 0;
 
   unformat_input_t input;
   unformat_init_string (&input, (char *)mp->services.buf, vl_api_string_len(&mp->services));

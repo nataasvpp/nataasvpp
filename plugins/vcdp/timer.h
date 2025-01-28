@@ -8,7 +8,7 @@
 
 /* Default session state protocol timeouts */
 #define foreach_vcdp_timeout                                                                                           \
-  _(EMBRYONIC, 5, "embryonic")                                                                                         \
+  _(EMBRYONIC, 10, "embryonic")                                                                                         \
   _(ESTABLISHED, 240, "established")                                                                                   \
   _(TCP_TRANSITORY, 60, "tcp-transitory")                                                                              \
   _(TCP_ESTABLISHED, 7440, "tcp-established")                                                                          \

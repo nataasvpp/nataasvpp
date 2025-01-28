@@ -63,8 +63,8 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   // u32 fib_index = 0;
   u8 proto = session->proto;
   u8 n_retries = 0;
-  u64 h;
-  u32 pseudo_flow_index;
+  // u64 h;
+  // u32 pseudo_flow_index;
 
   if (PREDICT_FALSE(session->session_version == nat_session->version)) {
     /* NAT State is already created, certainly a packet in flight. Refresh
@@ -76,10 +76,10 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   /* Allocate a new source */
   new_key.ip4.dst = instance->addresses[new_key.ip4.src % vec_len(instance->addresses)].as_u32;
 
-  pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
+  // pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
   u8 v4proto = proto == IP_PROTOCOL_ICMP6 ? IP_PROTOCOL_ICMP : proto;
   new_key.ip4.proto = v4proto;
-
+#if 0
   if (v4proto == IP_PROTOCOL_TCP || v4proto == IP_PROTOCOL_UDP || v4proto == IP_PROTOCOL_ICMP) {
     while ((++n_retries) < nm->port_retries &&
            vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h)) {
@@ -96,7 +96,7 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     /* Fall back to 3-tuple for non TCP/UDP/ICMP sessions */
     vcdp_session_try_add_secondary_key(vcdp, vptd, thread_index, pseudo_flow_index, &new_key, &h);
   }
-
+#endif
   if (n_retries == nm->port_retries) {
     /* Port allocation failure */
     *error = VCDP_NAT_SLOWPATH_ERROR_PORT_ALLOC_FAILURE;
@@ -204,7 +204,7 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
 
     /* Check if already created */
     u64 value;
-    if (vcdp_lookup_with_hash(h, &k, true, &value) == 0) {
+    if (vcdp_lookup_with_hash(h, &k, &value) == 0) {
       // ASSERT THAT THIS SESSION IS ON THE SAME THREAD
       vcdp_log_debug("Session already exists for %U sending to fast-path", format_vcdp_session_key, &k);
       u32 flow_thread_index = vcdp_thread_index_from_lookup(value);

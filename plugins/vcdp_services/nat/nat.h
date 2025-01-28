@@ -96,6 +96,15 @@ typedef struct {
   nat64_rewrite_data_t *flows64; /* by flow_index */
 } nat_per_thread_data_t;
 
+#define MAX_THREADS 16
+typedef struct {
+    // Each thread gets its own port ranges
+    struct {
+        u16 start_port;
+        u16 end_port;
+    } thread_port_range[MAX_THREADS];
+} nat_port_allocator_t;
+
 /*
  * 3-tuple session key
  */
@@ -143,6 +152,8 @@ typedef struct {
 
   clib_bihash_16_8_t port_forwarding;
   nat_port_forwarding_session_t *port_forwarding_sessions;
+
+  u32 random_seed;
 } nat_main_t;
 
 extern nat_main_t nat_main;

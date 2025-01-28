@@ -442,6 +442,9 @@ nat_init(vlib_main_t *vm)
 
   /* Port forwarding 3-tuple hash */
   clib_bihash_init_16_8(&nat->port_forwarding, "vcdp nat port forwarding", 256, 0);
+
+  // Seed random number generator
+  nat->random_seed = random_default_seed();
   return 0;
 }
 VLIB_INIT_FUNCTION(nat_init);

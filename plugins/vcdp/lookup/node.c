@@ -57,34 +57,37 @@ icmp_is_error(vlib_buffer_t *b, bool is_ip6)
 }
 
 int
-vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v)
+vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, u64 *v)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  if (is_ip6) {
+  if (k->is_ip6) {
     clib_bihash_kv_40_8_t kv;
     clib_memcpy_fast(&kv, &k->ip6, 40);
     kv.value = 0;
-    int rv = clib_bihash_search_inline_with_hash_40_8(&vcdp->table6, hash, &kv);
-    *v = kv.value;
-    return rv;
+    if (clib_bihash_search_inline_with_hash_40_8(&vcdp->table6, hash, &kv) == 0) {
+      *v = kv.value;
+      return 0;
+    }
   } else {
     clib_bihash_kv_16_8_t kv;
     clib_memcpy_fast(&kv, &k->ip4, 16);
-    int rv = clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, hash, &kv);
-    *v = kv.value;
-    return rv;
+    if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, hash, &kv) == 0) {
+      *v = kv.value;
+      return 0;
+    }
   }
+  return -1;
 }
 
 int
-vcdp_lookup (vcdp_session_key_t *k, bool is_ip6, u64 *v)
+vcdp_lookup (vcdp_session_key_t *k, u64 *v)
 {
   u64 h;
   if (k->is_ip6)
     h = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (&k->ip6.as_u64));
   else
     h = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (&k->ip4.as_u64));
-  return vcdp_lookup_with_hash(h, k, is_ip6, v);
+  return vcdp_lookup_with_hash(h, k, v);
 }
 
 VCDP_SERVICE_DECLARE(icmp_error_fwd)
@@ -136,7 +139,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   again:
     b[0]->error = 0;
     u64 value;
-    if (vcdp_lookup_with_hash(h[0], k, is_ip6, &value)) {
+    if (vcdp_lookup_with_hash(h[0], k, &value)) {
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
       if (icmp_is_error(b[0], is_ip6)) {

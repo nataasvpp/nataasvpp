@@ -332,14 +332,14 @@ vcdp_session_t *vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport
                                     u16 dport);
 void vcdp_session_clear(void);
 int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
-                                       u32 pseudo_flow_index, vcdp_session_key_t *key, u64 *h);
+                                       u32 pseudo_flow_index, vcdp_session_key_t *key);
 void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
 void vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
 bool vcdp_session_is_expired(vcdp_session_t *session, f64 time_now);
 void vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session);
-int vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, bool is_ip6, u64 *v);
-int vcdp_lookup(vcdp_session_key_t *k, bool is_ip6, u64 *v);
+int vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, u64 *v);
+int vcdp_lookup(vcdp_session_key_t *k, u64 *v);
 
 #endif
