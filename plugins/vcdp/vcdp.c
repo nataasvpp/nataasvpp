@@ -85,8 +85,7 @@ vcdp_init(vlib_main_t *vm)
   u32 session_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_sessions_per_thread);
   u32 tenant_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tenants);
 
-  clib_bihash_init_16_8(&vcdp->table4, "vcdp ipv4 session table", session_buckets, 0);
-  clib_bihash_init_40_8(&vcdp->table6, "vcdp ipv6 session table", session_buckets, 0);
+  clib_bihash_init_40_8(&vcdp->session_hash, "vcdp session hash table", session_buckets, 0);
   clib_bihash_init_8_8(&vcdp->tenant_idx_by_id, "vcdp tenant table", tenant_buckets, 0);
   clib_bihash_init_8_8(&vcdp->session_index_by_id, "session idx by id", session_buckets, 0);
 

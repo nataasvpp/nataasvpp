@@ -30,6 +30,15 @@ cbor_build_ip6(ip6_address_t *addr)
 }
 
 static cbor_item_t *
+cbor_build_ip46(ip46_address_t *addr)
+{
+  if (ip46_address_is_ip4(addr))
+    return cbor_build_ip4(addr->ip4.as_u32);
+  else
+    return cbor_build_ip6(&addr->ip6);
+}
+
+static cbor_item_t *
 cbor_build_bitmap(u32 bitmap)
 {
   vcdp_service_main_t *sm = &vcdp_service_main;
@@ -50,40 +59,21 @@ cbor_build_bitmap(u32 bitmap)
 #define VCDP_CBOR_TAG_5TUPLE 32768
 
 static cbor_item_t *
-cbor_build_session_key(vcdp_session_key_t *key)
+cbor_build_session_key(vcdp_session_key_t *k)
 {
-  if (key->is_ip6) {
-    vcdp_session_ip6_key_t *k = &key->ip6;
-    cbor_item_t *cbor = cbor_new_definite_array(6);
-    if (!cbor)
-      return 0;
-    if ((!cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->src))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport)))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_ip6(&k->dst))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport)))))) {
-      cbor_decref(&cbor);
-      return 0;
-    }
-    return cbor_build_tag(VCDP_CBOR_TAG_5TUPLE, cbor);
-  } else {
-    vcdp_session_ip4_key_t *k = &key->ip4;
-    cbor_item_t *cbor = cbor_new_definite_array(6);
-    if (!cbor)
-      return 0;
-    if ((!cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->src))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport)))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_ip4(k->dst))) ||
-         !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport)))))) {
-      cbor_decref(&cbor);
-      return 0;
-    }
-    return cbor_build_tag(VCDP_CBOR_TAG_5TUPLE, cbor);
+  cbor_item_t *cbor = cbor_new_definite_array(6);
+  if (!cbor)
+    return 0;
+  if ((!cbor_array_push(cbor, cbor_move(cbor_build_uint32(k->context_id))) ||
+       !cbor_array_push(cbor, cbor_move(cbor_build_ip46(&k->src))) ||
+       !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->sport)))) ||
+       !cbor_array_push(cbor, cbor_move(cbor_build_uint8(k->proto))) ||
+       !cbor_array_push(cbor, cbor_move(cbor_build_ip46(&k->dst))) ||
+       !cbor_array_push(cbor, cbor_move(cbor_build_uint16(ntohs(k->dport)))))) {
+    cbor_decref(&cbor);
+    return 0;
   }
-  return 0;
+  return cbor_build_tag(VCDP_CBOR_TAG_5TUPLE, cbor);
 }
 
 static cbor_item_t *
@@ -192,7 +182,8 @@ vcdp_sessions_serialize(unsigned char **buffer, u32 *no_sessions)
   return length;
 }
 
-int vcdp_sessions_to_file(const char *filename)
+int
+vcdp_sessions_to_file(const char *filename)
 {
   unsigned char *buffer;
   u32 no_sessions;

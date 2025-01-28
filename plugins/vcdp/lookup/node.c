@@ -14,8 +14,7 @@
 #include <vcdp/timer_lru.h>
 #include <vcdp/vcdp.api_enum.h>
 
-typedef struct
-{
+typedef struct {
   u32 next_index;
   u32 sw_if_index;
   u64 hash;
@@ -25,7 +24,7 @@ typedef struct
   bool hit;
   u32 session_idx;
   u32 service_bitmap;
-  vcdp_session_ip4_key_t k4;
+  vcdp_session_key_t k4;
 } vcdp_lookup_trace_t;
 
 typedef struct {
@@ -60,33 +59,20 @@ int
 vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, u64 *v)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  if (k->is_ip6) {
-    clib_bihash_kv_40_8_t kv;
-    clib_memcpy_fast(&kv, &k->ip6, 40);
-    kv.value = 0;
-    if (clib_bihash_search_inline_with_hash_40_8(&vcdp->table6, hash, &kv) == 0) {
-      *v = kv.value;
-      return 0;
-    }
-  } else {
-    clib_bihash_kv_16_8_t kv;
-    clib_memcpy_fast(&kv, &k->ip4, 16);
-    if (clib_bihash_search_inline_with_hash_16_8(&vcdp->table4, hash, &kv) == 0) {
-      *v = kv.value;
-      return 0;
-    }
+  clib_bihash_kv_40_8_t kv;
+  clib_memcpy_fast(&kv, &k, 40);
+  kv.value = 0;
+  if (clib_bihash_search_inline_with_hash_40_8(&vcdp->session_hash, hash, &kv) == 0) {
+    *v = kv.value;
+    return 0;
   }
   return -1;
 }
 
 int
-vcdp_lookup (vcdp_session_key_t *k, u64 *v)
+vcdp_lookup(vcdp_session_key_t *k, u64 *v)
 {
-  u64 h;
-  if (k->is_ip6)
-    h = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (&k->ip6.as_u64));
-  else
-    h = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (&k->ip4.as_u64));
+  u64 h = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
   return vcdp_lookup_with_hash(h, k, v);
 }
 
@@ -108,7 +94,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   u32 to_remote[VLIB_FRAME_SIZE], n_remote = 0;
   u16 thread_indices[VLIB_FRAME_SIZE];
   u16 local_next_indices[VLIB_FRAME_SIZE];
-  vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k= keys;
+  vcdp_session_key_t keys[VLIB_FRAME_SIZE], *k = keys;
   u64 hashes[VLIB_FRAME_SIZE], *h = hashes;
   f64 now = vlib_time_now(vm);
   bool hits[VLIB_FRAME_SIZE], *hit = hits;
@@ -121,7 +107,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   // Calculate key and hash
   while (n_left) {
-      vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, lookup_mode);
+    vcdp_calc_key(b[0], vcdp_buffer(b[0])->context_id, k, h, is_ip6, lookup_mode);
     h += 1;
     k += 1;
     b += 1;
@@ -143,7 +129,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       // Fork off ICMP error packets here. If they match a session, they will be
       // handled by the session. Otherwise, they will be dropped.
       if (icmp_is_error(b[0], is_ip6)) {
-        vcdp_buffer(b[0])->service_bitmap = is_ip6 ? VCDP_SERVICE_MASK(icmp6_error_fwd) : VCDP_SERVICE_MASK(icmp_error_fwd);
+        vcdp_buffer(b[0])->service_bitmap =
+          is_ip6 ? VCDP_SERVICE_MASK(icmp6_error_fwd) : VCDP_SERVICE_MASK(icmp_error_fwd);
       } else {
         // Miss-chain. Continue down the existing miss-chain or start a new one.
         if (lookup_mode == VCDP_LOOKUP_MODE_DEFAULT) {
@@ -182,7 +169,7 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       if (vcdp_session_is_expired(session, now)) {
         // Received a packet against an expired session. Recycle the session.
         vcdp_log_debug("Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
-                     vcdp_session_remaining_time(session, now));
+                       vcdp_session_remaining_time(session, now));
         vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
         goto again;
       }
@@ -224,7 +211,8 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
   /* handover buffers to remote node */
   if (n_remote) {
     u32 n_remote_enq;
-    n_remote_enq = vlib_buffer_enqueue_to_thread(vm, node, vcdp->frame_queue_index, to_remote, thread_indices, n_remote, 1);
+    n_remote_enq =
+      vlib_buffer_enqueue_to_thread(vm, node, vcdp->frame_queue_index, to_remote, thread_indices, n_remote, 1);
     vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_REMOTE, n_remote_enq);
     vlib_node_increment_counter(vm, node->node_index, VCDP_LOOKUP_ERROR_CON_DROP, n_remote - n_remote_enq);
   }
@@ -282,31 +270,31 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 VLIB_NODE_FN(vcdp_lookup_ip4_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_DEFAULT);
+  return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_DEFAULT);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_4tuple_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_4TUPLE);
+  return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_4TUPLE);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_3tuple_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_3TUPLE);
+  return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_3TUPLE);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip4_1tuple_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_1TUPLE);
+  return vcdp_lookup_inline(vm, node, frame, false, VCDP_LOOKUP_MODE_1TUPLE);
 }
 
 VLIB_NODE_FN(vcdp_lookup_ip6_node)
 (vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
-   return vcdp_lookup_inline(vm, node, frame, true, false);
+  return vcdp_lookup_inline(vm, node, frame, true, false);
 }
 
 /*
@@ -336,9 +324,9 @@ VLIB_NODE_FN(vcdp_handoff_node)
     vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
     if (!session) {
       // Session has been deleted underneath us
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-        b[0]->error = node->errors[VCDP_HANDOFF_ERROR_NO_SESSION];
-        goto next;
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[VCDP_HANDOFF_ERROR_NO_SESSION];
+      goto next;
     }
 
     // Check if session has expired. If so send it back to the lookup node to be created.
@@ -387,10 +375,10 @@ VLIB_NODE_FN(vcdp_handoff_node)
 static u8 *
 format_vcdp_lookup_trace(u8 *s, va_list *args)
 {
-  vlib_main_t __clib_unused *vm = va_arg (*args, vlib_main_t *);
-  vlib_node_t __clib_unused *node = va_arg (*args, vlib_node_t *);
-  vcdp_lookup_trace_t *t = va_arg (*args, vcdp_lookup_trace_t *);
-  u32 indent = format_get_indent (s);
+  vlib_main_t __clib_unused *vm = va_arg(*args, vlib_main_t *);
+  vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
+  vcdp_lookup_trace_t *t = va_arg(*args, vcdp_lookup_trace_t *);
+  u32 indent = format_get_indent(s);
 
   if (t->error)
     s = format(s, "error: %u", t->error);
@@ -402,9 +390,9 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
     else
       s = format(s, "missed session:");
   }
-  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u  key 0x%U %U",
-             format_white_space, indent, t->sw_if_index, t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4),
-             format_vcdp_session_key, &t->k4);
+  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u  key 0x%U %U", format_white_space, indent, t->sw_if_index,
+             t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4), format_vcdp_session_key,
+             &t->k4);
   s = format(s, "\n%Uservice chain: %U", format_white_space, indent, format_vcdp_bitmap, t->service_bitmap);
   return s;
 }
@@ -440,12 +428,10 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_4tuple_node) = {
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
 };
-VCDP_SERVICE_DEFINE(lookup_ip4_4tuple) = {
-  .node_name = "vcdp-lookup-ip4-4tuple",
-  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
-  .runs_after = VCDP_SERVICES(0),
-  .is_terminal = 0
-};
+VCDP_SERVICE_DEFINE(lookup_ip4_4tuple) = {.node_name = "vcdp-lookup-ip4-4tuple",
+                                          .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+                                          .runs_after = VCDP_SERVICES(0),
+                                          .is_terminal = 0};
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_3tuple_node) = {
   .name = "vcdp-lookup-ip4-3tuple",
@@ -455,12 +441,10 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_3tuple_node) = {
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
 };
-VCDP_SERVICE_DEFINE(lookup_ip4_3tuple) = {
-  .node_name = "vcdp-lookup-ip4-3tuple",
-  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
-  .runs_after = VCDP_SERVICES(0),
-  .is_terminal = 0
-};
+VCDP_SERVICE_DEFINE(lookup_ip4_3tuple) = {.node_name = "vcdp-lookup-ip4-3tuple",
+                                          .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+                                          .runs_after = VCDP_SERVICES(0),
+                                          .is_terminal = 0};
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip4_1tuple_node) = {
   .name = "vcdp-lookup-ip4-1tuple",
@@ -470,12 +454,10 @@ VLIB_REGISTER_NODE(vcdp_lookup_ip4_1tuple_node) = {
   .n_errors = VCDP_LOOKUP_N_ERROR,
   .error_counters = vcdp_lookup_error_counters,
 };
-VCDP_SERVICE_DEFINE(lookup_ip4_1tuple) = {
-  .node_name = "vcdp-lookup-ip4-1tuple",
-  .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
-  .runs_after = VCDP_SERVICES(0),
-  .is_terminal = 0
-};
+VCDP_SERVICE_DEFINE(lookup_ip4_1tuple) = {.node_name = "vcdp-lookup-ip4-1tuple",
+                                          .runs_before = VCDP_SERVICES("vcdp-nat-slowpath", "vcdp-drop"),
+                                          .runs_after = VCDP_SERVICES(0),
+                                          .is_terminal = 0};
 
 VLIB_REGISTER_NODE(vcdp_lookup_ip6_node) = {
   .name = "vcdp-lookup-ip6",

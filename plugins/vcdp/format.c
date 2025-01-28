@@ -39,33 +39,12 @@ format_vcdp_session_type(u8 *s, va_list *args)
 }
 
 u8 *
-format_vcdp_session_ip4_key(u8 *s, va_list *args)
-{
-  vcdp_session_ip4_key_t *k = va_arg(*args, vcdp_session_ip4_key_t *);
-  u32 context_id = k->context_id;
-  s = format(s, "%d: %U: %U:%d %U:%d", context_id, format_ip_protocol, k->proto, format_ip4_address, &k->src,
-             clib_net_to_host_u16(k->sport), format_ip4_address, &k->dst, clib_net_to_host_u16(k->dport));
-  return s;
-}
-
-u8 *
-format_vcdp_session_ip6_key(u8 *s, va_list *args)
-{
-  vcdp_session_ip6_key_t *k = va_arg(*args, vcdp_session_ip6_key_t *);
-  u32 context_id = k->context_id;
-  s = format(s, "%d: %U: %U:%d %U:%d", context_id, format_ip_protocol, k->proto, format_ip6_address, &k->src,
-             clib_net_to_host_u16(k->sport), format_ip6_address, &k->dst, clib_net_to_host_u16(k->dport));
-  return s;
-}
-
-u8 *
 format_vcdp_session_key(u8 *s, va_list *args)
 {
   vcdp_session_key_t *key = va_arg(*args, vcdp_session_key_t *);
-  if (key->is_ip6)
-    s = format(s, "%U", format_vcdp_session_ip6_key, &key->ip6);
-  else
-   s = format(s, "%U", format_vcdp_session_ip4_key, &key->ip4);
+  u32 context_id = key->context_id;
+  s = format(s, "%d: %U: %U:%d %U:%d", context_id, format_ip_protocol, key->proto, format_ip46_address, &key->src,
+             clib_net_to_host_u16(key->sport), format_ip46_address, &key->dst, clib_net_to_host_u16(key->dport));
   return s;
 }
 
@@ -101,7 +80,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
   skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
   s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);
   skey = &session->keys[VCDP_SESSION_KEY_SECONDARY];
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
     s = format(s, "  secondary key: %U\n", format_vcdp_session_key, skey);
   s = format(s, "  state: %U\n", format_vcdp_session_state, session->state);
   if (session->state != VCDP_SESSION_STATE_STATIC)

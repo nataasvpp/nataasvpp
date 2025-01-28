@@ -21,20 +21,7 @@
 void vcdp_set_service_chain(vcdp_tenant_t *tenant, u8 proto, u32 *bitmaps);
 
 static int
-vcdp_session_add_del_key4(vcdp_session_ip4_key_t *k, int is_add, u64 value, u64 *h)
-{
-  vcdp_main_t *vcdp = &vcdp_main;
-  clib_bihash_kv_16_8_t kv = {
-    .key[0] = k->as_u64[0],
-    .key[1] = k->as_u64[1],
-    .value = value,
-  };
-  *h = clib_bihash_hash_16_8(&kv);
-  return clib_bihash_add_del_with_hash_16_8(&vcdp->table4, &kv, *h, is_add);
-}
-
-static int
-vcdp_session_add_del_key6(vcdp_session_ip6_key_t *k, int is_add, u64 value, u64 *h)
+vcdp_session_add_del_key(vcdp_session_key_t *k, int is_add, u64 value, u64 *h)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   clib_bihash_kv_40_8_t kv;
@@ -42,14 +29,7 @@ vcdp_session_add_del_key6(vcdp_session_ip6_key_t *k, int is_add, u64 value, u64 
   clib_memcpy(&kv.key, k, 40);
   kv.value = value;
   *h = clib_bihash_hash_40_8(&kv);
-  return clib_bihash_add_del_with_hash_40_8(&vcdp->table6, &kv, *h, is_add);
-}
-
-static int
-vcdp_session_add_del_key(vcdp_session_key_t *k, int is_add, u64 value, u64 *h)
-{
-  return k->is_ip6 ? vcdp_session_add_del_key6(&k->ip6, is_add, value, h) :
-                     vcdp_session_add_del_key4(&k->ip4, is_add, value, h);
+  return clib_bihash_add_del_with_hash_40_8(&vcdp->session_hash, &kv, *h, is_add);
 }
 
 vcdp_session_t *
@@ -89,8 +69,8 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     pool_put(ptd->sessions, session);
     return 0;
   }
-  session->key_flags = primary->is_ip6 ? VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 : VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4;
-  session->proto = primary->is_ip6 ? primary->ip6.proto : primary->ip4.proto;
+  session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID;
+  session->proto = primary->proto;
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], primary, sizeof(session->keys[0]));
 
   if (secondary) {
@@ -100,8 +80,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
       pool_put(ptd->sessions, session);
       return 0;
     }
-    session->key_flags |=
-      secondary->is_ip6 ? VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 : VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
+    session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID;
     clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_SECONDARY], secondary, sizeof(session->keys[1]));
   }
 
@@ -133,8 +112,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   if (is_static) {
     session->state = VCDP_SESSION_STATE_STATIC;
   } else {
-    vcdp_session_timer_start(vcdp, session, thread_index, vlib_time_now(vlib_get_main()),
-                             VCDP_TIMEOUT_EMBRYONIC);
+    vcdp_session_timer_start(vcdp, session, thread_index, vlib_time_now(vlib_get_main()), VCDP_TIMEOUT_EMBRYONIC);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index, tenant_idx, 1);
   vcdp_log_debug("Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
@@ -153,34 +131,22 @@ vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, i
     return 0;
 
   if (src->version == AF_IP6) {
+    ;
+  };
 
-    vcdp_session_ip6_key_t k = {
-      .context_id = context_id,
-      .src = src->ip.ip6,
-      .dst = dst->ip.ip6,
-      .sport = sport,
-      .dport = dport,
-      .proto = protocol,
-    };
-    clib_bihash_kv_40_8_t kv;
-    clib_memcpy(&kv.key, &k, sizeof(k));
-    if (clib_bihash_search_inline_40_8(&vcdp->table6, &kv))
-      return 0;
-    value = kv.value;
-  } else {
-    vcdp_session_ip4_key_t k = {
-      .context_id = context_id,
-      .src = src->ip.ip4.as_u32,
-      .dst = dst->ip.ip4.as_u32,
-      .sport = sport,
-      .dport = dport,
-      .proto = protocol,
-    };
-    clib_bihash_kv_16_8_t kv = {.key[0] = k.as_u64[0], .key[1] = k.as_u64[1], .value = 0};
-    if (clib_bihash_search_inline_16_8(&vcdp->table4, &kv))
-      return 0;
-    value = kv.value;
-  }
+  vcdp_session_key_t k = {
+    .context_id = context_id,
+    .src = src->ip,
+    .dst = dst->ip,
+    .sport = sport,
+    .dport = dport,
+    .proto = protocol,
+  };
+  clib_bihash_kv_40_8_t kv;
+  clib_memcpy(&kv.key, &k, sizeof(k));
+  if (clib_bihash_search_inline_40_8(&vcdp->session_hash, &kv))
+    return 0;
+  value = kv.value;
   u32 thread_index, session_index;
   return vcdp_session_from_lookup_value(vcdp, value, &thread_index, &session_index);
 }
@@ -203,9 +169,9 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_se
     vcdp_log_err("Failed to remove session key from table");
   }
 
-  if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4|VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)) {
+  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID) {
     if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_SECONDARY], 0, 0, &h)) {
-      vcdp_log_err("Failed to remove session from table4 - secondary");
+      vcdp_log_err("Failed to remove session from session hash - secondary");
     }
   }
 
@@ -215,23 +181,22 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_se
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], thread_index,
                                 session->tenant_idx, 1);
 
-
-  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_TX], thread_index,
-                                  session->tenant_idx, session->pkts[VCDP_FLOW_FORWARD], session->bytes[VCDP_FLOW_FORWARD]);
-  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], thread_index,
-                                  session->tenant_idx, session->pkts[VCDP_FLOW_REVERSE], session->bytes[VCDP_FLOW_REVERSE]);
+  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_TX], thread_index, session->tenant_idx,
+                                  session->pkts[VCDP_FLOW_FORWARD], session->bytes[VCDP_FLOW_FORWARD]);
+  vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], thread_index, session->tenant_idx,
+                                  session->pkts[VCDP_FLOW_REVERSE], session->bytes[VCDP_FLOW_REVERSE]);
   pool_put_index(ptd->sessions, session_index);
 }
 
 void
 vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
-                         u32 session_index)
+                    u32 session_index)
 {
   vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, true);
 }
 void
 vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
-                         u32 session_index)
+                             u32 session_index)
 {
   vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, false);
 }
@@ -247,8 +212,8 @@ vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session
                                 session->tenant_idx, 1);
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index,
                                 session->tenant_idx, 1);
-  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], thread_index,
-                                session->tenant_idx, 1);
+  vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], thread_index, session->tenant_idx,
+                                1);
 
   session->bytes[VCDP_FLOW_FORWARD] = 0;
   session->bytes[VCDP_FLOW_REVERSE] = 0;
@@ -259,8 +224,7 @@ vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session
 bool
 vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
 {
-  return (session->state != VCDP_SESSION_STATE_STATIC &&
-          (vcdp_session_remaining_time(session, time_now) == 0));
+  return (session->state != VCDP_SESSION_STATE_STATIC && (vcdp_session_remaining_time(session, time_now) == 0));
 }
 
 bool
@@ -287,7 +251,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
 
   rv = vcdp_session_add_del_key(key, 2, value, &h);
   if (rv == 0) {
-    session->key_flags |= key->is_ip6 ? VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 : VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4;
+    session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID;
   }
   return rv;
 }
@@ -297,7 +261,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
  * This requires to be called within a barrier.
  */
 void
-vcdp_session_clear (void)
+vcdp_session_clear(void)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_per_thread_data_t *ptd;
@@ -306,14 +270,14 @@ vcdp_session_clear (void)
   u32 *session_index;
   vcdp_session_t *session;
 
-  vec_foreach_index(thread_index, vcdp->per_thread_data) {
+  vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    pool_foreach(session, ptd->sessions) {
+    pool_foreach (session, ptd->sessions) {
       if (session->state != VCDP_SESSION_STATE_STATIC) {
         vec_add1(to_delete, session - ptd->sessions);
       }
     }
-    vec_foreach(session_index, to_delete) {
+    vec_foreach (session_index, to_delete) {
       session = vcdp_session_at_index(ptd, *session_index);
       vcdp_session_remove(vcdp, ptd, session, thread_index, *session_index);
     }

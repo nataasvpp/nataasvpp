@@ -200,13 +200,12 @@ create_session(u32 src, u16 sport, int *n_retries, int *n_expired)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_session_key_t k = {
-    .ip4.src = htonl(src),
-    .ip4.dst = htonl(0x08080808), // 8.8.8.8
-    .ip4.sport = htons(sport),
-    .ip4.dport = htons(443),
-    .ip4.proto = 6,
-    .is_ip6 = false,
-    .ip4.context_id = 0,
+    .src.ip4.as_u32 = htonl(src),
+    .dst.ip4.as_u32 = htonl(0x08080808), // 8.8.8.8
+    .sport = htons(sport),
+    .dport = htons(443),
+    .proto = 6,
+    .context_id = 0,
   };
   u32 flow_index = 0;
   int rv = 0;
@@ -219,17 +218,13 @@ create_session(u32 src, u16 sport, int *n_retries, int *n_expired)
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
     vcdp_session_key_t secondary_key = {
-      .ip4 =
-        {
-          .dport = k.ip4.sport,
-          .proto = k.ip4.proto,
-          .src = k.ip4.dst,
-          .sport = k.ip4.dport,
-          .context_id = k.ip4.context_id,
-        },
-      .is_ip6 = false,
+          .dport = k.sport,
+          .proto = k.proto,
+          .src = k.dst,
+          .sport = k.dport,
+          .context_id = k.context_id,
     };
-    secondary_key.ip4.dst = htonl(0x01010101); // 1.1.1.1
+    secondary_key.dst.ip4.as_u32 = htonl(0x01010101); // 1.1.1.1
     u32 session_index = session - ptd->sessions;
     u32 pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
     rv = nat_try_port_allocation(vcdp, ptd, thread_index, pseudo_flow_index, &k, &secondary_key, n_retries, n_expired);
@@ -350,10 +345,10 @@ nat_run_performance_test(vcdp_main_t *vcdp, int n_attempts)
 
   for (u32 i = 0; i < n_attempts; i++) {
     // Setup test keys with random values
-    org_key.ip4.src = random_u32(&nat_main.random_seed);
-    org_key.ip4.sport = random_u32(&nat_main.random_seed) % 65535;
+    org_key.src.ip4.as_u32 = random_u32(&nat_main.random_seed);
+    org_key.sport = random_u32(&nat_main.random_seed) % 65535;
     // new_key.ip4.dst = random_u32(&nat_main.random_seed);
-    if (create_session(org_key.ip4.src, org_key.ip4.sport, &n_retries, &n_expired)) {
+    if (create_session(org_key.src.ip4.as_u32, org_key.sport, &n_retries, &n_expired)) {
       stats.failed_allocations++;
     } else {
       stats.total_retries += n_retries;

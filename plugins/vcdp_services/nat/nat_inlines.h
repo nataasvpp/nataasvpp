@@ -48,13 +48,13 @@ nat_try_port_allocation(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thre
   f64 now = vlib_time_now(vlib_get_main());
 
   // Try same source port
-  new_key->ip4.dport = org_key->ip4.sport;
+  new_key->dport = org_key->sport;
   if (nat_try_add_secondary_key(vcdp, ptd, thread_index, pseudo_flow_index, now, new_key, n_expired) == 0) {
     return 0;
   }
 
   for (int retries = 0; retries < nat->port_retries; retries++) {
-    new_key->ip4.dport = clib_host_to_net_u16(1024 + (random_u32(&nat->random_seed) % 64512));
+    new_key->dport = clib_host_to_net_u16(1024 + (random_u32(&nat->random_seed) % 64512));
     if (nat_try_add_secondary_key(vcdp, ptd, thread_index, pseudo_flow_index, now, new_key, n_expired) == 0) {
       *n_retries = retries + 1;
       return 0;

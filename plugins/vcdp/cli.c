@@ -208,7 +208,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
                        tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
                        format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
                        format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
-        if (session->key_flags & (VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6))
+        if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
           s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
         vlib_cli_output(vm, "%v", s);
@@ -429,7 +429,7 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   unformat_input_t _line_input, *line_input = &_line_input;
   clib_error_t *error = 0;
   u32 dport, sport;
-  ip_address_t src, dst;
+  ip46_address_t src, dst;
   u8 proto;
   u32 tenant_id = ~0;
   u32 context_id = 0; // TODO: support context_id
@@ -439,8 +439,8 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip_address, &src, &sport,
-                 unformat_ip_protocol, &proto, unformat_ip_address, &dst, &dport)) {
+    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip46_address, &src, &sport,
+                 unformat_ip_protocol, &proto, unformat_ip46_address, &dst, &dport)) {
       if (sport == 0 || sport > 65535) {
         error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
         goto done;
@@ -461,23 +461,12 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   }
 
   vcdp_session_key_t k;
-  if (src.version ==  AF_IP6) {
-    k.ip6.context_id = context_id;
-    k.ip6.src = src.ip.ip6;
-    k.ip6.dst = dst.ip.ip6;
-    k.ip6.sport = clib_host_to_net_u16(sport);
-    k.ip6.dport = clib_host_to_net_u16(dport);
-    k.ip6.proto = proto;
-    k.is_ip6 = true;
-  } else {
-    k.ip4.context_id = context_id;
-    k.ip4.src = src.ip.ip4.as_u32;
-    k.ip4.dst = dst.ip.ip4.as_u32;
-    k.ip4.sport = clib_host_to_net_u16(sport);
-    k.ip4.dport = clib_host_to_net_u16(dport);
-    k.ip4.proto = proto;
-    k.is_ip6 = false;
-  }
+  k.context_id = context_id;
+  k.src = src;
+  k.dst = dst;
+  k.sport = clib_host_to_net_u16(sport);
+  k.dport = clib_host_to_net_u16(dport);
+  k.proto = proto;
 
   u16 tenant_idx = vcdp_tenant_idx_by_id(tenant_id);
   if (tenant_idx == VCDP_TENANT_INVALID_IDX) {

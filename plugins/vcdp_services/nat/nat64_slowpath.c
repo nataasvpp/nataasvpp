@@ -36,29 +36,26 @@ format_vcdp_nat64_slowpath_trace(u8 *s, va_list *args)
   return s;
 }
 
-
-static u32
-nat64_get_v4(ip6_address_t *a)
+static ip46_address_t
+nat64_get_v4(ip46_address_t *a)
 {
-  return a->as_u32[3];
+  ip46_address_t r = {.ip4.as_u32 = a->ip4.as_u32};
+  return r;
 }
 
 static_always_inline void
 nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
-                          vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
-                          u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
-                          nat64_rewrite_data_t *nat_session, vcdp_session_t *session, u32 *error, vlib_buffer_t **b)
+                            vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
+                            u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
+                            nat64_rewrite_data_t *nat_session, vcdp_session_t *session, u32 *error, vlib_buffer_t **b)
 {
-  u16 old_sport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip6.sport;
+  u16 old_sport = session->keys[VCDP_SESSION_KEY_PRIMARY].sport;
   vcdp_session_key_t new_key = {
-    .ip4 = {
-      .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip6.sport,
-      .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].ip6.proto,
-      .src = nat64_get_v4(&session->keys[VCDP_SESSION_KEY_PRIMARY].ip6.dst),
-      .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip6.dport,
-      .context_id = instance->context_id,
-    },
-    .is_ip6 = false,
+    .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].sport,
+    .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto,
+    .src = nat64_get_v4(&session->keys[VCDP_SESSION_KEY_PRIMARY].dst),
+    .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].dport,
+    .context_id = instance->context_id,
   };
   // u32 fib_index = 0;
   u8 proto = session->proto;
@@ -74,11 +71,11 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   }
 
   /* Allocate a new source */
-  new_key.ip4.dst = instance->addresses[new_key.ip4.src % vec_len(instance->addresses)].as_u32;
+  new_key.dst.ip4.as_u32 = instance->addresses[new_key.src.ip4.as_u32 % vec_len(instance->addresses)].as_u32;
 
   // pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
   u8 v4proto = proto == IP_PROTOCOL_ICMP6 ? IP_PROTOCOL_ICMP : proto;
-  new_key.ip4.proto = v4proto;
+  new_key.proto = v4proto;
 #if 0
   if (v4proto == IP_PROTOCOL_TCP || v4proto == IP_PROTOCOL_UDP || v4proto == IP_PROTOCOL_ICMP) {
     while ((++n_retries) < nm->port_retries &&
@@ -106,14 +103,14 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
 
   if (n_retries > 1) {
     nat_session[0].ops = NAT64_REWRITE_OP_SPORT;
-    nat_session[0].sport = new_key.ip4.dport;
+    nat_session[0].sport = new_key.dport;
     nat_session[1].ops = NAT64_REWRITE_OP_DPORT;
     nat_session[1].dport = old_sport;
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_RETRIES], thread_index, nat_idx,
                                   n_retries - 1);
   }
   ip6_header_t *ip6 = vcdp_get_ip6_header(b[0]);
-  nat_session[0].ip4.ip_version_and_header_length = IP4_VERSION_AND_HEADER_LENGTH_NO_OPTIONS;    //0x45;
+  nat_session[0].ip4.ip_version_and_header_length = IP4_VERSION_AND_HEADER_LENGTH_NO_OPTIONS; // 0x45;
   nat_session[0].ip4.tos = 0;
   nat_session[0].ip4.length = 0;
   nat_session[0].ip4.fragment_id = 0;
@@ -121,8 +118,8 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   nat_session[0].ip4.ttl = 0;
   nat_session[0].ip4.protocol = v4proto;
   nat_session[0].ip4.checksum = 0;
-  nat_session[0].ip4.src_address.as_u32 = new_key.ip4.dst;
-  nat_session[0].ip4.dst_address.as_u32 = new_key.ip4.src;
+  nat_session[0].ip4.src_address.as_u32 = new_key.dst.ip4.as_u32;
+  nat_session[0].ip4.dst_address.as_u32 = new_key.src.ip4.as_u32;
 
   nat_session[0].version = session->session_version;
   nat_session[0].ops |= NAT64_REWRITE_OP_HDR_64;
@@ -138,7 +135,7 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   nat_session[1].ops |= NAT64_REWRITE_OP_HDR_46;
 
   vcdp_log_debug("Creating a mapping between %U and %U", format_ip4_header, &nat_session[0].ip4, sizeof(ip4_header_t),
-           format_ip6_header, &nat_session[1].ip6, sizeof(ip6_header_t));
+                 format_ip6_header, &nat_session[1].ip6, sizeof(ip6_header_t));
 
   vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
 
@@ -222,31 +219,31 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
       goto next;
     }
 
-      session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
-      if (!session) {
-        error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
-        goto next;
-      }
-      session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat64_early_rewrite);
-      session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat64_late_rewrite);
-
-      session_idx = session - ptd->sessions;
-      session->type = VCDP_SESSION_TYPE_NAT64;
-      nat_rewrites = vec_elt_at_index(nptd->flows64, session_idx << 1);
-      nat64_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance,
-                                  nat_idx, session_idx, nat_rewrites, session, &error, b);
-
-    next:
-      if (error) {
-        vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
-        b[0]->error = node->errors[error];
-      }
-      b[0]->flow_id = flow_index;
-      vcdp_next(b[0], to_next);
-      n_left -= 1;
-      b += 1;
-      to_next += 1;
+    session = vcdp_create_session(tenant_idx, &k, 0, false, &flow_index);
+    if (!session) {
+      error = VCDP_NAT_SLOWPATH_ERROR_SESSION;
+      goto next;
     }
+    session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat64_early_rewrite);
+    session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat64_late_rewrite);
+
+    session_idx = session - ptd->sessions;
+    session->type = VCDP_SESSION_TYPE_NAT64;
+    nat_rewrites = vec_elt_at_index(nptd->flows64, session_idx << 1);
+    nat64_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx,
+                                session_idx, nat_rewrites, session, &error, b);
+
+  next:
+    if (error) {
+      vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
+      b[0]->error = node->errors[error];
+    }
+    b[0]->flow_id = flow_index;
+    vcdp_next(b[0], to_next);
+    n_left -= 1;
+    b += 1;
+    to_next += 1;
+  }
   vlib_buffer_enqueue_to_next(vm, node, from, next_indices, frame->n_vectors);
 
   if (PREDICT_FALSE((node->flags & VLIB_NODE_FLAG_TRACE))) {
@@ -276,9 +273,7 @@ VLIB_REGISTER_NODE(vcdp_nat64_slowpath_node) = {
   .error_counters = vcdp_nat_slowpath_error_counters,
 };
 
-VCDP_SERVICE_DEFINE(nat64_output) = {
-  .node_name = "vcdp-nat64-slowpath",
-  .runs_before = VCDP_SERVICES(0),
-  .runs_after = VCDP_SERVICES(0),
-  .is_terminal = 0
-};
+VCDP_SERVICE_DEFINE(nat64_output) = {.node_name = "vcdp-nat64-slowpath",
+                                     .runs_before = VCDP_SERVICES(0),
+                                     .runs_after = VCDP_SERVICES(0),
+                                     .is_terminal = 0};

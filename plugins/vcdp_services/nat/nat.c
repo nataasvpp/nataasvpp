@@ -343,7 +343,7 @@ vcdp_nat_port_forwarding_session_add(u32 tenant_idx, nat_3tuple_ip4_key_t *key, 
   nat_port_forwarding_session_t *session;
   pool_get(nat->port_forwarding_sessions, session);
 
-  session->addr.as_u32 = inside->as_u32;
+  session->addr.ip4.as_u32 = inside->as_u32;
   session->port = iport;
   session->fib_index = 0; // TODO: Get from tenant
   session->ops = NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB;

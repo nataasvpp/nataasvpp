@@ -33,7 +33,7 @@ typedef struct
   bool hit;
   u32 session_idx;
   u32 service_bitmap;
-  vcdp_session_ip4_key_t k4;
+  vcdp_session_key_t k4;
 } vcdp_icmp_fwd_trace_t;
 
 typedef struct {

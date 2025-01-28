@@ -82,10 +82,8 @@ typedef enum {
 } vcdp_session_direction_t;
 
 typedef enum {
-  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 = 1 << 0,
-  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4 = 1 << 1,
-  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 = 1 << 2,
-  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6 = 1 << 3,
+  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID = 1 << 0,
+  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID = 1 << 1,
 } vcdp_session_key_flag_t;
 
 // #define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
@@ -105,37 +103,15 @@ enum {
 //   VCDP_SESSION_KEY_IP6 = 1,
 // } vcdp_session_key_type_t;
 
-typedef union {
-  struct {
-    u32 src, dst;
-    u32 proto : 8;
-    u32 context_id : 24;
-    u16 sport, dport;
-  };
-  u64 as_u64[2];
-} __clib_packed vcdp_session_ip4_key_t;
-_Static_assert(sizeof(vcdp_session_ip4_key_t) == 16, "Size of vcdp_session_ip4_key_t should be 16");
-
-typedef union {
-  struct {
-    ip6_address_t src, dst;
-    u32 proto : 8;
-    u32 context_id : 24;
-    u16 sport, dport;
-  };
-  u64 as_u64[5];
-} __clib_packed vcdp_session_ip6_key_t;
-_Static_assert(sizeof(vcdp_session_ip6_key_t) == 40, "Size of vcdp_session_ip6_key_t should be 40");
 
 typedef struct {
-  union {
-    vcdp_session_ip6_key_t ip6;
-    vcdp_session_ip4_key_t ip4;
-  };
-  u8 pad[23];
-  bool is_ip6; // REMOVE?
+  ip46_address_t src;
+  ip46_address_t dst;
+  u32 proto : 8;
+  u32 context_id : 24;
+  u16 sport, dport;
 } vcdp_session_key_t;
-_Static_assert(sizeof(vcdp_session_key_t) == 64, "Size of vcdp_session_key_t should be 64");
+_Static_assert(sizeof(vcdp_session_key_t) == 40, "Size of vcdp_session_key_t should be 64");
 
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
@@ -184,8 +160,7 @@ typedef struct {
 
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
-  clib_bihash_16_8_t table4;
-  clib_bihash_40_8_t table6;
+  clib_bihash_40_8_t session_hash;
   clib_bihash_8_8_t session_index_by_id;
   u32 frame_queue_index;
   u32 frame_queue_icmp_index;

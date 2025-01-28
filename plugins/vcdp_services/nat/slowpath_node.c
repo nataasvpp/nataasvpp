@@ -124,23 +124,19 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
 {
   // Create a new reverse key with the ports and addresses swapped
   vcdp_session_key_t new_key = {
-    .ip4 =
-      {
-        // .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
-        .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.sport,
-        .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.proto,
-        .src = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.dst,
-        .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.dport,
-        .context_id = instance->context_id,
-      },
-    .is_ip6 = false,
+    // .dst = session->keys[VCDP_SESSION_KEY_PRIMARY].src,
+    .dport = session->keys[VCDP_SESSION_KEY_PRIMARY].sport,
+    .proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto,
+    .src = session->keys[VCDP_SESSION_KEY_PRIMARY].dst,
+    .sport = session->keys[VCDP_SESSION_KEY_PRIMARY].dport,
+    .context_id = instance->context_id,
   };
 
   u32 fib_index = 0;
   u8 proto = session->proto;
   int n_retries = 0, n_expired = 0;
-  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.src;
-  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].ip4.sport;
+  u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].src.ip4.as_u32;
+  u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].sport;
 
   u32 pseudo_flow_index;
   int rv = 0;
@@ -153,7 +149,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   }
 
   /* Allocate a new source */
-  new_key.ip4.dst = instance->addresses[new_key.ip4.src % vec_len(instance->addresses)].as_u32;
+  new_key.dst.ip4.as_u32 = instance->addresses[new_key.src.ip4.as_u32 % vec_len(instance->addresses)].as_u32;
 
   pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
 
@@ -173,23 +169,23 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   switch (proto) {
   case IP_PROTOCOL_UDP:
   case IP_PROTOCOL_TCP:
-    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.ip4.dst,
-                 ip4_old_port, new_key.ip4.dport, fib_index, session->session_version, &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, new_key.ip4.dst, ip4_old_src_addr,
-                 ip4_old_port, new_key.ip4.dport, fib_index, session->session_version, &nat_session[1]);
+    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst.ip4.as_u32,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[0]);
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, new_key.dst.ip4.as_u32, ip4_old_src_addr,
+                 ip4_old_port, new_key.dport, fib_index, session->session_version, &nat_session[1]);
     break;
   case IP_PROTOCOL_ICMP:
     nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr,
-                 new_key.ip4.dst, ip4_old_port, new_key.ip4.dport, fib_index, session->session_version,
+                 new_key.dst.ip4.as_u32, ip4_old_port, new_key.dport, fib_index, session->session_version,
                  &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, new_key.ip4.dst,
-                 ip4_old_src_addr, ip4_old_port, new_key.ip4.dport, fib_index, session->session_version,
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_ICMP_ID | NAT_REWRITE_OP_TXFIB, new_key.dst.ip4.as_u32,
+                 ip4_old_src_addr, ip4_old_port, new_key.dport, fib_index, session->session_version,
                  &nat_session[1]);
     break;
   default:
-    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.ip4.dst, 0, 0, fib_index,
+    nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst.ip4.as_u32, 0, 0, fib_index,
                  session->session_version, &nat_session[0]);
-    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.ip4.dst, 0, 0, fib_index,
+    nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_TXFIB, ip4_old_src_addr, new_key.dst.ip4.as_u32, 0, 0, fib_index,
                  session->session_version, &nat_session[1]);
   }
 
@@ -284,8 +280,8 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     vcdp_log_debug("Creating session for: %U", format_vcdp_session_key, &k);
     session_idx = session - ptd->sessions;
     nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
-    if (nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx,
-                              session_idx, nat_rewrites, session, &error, b) < 0) {
+    if (nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance,
+                                  nat_idx, session_idx, nat_rewrites, session, &error, b) < 0) {
       vcdp_session_remove(vcdp, ptd, session, thread_index, session_idx);
       goto next;
     }
@@ -355,13 +351,12 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node, vc
   if (rv != 0)
     goto error;
 
-  reverse_k.ip4.dst = k.ip4.src;
-  reverse_k.ip4.dport = k.ip4.sport;
-  reverse_k.ip4.proto = k.ip4.proto;
-  reverse_k.ip4.src = nat_session->addr.as_u32;
-  reverse_k.ip4.sport = nat_session->port;
-  reverse_k.ip4.context_id = 0;
-  reverse_k.is_ip6 = false;
+  reverse_k.dst = k.src;
+  reverse_k.dport = k.sport;
+  reverse_k.proto = k.proto;
+  reverse_k.src = nat_session->addr;
+  reverse_k.sport = nat_session->port;
+  reverse_k.context_id = 0;
 
   vcdp_session_t *full_session = vcdp_create_session(tenant_idx, &k, &reverse_k, false, &flow_index);
   if (!full_session)
@@ -377,10 +372,10 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node, vc
   nat_rewrite_data_t *nat_rewrite; /* rewrite data in both directions */
   nat_rewrite = vec_elt_at_index(nptd->flows, (full_session - ptd->sessions) << 1);
 
-  nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, k.ip4.dst, reverse_k.ip4.src,
-               k.ip4.dport, reverse_k.ip4.sport, fib_index, full_session->session_version, &nat_rewrite[0]);
-  nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, reverse_k.ip4.src, k.ip4.dst,
-               reverse_k.ip4.sport, k.ip4.dport, fib_index, full_session->session_version, &nat_rewrite[1]);
+  nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, k.dst.ip4.as_u32, reverse_k.src.ip4.as_u32,
+               k.dport, reverse_k.sport, fib_index, full_session->session_version, &nat_rewrite[0]);
+  nat_rewrites(NAT_REWRITE_OP_SADDR | NAT_REWRITE_OP_SPORT | NAT_REWRITE_OP_TXFIB, reverse_k.src.ip4.as_u32, k.dst.ip4.as_u32,
+               reverse_k.sport, k.dport, fib_index, full_session->session_version, &nat_rewrite[1]);
 
   b[0]->flow_id = flow_index;
   vcdp_buffer(b[0])->service_bitmap = full_session->bitmaps[VCDP_FLOW_FORWARD];

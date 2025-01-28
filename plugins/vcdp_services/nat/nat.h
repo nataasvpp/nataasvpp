@@ -124,7 +124,7 @@ STATIC_ASSERT_SIZEOF(nat_3tuple_ip4_key_t, 16);
  */
 typedef struct {
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  ip4_address_t addr;
+  ip46_address_t addr;
   u16 port;
   u32 fib_index;
   nat_rewrite_op_t ops;
