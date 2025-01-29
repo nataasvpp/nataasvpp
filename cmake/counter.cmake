@@ -19,8 +19,8 @@ message(STATUS, "Python3 interpreter ${Python3_EXECUTABLE}")
 
 # set (CounterName vcdp_services/nat/nat_counter)
 # add_custom_command(
-#     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py --header ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName}.json > ${CMAKE_BINARY_DIR}/plugins/${CounterName}.h
-#     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName}.json > ${CMAKE_BINARY_DIR}/plugins/${CounterName}.c
+#     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py --header ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName}.json > ${CMAKE_BINARY_DIR}/${CounterName}.h
+#     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/counters.py ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName}.json > ${CMAKE_BINARY_DIR}/${CounterName}.c
 #     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/counters.py ${CounterName}.json
 #     OUTPUT ${CounterName}.c ${CounterName}.h
 #     COMMENT "Generating code for ${CounterName}."
@@ -32,11 +32,11 @@ macro(add_vpp_counters)
   set(multiValueArgs COUNTERS)
   cmake_parse_arguments(CNT "" "" "${multiValueArgs}" ${ARGN})
 
-  
+
   foreach (f ${CNT_COUNTERS})
         set (CounterName ${f})
-        set (HeaderFile ${CMAKE_BINARY_DIR}/plugins/${CounterName}.h)
-        set (CFile ${CMAKE_BINARY_DIR}/plugins/${CounterName}.c)
+        set (HeaderFile ${CMAKE_BINARY_DIR}/${CounterName}.h)
+        set (CFile ${CMAKE_BINARY_DIR}/${CounterName}.c)
         message(STATUS, "Compile counter ${f} into ${HeaderFile}")
         add_custom_command(
             COMMAND ${vppcounters} --header ${CMAKE_CURRENT_SOURCE_DIR}/${CounterName} ${CounterName}> ${HeaderFile}

@@ -52,7 +52,7 @@
 
 #define VCDP_TENANT_INVALID_IDX (65535)
 
-typedef enum : u8 {
+typedef enum vcdp_session_type : u8 {
   VCDP_SESSION_TYPE_IP4,
   VCDP_SESSION_TYPE_IP6,
   VCDP_SESSION_TYPE_NAT64,
@@ -66,7 +66,7 @@ typedef enum : u8 {
   _(TIME_WAIT, "time-wait")                                                                                            \
   _(STATIC, "static")
 
-typedef enum : u8{
+typedef enum vcdp_session_state : u8 {
 #define _(val, str) VCDP_SESSION_STATE_##val,
   foreach_vcdp_session_state
 #undef _

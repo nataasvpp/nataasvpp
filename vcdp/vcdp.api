@@ -2,7 +2,7 @@
 
 option version = "0.0.1";
 import "vnet/ip/ip_types.api";
-import "plugins/vcdp/vcdp_types.api";
+import "vcdp/vcdp_types.api";
 
 autoreply autoendian define vcdp_tenant_add_del
 {
