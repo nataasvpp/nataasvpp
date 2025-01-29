@@ -81,18 +81,13 @@ typedef enum {
    VCDP_FLOW_F_B_N = 2,
 } vcdp_session_direction_t;
 
-typedef enum {
-  VCDP_SESSION_KEY_FLAG_PRIMARY_VALID = 1 << 0,
-  VCDP_SESSION_KEY_FLAG_SECONDARY_VALID = 1 << 1,
-} vcdp_session_key_flag_t;
-
 enum {
   VCDP_SESSION_KEY_PRIMARY = 0,
   VCDP_SESSION_KEY_SECONDARY = 1,
   VCDP_SESSION_N_KEY = 2,
 };
 
-typedef struct {
+typedef struct __attribute__((packed)) {
   ip46_address_t src;
   ip46_address_t dst;
   u32 proto : 8;
@@ -122,11 +117,9 @@ typedef struct {
   vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 80
   u64 session_id;
   u32 created;                       // 4
-  u8 proto;                          // 1
   vcdp_session_type_t type;          // 1
-  u8 key_flags;                      // 1
 } vcdp_session_t;
-
+STATIC_ASSERT_SIZEOF(vcdp_session_t, 256);
 //char (*__compile_time_check)[sizeof(vcdp_session_t)] = 1;  // This will show actual size
 // char (*__compile_time_assert)[128] = 1;  // This will show expected size
 

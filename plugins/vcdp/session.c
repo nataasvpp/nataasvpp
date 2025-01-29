@@ -69,8 +69,6 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     pool_put(ptd->sessions, session);
     return 0;
   }
-  session->key_flags = VCDP_SESSION_KEY_FLAG_PRIMARY_VALID;
-  session->proto = primary->proto;
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], primary, sizeof(session->keys[0]));
 
   if (secondary) {
@@ -80,7 +78,6 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
       pool_put(ptd->sessions, session);
       return 0;
     }
-    session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID;
     clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_SECONDARY], secondary, sizeof(session->keys[1]));
   }
 
@@ -107,7 +104,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   }
 
   /* Assign service chain */
-  vcdp_set_service_chain(tenant, session->proto, session->bitmaps);
+  vcdp_set_service_chain(tenant, primary->proto, session->bitmaps);
 
   if (is_static) {
     session->state = VCDP_SESSION_STATE_STATIC;
@@ -168,11 +165,8 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_se
   if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_PRIMARY], 0, 0, &h)) {
     vcdp_log_err("Failed to remove session key from table");
   }
-
-  if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID) {
-    if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_SECONDARY], 0, 0, &h)) {
-      vcdp_log_err("Failed to remove session from session hash - secondary");
-    }
+  if (vcdp_session_add_del_key(&session->keys[VCDP_SESSION_KEY_SECONDARY], 0, 0, &h)) {
+    vcdp_log_err("Failed to remove session from session hash - secondary");
   }
 
   if (clib_bihash_add_del_8_8(&vcdp->session_index_by_id, &kv2, 0)) {
@@ -238,7 +232,6 @@ int
 vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
                                    u32 pseudo_flow_index, vcdp_session_key_t *key)
 {
-  int rv;
   u64 value;
   vcdp_session_t *session;
   u32 session_index;
@@ -249,11 +242,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
   session = vcdp_session_at_index(ptd, session_index);
   clib_memcpy(&session->keys[VCDP_SESSION_KEY_SECONDARY], key, sizeof(*key));
 
-  rv = vcdp_session_add_del_key(key, 2, value, &h);
-  if (rv == 0) {
-    session->key_flags |= VCDP_SESSION_KEY_FLAG_SECONDARY_VALID;
-  }
-  return rv;
+  return vcdp_session_add_del_key(key, 2, value, &h);
 }
 
 /*

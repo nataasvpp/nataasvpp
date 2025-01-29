@@ -177,7 +177,7 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
     rmp->context_id = mp->context_id;
     rmp->session_idx = 0; //session_index;
     rmp->session_type = vcdp_session_type_encode(session->type);
-    rmp->proto = ip_proto_encode(session->proto);
+    rmp->proto = ip_proto_encode(session->keys[VCDP_SESSION_KEY_PRIMARY].proto);
     rmp->state = vcdp_session_state_encode(session->state);
     rmp->remaining_time = vcdp_session_remaining_time(session, now);
     rmp->forward_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];

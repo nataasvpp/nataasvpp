@@ -133,7 +133,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
   };
 
   u32 fib_index = 0;
-  u8 proto = session->proto;
+  u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
   int n_retries = 0, n_expired = 0;
   u32 ip4_old_src_addr = session->keys[VCDP_SESSION_KEY_PRIMARY].src.ip4.as_u32;
   u16 ip4_old_port = session->keys[VCDP_SESSION_KEY_PRIMARY].sport;

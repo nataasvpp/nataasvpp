@@ -203,12 +203,13 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
         //                   tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
         //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
 
-        u8 proto = session->proto;
+        u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
         s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
                        tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
                        format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
                        format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
-        if (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID)
+
+        if (session->keys[VCDP_SESSION_KEY_SECONDARY].dst.ip4.as_u32 || session->keys[VCDP_SESSION_KEY_SECONDARY].src.ip4.as_u32)
           s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
         vlib_cli_output(vm, "%v", s);

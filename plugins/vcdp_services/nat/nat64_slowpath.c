@@ -58,7 +58,7 @@ nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     .context_id = instance->context_id,
   };
   // u32 fib_index = 0;
-  u8 proto = session->proto;
+  u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
   u8 n_retries = 0;
   // u64 h;
   // u32 pseudo_flow_index;
