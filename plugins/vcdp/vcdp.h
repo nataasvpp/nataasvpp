@@ -52,7 +52,7 @@
 
 #define VCDP_TENANT_INVALID_IDX (65535)
 
-typedef enum {
+typedef enum : u8 {
   VCDP_SESSION_TYPE_IP4,
   VCDP_SESSION_TYPE_IP6,
   VCDP_SESSION_TYPE_NAT64,
@@ -66,7 +66,7 @@ typedef enum {
   _(TIME_WAIT, "time-wait")                                                                                            \
   _(STATIC, "static")
 
-typedef enum {
+typedef enum : u8{
 #define _(val, str) VCDP_SESSION_STATE_##val,
   foreach_vcdp_session_state
 #undef _
@@ -86,55 +86,51 @@ typedef enum {
   VCDP_SESSION_KEY_FLAG_SECONDARY_VALID = 1 << 1,
 } vcdp_session_key_flag_t;
 
-// #define VCDP_SESSION_KEY_IP4 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP4 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP4)
-// #define VCDP_SESSION_KEY_IP6 (VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6 | VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
-
-// #define VCDP_SESSION_KEY_IS_PRIMARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_PRIMARY_VALID_IP6)
-// #define VCDP_SESSION_KEY_IS_SECONDARY_IP6(session) (session->key_flags & VCDP_SESSION_KEY_FLAG_SECONDARY_VALID_IP6)
-
 enum {
   VCDP_SESSION_KEY_PRIMARY = 0,
   VCDP_SESSION_KEY_SECONDARY = 1,
   VCDP_SESSION_N_KEY = 2,
 };
 
-// typedef enum {
-//   VCDP_SESSION_KEY_IP4 = 0,
-//   VCDP_SESSION_KEY_IP6 = 1,
-// } vcdp_session_key_type_t;
-
-
 typedef struct {
   ip46_address_t src;
   ip46_address_t dst;
   u32 proto : 8;
   u32 context_id : 24;
-  u16 sport, dport;
+  u16 sport;
+  u16 dport;
 } vcdp_session_key_t;
 _Static_assert(sizeof(vcdp_session_key_t) == 40, "Size of vcdp_session_key_t should be 64");
 
 typedef struct {
+  /* First cache line (64 bytes) */
   CLIB_CACHE_LINE_ALIGN_MARK(cache0);
-  u32 bitmaps[VCDP_FLOW_F_B_N]; // 8
-  u64 session_id;               // 8
-  vcdp_session_timer_t timer;
-  u32 rx_id;      // Session originator identifier (tunnel id, sw_if_index)  // 4
-  vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 72
+  u64 bytes[VCDP_FLOW_F_B_N];        // 16
+  u32 pkts[VCDP_FLOW_F_B_N];         // 8
+  u32 bitmaps[VCDP_FLOW_F_B_N];      // 8
+  u32 last_heard;                    // 4
+  vcdp_session_timer_t timer;        // 16
+  u32 rx_id;                         // 4
+  u16 tenant_idx;                    // 2
+  session_version_t session_version; // 2
+  vcdp_session_state_t state;        // 1
 
-  u64 bytes[VCDP_FLOW_F_B_N];   // 16
-  u32 pkts[VCDP_FLOW_F_B_N];    // 8
-  f64 created;                  // 8
-  /* Last heard timer */
-  f64 last_heard;               // 8
+  /* Second cache line (64 bytes) */
+  // CLIB_CACHE_LINE_ALIGN_MARK(cache1);
 
-  session_version_t session_version;    // 2
-  u16 tenant_idx;               // 2
-  u8 state; /* see vcdp_session_state_t */ // 1
-  u8 proto;                     // 1 TODO: Needed? Could use protocol from key instead
-  u8 type; /* see vcdp_session_type_t */ // 1
-  u8 key_flags;                 // vcdp_session_key_flag_t
-} vcdp_session_t;               /* TODO: optimise mem layout */
-//_Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
+  // Slow-path fields
+  vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 80
+  u64 session_id;
+  u32 created;                       // 4
+  u8 proto;                          // 1
+  vcdp_session_type_t type;          // 1
+  u8 key_flags;                      // 1
+} vcdp_session_t;
+
+//char (*__compile_time_check)[sizeof(vcdp_session_t)] = 1;  // This will show actual size
+// char (*__compile_time_assert)[128] = 1;  // This will show expected size
+
+// _Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
 
 typedef struct {
   vcdp_session_t *sessions; /* fixed pool */

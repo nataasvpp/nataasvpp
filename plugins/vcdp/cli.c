@@ -439,8 +439,8 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip46_address, &src, &sport,
-                 unformat_ip_protocol, &proto, unformat_ip46_address, &dst, &dport)) {
+    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip46_address, &src, IP46_TYPE_ANY,&sport,
+                 unformat_ip_protocol, &proto, unformat_ip46_address, &dst, IP46_TYPE_ANY, &dport)) {
       if (sport == 0 || sport > 65535) {
         error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
         goto done;

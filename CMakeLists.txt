@@ -63,4 +63,7 @@ set(CPACK_PACKAGE_CONTACT "otroan@employees.org")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Ole Troan")
 include(CPack)
 
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 include_directories(${CMAKE_BINARY_DIR}/plugins)

@@ -26,7 +26,7 @@ typedef struct {
   u32 lru_head_index;
   /* index in global LRU list */
   u32 lru_index;
-  f64 last_lru_update;
+  u32 last_lru_update;
   vcdp_timeout_type_t type;
 } vcdp_session_timer_t;
 

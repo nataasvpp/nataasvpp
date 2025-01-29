@@ -43,8 +43,8 @@ format_vcdp_session_key(u8 *s, va_list *args)
 {
   vcdp_session_key_t *key = va_arg(*args, vcdp_session_key_t *);
   u32 context_id = key->context_id;
-  s = format(s, "%d: %U: %U:%d %U:%d", context_id, format_ip_protocol, key->proto, format_ip46_address, &key->src,
-             clib_net_to_host_u16(key->sport), format_ip46_address, &key->dst, clib_net_to_host_u16(key->dport));
+  s = format(s, "%d: %U: %U:%d %U:%d", context_id, format_ip_protocol, key->proto, format_ip46_address, &key->src, IP46_TYPE_ANY,
+             clib_net_to_host_u16(key->sport), format_ip46_address, &key->dst, IP46_TYPE_ANY, clib_net_to_host_u16(key->dport));
   return s;
 }
 
