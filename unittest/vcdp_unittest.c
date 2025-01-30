@@ -172,7 +172,7 @@ vcdp_test_t test_functions[] = {
 };
 
 static void
-test_runner(u32 test_id)
+test_packets(u32 test_id)
 {
   vlib_main_t *vm = vlib_get_main();
   int no_tests = sizeof(test_functions) / sizeof(test_functions[0]);
@@ -309,7 +309,7 @@ test_vcdp_packets_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
     goto done;
   }
 
-  test_runner(test_id);
+  test_packets(test_id);
   clib_warning("Test finished");
   return 0;
 

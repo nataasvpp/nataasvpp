@@ -10,12 +10,6 @@
 
 #undef BIHASH_TYPE
 #undef __included_bihash_template_h__
-#include <vppinfra/bihash_16_8.h>
-#include <vppinfra/bihash_template.h>
-#include <vppinfra/bihash_template.c>
-
-#undef BIHASH_TYPE
-#undef __included_bihash_template_h__
 #include <vppinfra/bihash_40_8.h>
 #include <vppinfra/bihash_template.h>
 #include <vppinfra/bihash_template.c>
@@ -245,12 +239,6 @@ vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeouts[])
 #undef _
 
   return 0;
-}
-
-int
-vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add)
-{
-  return clib_bihash_add_del_inline_with_hash_16_8(h, kv, hash, is_add, 0, 0, 0, 0);
 }
 
 // TODO: Change to sparse vector or something more lightweight than bihash

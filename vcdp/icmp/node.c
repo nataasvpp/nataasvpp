@@ -14,7 +14,6 @@
 #include <vnet/pg/pg.h>
 #include <vnet/ethernet/ethernet.h>
 #include <vppinfra/error.h>
-#include <vppinfra/bihash_16_8.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>

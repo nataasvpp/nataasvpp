@@ -22,11 +22,10 @@ vcdp_header_offset(void *start, void *end, int header_size)
 }
 
 static inline void
-vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_key_t *skey,
-                 u64 *h)
+vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_key_t *skey)
 {
   ip4_header_t *ip = vcdp_get_ip4_header(b);
-  udp_header_t *udp = (udp_header_t *) (ip+1);
+  udp_header_t *udp = (udp_header_t *) (ip + 1);
   b->flags |= VNET_BUFFER_F_L4_HDR_OFFSET_VALID;
   vnet_buffer(b)->l4_hdr_offset = (u8 *) udp - b->data;
 
@@ -52,27 +51,24 @@ vcdp_calc_key_v4(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e looku
     break;
   case VCDP_LOOKUP_MODE_3TUPLE:
     skey->sport = 0;
-    skey->src = (ip46_address_t) {0};
+    skey->src = (ip46_address_t){0};
     break;
   case VCDP_LOOKUP_MODE_1TUPLE:
     skey->sport = 0;
     skey->dport = 0;
     skey->proto = 0;
-    skey->src = (ip46_address_t) {0};
+    skey->src = (ip46_address_t){0};
     break;
   default:
     ASSERT(0);
   }
-  /* calculate hash */
-  h[0] = clib_bihash_hash_16_8((clib_bihash_kv_16_8_t *) (skey));
 }
 
 static inline void
-vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_key_t *skey,
-                 u64 *h)
+vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e lookup_mode, vcdp_session_key_t *skey)
 {
   ip6_header_t *ip = vcdp_get_ip6_header(b);
-  udp_header_t *udp = (udp_header_t *) (ip+1);
+  udp_header_t *udp = (udp_header_t *) (ip + 1);
   b->flags |= VNET_BUFFER_F_L4_HDR_OFFSET_VALID;
   vnet_buffer(b)->l4_hdr_offset = (u8 *) udp - b->data;
 
@@ -112,20 +108,21 @@ vcdp_calc_key_v6(vlib_buffer_t *b, u32 context_id, enum vcdp_lookup_mode_e looku
   default:
     ASSERT(0);
   }
-
-  /* calculate hash */
-  h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (skey));
 }
 
 static inline void
-vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *skey, u64 *h, bool is_ip6,
+vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *k, u64 *h, bool is_ip6,
               enum vcdp_lookup_mode_e lookup_mode)
 {
   if (is_ip6) {
-    return vcdp_calc_key_v6(b, context_id, lookup_mode, skey, h);
+    vcdp_calc_key_v6(b, context_id, lookup_mode, k);
+
   } else {
-    return vcdp_calc_key_v4(b, context_id, lookup_mode, skey, h);
+    vcdp_calc_key_v4(b, context_id, lookup_mode, k);
   }
+  /* calculate hash */
+  h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
+  clib_warning("Looking up session key %U (hash %llx) size: %d", format_vcdp_session_key, k, *h, sizeof(*k));
 }
 
 /*
@@ -203,7 +200,6 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *k, u64 
     k->proto = ip->protocol;
     k->context_id = context_id;
 
-
     if (ip->protocol == IP_PROTOCOL_TCP || ip->protocol == IP_PROTOCOL_UDP) {
       udp = (udp_header_t *) (ip + 1);
       offset = vcdp_header_offset(ip, udp, sizeof(*udp));
@@ -246,9 +242,9 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *k, u64 
       k->sport = k->dport = 0;
     }
   }
-      /* calculate hash */
-    h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
-
+  /* calculate hash */
+  h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
+  clib_warning("Calculating session key %U (hash %llx) size: %d", format_vcdp_session_key, k, *h, sizeof(*k));
   if (offset > b->current_length) {
     return -3;
   }

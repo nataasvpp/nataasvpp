@@ -6,7 +6,6 @@
 #include <vnet/pg/pg.h>
 #include <vnet/ethernet/ethernet.h>
 #include <vppinfra/error.h>
-#include <vppinfra/bihash_16_8.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
 #include <vcdp/vcdp_funcs.h>
@@ -60,7 +59,7 @@ vcdp_lookup_with_hash(u64 hash, vcdp_session_key_t *k, u64 *v)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   clib_bihash_kv_40_8_t kv;
-  clib_memcpy_fast(&kv, &k, 40);
+  clib_memcpy_fast(&kv, k, 40);
   kv.value = 0;
   if (clib_bihash_search_inline_with_hash_40_8(&vcdp->session_hash, hash, &kv) == 0) {
     *v = kv.value;
@@ -380,9 +379,7 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
   vcdp_lookup_trace_t *t = va_arg(*args, vcdp_lookup_trace_t *);
   u32 indent = format_get_indent(s);
 
-  if (t->error)
-    s = format(s, "error: %u", t->error);
-  else if (t->next_index == ~0)
+  if (t->next_index == ~0)
     s = format(s, "handoff: %u", t->remote_worker);
   else {
     if (t->hit)
@@ -390,10 +387,11 @@ format_vcdp_lookup_trace(u8 *s, va_list *args)
     else
       s = format(s, "missed session:");
   }
-  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u  key 0x%U %U", format_white_space, indent, t->sw_if_index,
-             t->hash, t->flow_id, format_hex_bytes_no_wrap, (u8 *) &t->k4, sizeof(t->k4), format_vcdp_session_key,
-             &t->k4);
+  s = format(s, "\n%Urx ifindex %d, hash 0x%x flow-id %u", format_white_space, indent, t->sw_if_index, t->hash,
+             t->flow_id);
+  s = format(s, "\n%Ukey: %U", format_white_space, indent, format_vcdp_session_key, &t->k4);
   s = format(s, "\n%Uservice chain: %U", format_white_space, indent, format_vcdp_bitmap, t->service_bitmap);
+  s = format(s, "\n%Uerror: %u", format_white_space, indent, t->error);
   return s;
 }
 

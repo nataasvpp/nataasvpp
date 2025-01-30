@@ -6,9 +6,9 @@
 #include <vnet/pg/pg.h>
 #include <vnet/ethernet/ethernet.h>
 #include <vppinfra/error.h>
-#include <vppinfra/bihash_16_8.h>
 #include <vcdp/common.h>
 #include <vcdp/service.h>
+#include <vppinfra/bihash_40_8.h>
 #include <vcdp/vcdp_funcs.h>
 #include <vcdp/lookup/lookup_inlines.h>
 #include <vcdp/vcdp.api_enum.h>
@@ -29,6 +29,7 @@ vcdp_session_add_del_key(vcdp_session_key_t *k, int is_add, u64 value, u64 *h)
   clib_memcpy(&kv.key, k, 40);
   kv.value = value;
   *h = clib_bihash_hash_40_8(&kv);
+  clib_warning("Adding session key %U (hash %llx) size: %d", format_vcdp_session_key, k, *h, sizeof(*k));
   return clib_bihash_add_del_with_hash_40_8(&vcdp->session_hash, &kv, *h, is_add);
 }
 

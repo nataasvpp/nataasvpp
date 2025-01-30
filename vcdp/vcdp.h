@@ -12,7 +12,6 @@
 #include <vppinfra/error.h>
 #include <vppinfra/elog.h>
 
-#include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_8_8.h>
 #include <vppinfra/bihash_40_8.h>
 
@@ -287,7 +286,6 @@ clib_error_t *vcdp_set_services(vcdp_main_t *vcdp, u32 tenant_id, u32 bitmap, vl
 clib_error_t *vcdp_set_timeout(vcdp_main_t *vcdp, u32 timeouts[]);
 
 u32 vcdp_table_format_insert_session(table_t *t, u32 n, u32 session_index, vcdp_session_t *session, u32 tenant_id, f64 now);
-int vcdp_bihash_add_del_inline_with_hash_16_8(clib_bihash_16_8_t *h, clib_bihash_kv_16_8_t *kv, u64 hash, u8 is_add);
 u32 vcdp_calc_bihash_buckets (u32 n_elts);
 u16 vcdp_tenant_idx_by_id(u32 tenant_id);
 vcdp_session_t *vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_key_t *secondary,

@@ -10,7 +10,7 @@ common_flags =-g -fstack-protector -fno-common -Wall -Werror
 debug_flags = -O0 $(common_flags) -DCLIB_DEBUG
 release_flags =-O3 $(common_flags)
 
-CFLAGS += -I./_build/debug/plugins
+CFLAGS += -I./_build/debug
 
 define configure
 	@mkdir -p $($(1)_build_dir)
@@ -62,7 +62,7 @@ clean:
 	@rm -rf $(build_dir)
 
 fixstyle:
-	@for i in plugins/*/*.[ch] plugins/*/*/*.[ch] ; do clang-format -i $$i; done
+	@for i in */*.[ch] */*/*.[ch] ; do clang-format -i $$i; done
 
 .PHONY: compdb
 compdb:
@@ -93,4 +93,3 @@ help:
 	@echo ""
 	@echo "Make Arguments:"
 	@echo " VPP_DIR=<path>       - path to VPP directory"
-

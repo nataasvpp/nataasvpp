@@ -8,6 +8,7 @@
 #include <vcdp/vcdp.h>
 #include <vnet/ip/ip46_address.h>
 #include <vcdp_services/nat/nat_counter.json.h>
+#include <vppinfra/bihash_16_8.h>
 
 #define NAT_INVALID_TENANT_IDX  (u16)(~0)
 
