@@ -47,11 +47,5 @@
     "cmake.configureSettings": {
         "CMAKE_PREFIX_PATH": "${workspaceRoot}/../vpp/build-root/install-vpp_debug-native/vpp",
     },
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": true,
-    "[python]": {
-        "editor.defaultFormatter": null
-    },
-    "python.formatting.provider": "none",
     "workbench.colorTheme": "Default Dark Modern",
 }

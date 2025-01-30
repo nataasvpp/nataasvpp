@@ -80,8 +80,6 @@ nat_rewrites(u32 instructions, u32 oldaddr, u32 newaddr, u16 oldport, u16 newpor
   // l4_sum_delta = ip_csum_fold(l4_sum_delta);
   // if (l4_sum_delta == 0xffff)
   //   l4_sum_delta = 0;
-  clib_warning("oldaddr: %U:%d newaddr: %U:%d", format_ip4_address, &oldaddr, ntohs(oldport), format_ip4_address,
-               &newaddr, ntohs(newport));
 
   // old_fib_index = vec_elt(fib_index_by_sw_if_index, vnet_buffer(b[0])->sw_if_index[VLIB_RX]);
   nat_session->version = version;
@@ -105,7 +103,6 @@ nat_rewrites(u32 instructions, u32 oldaddr, u32 newaddr, u16 oldport, u16 newpor
     nat_session->rewrite.fib_index = new_fib_index;
 
   // nat_session->rewrite.proto = proto;
-  clib_warning("l3_sum_delta: %x l4_sum_delta: %x", l3_sum_delta, l4_sum_delta);
   nat_session->l3_csum_delta = l3_sum_delta;
   nat_session->l4_csum_delta = l4_sum_delta;
 }
@@ -159,7 +156,6 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
     return -1;
   }
-
   vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_RETRIES], thread_index, nat_idx,
                                 n_retries);
   vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_EXPIRED], thread_index, nat_idx,

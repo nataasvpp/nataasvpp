@@ -25,7 +25,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
 #if VCDP_DEBUG > 0
   bool checksum_valid = true;
   if (ip4->checksum != ip4_header_checksum(ip4)) {
-    clib_warning("Checksum generation error in PRE NAT %U", format_ip4_header, ip4, 32);
+    vcdp_log_error("Checksum generation error in PRE NAT %U", format_ip4_header, ip4, 32);
     checksum_valid = false;
   }
 #endif
@@ -48,7 +48,6 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
     tcp_sum = tcp->checksum;
     tcp_sum = ip_csum_sub_even(tcp_sum, rewrite->l4_csum_delta);
     tcp_sum = ip_csum_fold(tcp_sum);
-    clib_warning("TCP checksum: %x %x delta: %x", tcp_sum, tcp->checksum, rewrite->l4_csum_delta);
     tcp->checksum = tcp_sum;
     if (tcp->checksum == 0xffff)
       tcp->checksum = 0;
@@ -93,7 +92,7 @@ nat_rewrite(ip4_header_t *ip4, nat_rewrite_data_t *rewrite)
   }
 #if VCDP_DEBUG > 0
   if (checksum_valid && (ip4->checksum != ip4_header_checksum(ip4))) {
-    clib_warning("Checksum generation error in NAT %U", format_ip4_header, ip4, sizeof(*ip4));
+    vcdp_log_error("Checksum generation error in NAT %U", format_ip4_header, ip4, sizeof(*ip4));
   }
 #endif
 }

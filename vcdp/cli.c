@@ -269,7 +269,7 @@ vcdp_show_interface_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   vcdp_main_t *vcdp = &vcdp_main;
   gw_main_t *gm = &gateway_main;
   u32 sw_if_index;
-  u32 inside_tenant_id, outside_tenant_id = ~0;
+  u32 inside_tenant_id, outside_tenant_id;
   vec_foreach_index (sw_if_index, gm->tenant_idx_by_sw_if_idx[VLIB_RX]) {
     // vcdp_tenant_t *tenant = vcdp_tenant_at_index(vcdp, tenant_idx);
     if (sw_if_index == ~0)
@@ -278,8 +278,8 @@ vcdp_show_interface_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
     if (config[0] == 0xFFFF)
       continue;
     inside_tenant_id = vcdp_tenant_at_index(vcdp, config[0])->tenant_id;
-
-    if (sw_if_index <= vec_len(gm->tenant_idx_by_sw_if_idx[VLIB_TX])) {
+    outside_tenant_id = ~0;
+    if (sw_if_index < vec_len(gm->tenant_idx_by_sw_if_idx[VLIB_TX])) {
       config = vec_elt_at_index(gm->tenant_idx_by_sw_if_idx[VLIB_TX], sw_if_index);
       if (config[0] != 0xFFFF)
         outside_tenant_id = vcdp_tenant_at_index(vcdp, config[0])->tenant_id;
@@ -287,7 +287,6 @@ vcdp_show_interface_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
 
     vlib_cli_output(vm, "%U: tenant: rx %d tx: %d", format_vnet_sw_if_index_name, vnet_get_main(),
                     sw_if_index, inside_tenant_id, outside_tenant_id);
-
   }
 
   return 0;
@@ -340,6 +339,36 @@ vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vli
 
   return err;
 }
+  // vlib_simple_counter_main_t tenant_simple_ctr[VCDP_TENANT_COUNTER_N_SIMPLE];
+  // vlib_combined_counter_main_t tenant_combined_ctr[VCDP_TENANT_COUNTER_N_COMBINED];
+
+static clib_error_t *
+vcdp_tenant_show_stats_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  clib_error_t *err = 0;
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 tenant_idx;
+  pool_foreach_index (tenant_idx, vcdp->tenants) {
+    vlib_cli_output(vm, "%d:", vcdp->tenants[tenant_idx].tenant_id);
+#define _(NAME, VALUE, STR)                                                                                            \
+  vlib_cli_output(vm, "\t%s: %lu", STR, vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VALUE], tenant_idx));
+    foreach_vcdp_tenant_simple_counter
+#undef _
+      vlib_counter_t counter;
+#define _(NAME, VALUE, STR)                                                                                            \
+  vlib_get_combined_counter(&vcdp->tenant_combined_ctr[VALUE], tenant_idx, &counter);                                        \
+  vlib_cli_output(vm, "\t%s: %lu packets, %lu bytes", STR, counter.packets, counter.bytes);
+    foreach_vcdp_tenant_combined_counter
+#undef _
+  }
+  return err;
+}
+
+VLIB_CLI_COMMAND(show_vcdp_tenant_stats_command, static) = {
+  .path = "show vcdp tenant statistics",
+  .short_help = "show vcdp tenant statistics",
+  .function = vcdp_tenant_show_stats_command_fn,
+};
 
 VLIB_CLI_COMMAND(vcdp_tenant_add_del_command, static) = {
   .path = "set vcdp tenant",

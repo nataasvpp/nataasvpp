@@ -141,6 +141,7 @@ typedef struct {
   u16 msg_id_base;
 
   /* Per instance counters */
+  /* A separate 2d counter vector per counter that is indexed by thead and instance.*/
   clib_spinlock_t counter_lock;
   vlib_simple_counter_main_t simple_counters[VCDP_NAT_COUNTER_N_SIMPLE];
   vlib_combined_counter_main_t combined_counters[VCDP_NAT_COUNTER_N_COMBINED];

@@ -61,9 +61,15 @@ class Counter(BaseModel):
         s = f'// {self.description}\n'
         s += 'typedef enum {\n'
         for name in self.counter:
-            s += f'  {enum_element(prefix, name)},\n'
+            s += f'  {enum_element(prefix, name)} = {self.counter.index(name)},\n'
         s += f'  {prefix}N_{self.type.upper()}\n'
         s += f'}} {enum_name};\n'
+        s += '\n'
+        s += f'#define foreach_{basename}_{self.type}_counter\\\n'
+        for name in self.counter:
+            s += f'  _({enum_element(prefix, name)}, {self.counter.index(name)}, "{name}")\\\n'
+        s = s.rstrip('\\\n') + '\n\n'
+        s += '\n'
 
         # Prototypes
         s += f'void {basename}_init_counters_{self.type}(vlib_{self.type}_counter_main_t *cm);\n'
@@ -149,6 +155,7 @@ class CountersModel(BaseModel):
         s = '/* SPDX-License-Identifier: Apache-2.0 */\n'
         s += '/* Auto-generated do not change. */\n'
         s += f'#ifndef included_{header_name}_h\n'
+        s += '#include <vlib/counter.h>\n'
         for counter in self.counters:
             s += counter.gen_headers()
         s += '#endif\n'

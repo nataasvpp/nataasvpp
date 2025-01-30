@@ -122,7 +122,6 @@ vcdp_calc_key(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *k, u64 *h, b
   }
   /* calculate hash */
   h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
-  clib_warning("Looking up session key %U (hash %llx) size: %d", format_vcdp_session_key, k, *h, sizeof(*k));
 }
 
 /*
@@ -244,7 +243,6 @@ vcdp_calc_key_slow(vlib_buffer_t *b, u32 context_id, vcdp_session_key_t *k, u64 
   }
   /* calculate hash */
   h[0] = clib_bihash_hash_40_8((clib_bihash_kv_40_8_t *) (k));
-  clib_warning("Calculating session key %U (hash %llx) size: %d", format_vcdp_session_key, k, *h, sizeof(*k));
   if (offset > b->current_length) {
     return -3;
   }
