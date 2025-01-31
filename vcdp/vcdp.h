@@ -126,7 +126,6 @@ STATIC_ASSERT_SIZEOF(vcdp_session_t, 256);
 // _Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
 
 typedef struct {
-  f64 current_time;
   u64 session_id_ctr;
   u64 session_id_template;
 

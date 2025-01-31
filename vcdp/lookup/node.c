@@ -84,7 +84,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   vcdp_session_t *session;
   u32 session_index;
@@ -103,7 +102,6 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
 
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;
-  ptd->current_time = now;
 
   // Calculate key and hash
   while (n_left) {
@@ -305,14 +303,12 @@ VLIB_NODE_FN(vcdp_handoff_node)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   vlib_buffer_t *bufs[VLIB_FRAME_SIZE], **b;
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
   u16 next_indices[VLIB_FRAME_SIZE], *current_next;
   f64 now = vlib_time_now(vm);
 
-  ptd->current_time = now;
 
   vlib_get_buffers(vm, from, bufs, n_left);
   b = bufs;

@@ -70,7 +70,6 @@ format_vcdp_session_detail(u8 *s, va_list *args)
 
   f64 remaining_time = vcdp_session_remaining_time(session, now);
   u64 session_net = clib_host_to_net_u64(session->session_id);
-  // uword thread_index = ptd - vcdp_main.per_thread_data;
   vcdp_session_key_t *skey;
 
   /* TODO: deal with secondary keys */

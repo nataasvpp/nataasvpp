@@ -120,6 +120,7 @@ add_vpp_plugin(vcdp
   vcdp_services/tcp-check-lite/node.c
   vcdp_services/tcp-check-lite/tcp_check_lite.c
 
+  vcdp_services/l4-lifecycle/api.c
   vcdp_services/l4-lifecycle/node.c
 
   vcdp_services/nat/nat.c

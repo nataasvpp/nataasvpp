@@ -148,13 +148,7 @@ vl_api_vcdp_session_lookup_t_handler(vl_api_vcdp_session_lookup_t *mp)
   vl_api_vcdp_session_lookup_reply_t *rmp;
   int rv = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-  // vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
-  // uword thread_index;
-  // uword session_index;
-
-  // vcdp_tenant_t *tenant;
-  // u32 tenant_id;
   f64 now = vlib_time_now(vlib_get_main());
 
   // Lookup session in the flow table

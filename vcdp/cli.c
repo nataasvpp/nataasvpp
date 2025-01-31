@@ -152,8 +152,6 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     return err;
 
   if (session_idx != ~0) {
-    if (thread_index == ~0 || thread_index >= vec_len(vcdp->per_thread_data))
-      return clib_error_return(0, "Thread index not set");
     vcdp_session_t *session = vcdp_session_at_index_check(vcdp, session_idx);
     if (session)
       vlib_cli_output(vm, "%U", format_vcdp_session_detail, vcdp, session_idx, now);
@@ -173,43 +171,39 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     return err;
   }
 
-  vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    if (vec_len(vcdp->per_thread_data) > 1)
-      vlib_cli_output(vm, "Thread #%d:", thread_index);
-    vlib_cli_output(vm, "session id         tenant  index  type proto        state TTL(s)");
-    pool_foreach (session, vcdp->sessions) {
-      tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
-      if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
-        continue;
+  vlib_cli_output(vm, "session id         tenant  index  type proto        state TTL(s)");
+  pool_foreach (session, vcdp->sessions) {
+    tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
+    if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
+      continue;
 
-      f64 remaining_time = vcdp_session_remaining_time(session, now);
-      if (remaining_time <= 0 && session->state != VCDP_SESSION_STATE_STATIC)
-        continue;
+    f64 remaining_time = vcdp_session_remaining_time(session, now);
+    if (remaining_time <= 0 && session->state != VCDP_SESSION_STATE_STATIC)
+      continue;
+    // if (session->state == VCDP_SESSION_STATE_STATIC)
+    //   remaining_time = 0;
+
+    u64 session_net = clib_host_to_net_u64(session->session_id);
+    if (detail) {
+      vlib_cli_output(vm, "%U\n", format_vcdp_session_detail, vcdp, session - vcdp->sessions, now);
+    } else {
       // if (session->state == VCDP_SESSION_STATE_STATIC)
-      //   remaining_time = 0;
+      //   vlib_cli_output(vm, "0x%U %6d %6d %5U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
+      //                   tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
+      //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
 
-      u64 session_net = clib_host_to_net_u64(session->session_id);
-      if (detail) {
-        vlib_cli_output(vm, "%U\n", format_vcdp_session_detail, vcdp, session - vcdp->sessions, now);
-      } else {
-        // if (session->state == VCDP_SESSION_STATE_STATIC)
-        //   vlib_cli_output(vm, "0x%U %6d %6d %5U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
-        //                   tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
-        //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
+      u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
+      s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
+                 tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
+                 format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
+                 format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
 
-        u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
-        s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
-                   tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
-                   format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
-                   format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
+      if (session->keys[VCDP_SESSION_KEY_SECONDARY].dst.ip4.as_u32 ||
+          session->keys[VCDP_SESSION_KEY_SECONDARY].src.ip4.as_u32)
+        s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
-        if (session->keys[VCDP_SESSION_KEY_SECONDARY].dst.ip4.as_u32 ||
-            session->keys[VCDP_SESSION_KEY_SECONDARY].src.ip4.as_u32)
-          s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
-
-        vlib_cli_output(vm, "%v", s);
-        vec_reset_length(s);
-      }
+      vlib_cli_output(vm, "%v", s);
+      vec_reset_length(s);
     }
   }
   return err;
@@ -219,8 +213,6 @@ static clib_error_t *
 vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  u32 thread_index;
-  // u32 n_threads = vlib_num_workers();
 
   vlib_cli_output(vm, "Configuration:");
   vlib_cli_output(vm, "Max Tenants: %d", vcdp_cfg_main.no_tenants);
@@ -236,10 +228,7 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
   foreach_vcdp_timeout
 #undef _
 
-    vec_foreach_index (thread_index, vcdp->per_thread_data)
-  {
-    vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(vcdp->sessions));
-  }
+  vlib_cli_output(vm, "Active sessions: %d",  pool_elts(vcdp->sessions));
   u32 tenant_idx;
   pool_foreach_index (tenant_idx, vcdp->tenants) {
     vlib_cli_output(vm, "%d: %U", vcdp->tenants[tenant_idx].tenant_id, format_vcdp_tenant_stats, vcdp, tenant_idx);
@@ -521,8 +510,8 @@ vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
       vlib_cli_output(vm, "Head index: %d", ptd->lru_head_index[i]);
       dlist_elt_t *lru_entry = pool_elt_at_index(ptd->lru_pool, ptd->lru_head_index[i]);
       while (lru_entry) {
-        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, vcdp, lru_entry->next, lru_entry->prev,
-                        lru_entry->value);
+        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, vcdp, lru_entry->next,
+                        lru_entry->prev, lru_entry->value);
         if (lru_entry->next == ~0 || lru_entry->next == ptd->lru_head_index[i])
           break;
         lru_entry = pool_elt_at_index(ptd->lru_pool, lru_entry->next);

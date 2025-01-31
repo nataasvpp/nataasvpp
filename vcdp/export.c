@@ -139,43 +139,22 @@ vcdp_sessions_serialize(unsigned char **buffer, u32 *no_sessions)
 {
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_session_t *session;
-  // vcdp_tenant_t *tenant;
-  u32 thread_index = ~0;
-  // u32 tenant_id = ~0;
   cbor_item_t *spt;
-  cbor_item_t *root = cbor_new_definite_map(vec_len(vcdp->per_thread_data));
   *no_sessions = 0;
 
-  vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    clib_warning("thread_index %d session elements: %d", thread_index, pool_elts(vcdp->sessions));
-    *no_sessions += pool_elts(vcdp->sessions);
-    spt = cbor_new_definite_array(pool_elts(vcdp->sessions));
-
-    pool_foreach (session, vcdp->sessions) {
-      // tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
-      // if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
-      //   continue;
-      if (!cbor_array_push(spt, vcdp_session_to_cbor(session))) {
-        cbor_decref(&spt);
-        cbor_decref(&root);
-        return 0;
-      }
-    }
-    struct cbor_pair pair;
-    pair.key = cbor_move(cbor_build_uint32(thread_index));
-    pair.value = cbor_move(spt);
-    if (!cbor_map_add(root, pair)) {
-      cbor_decref(&root);
+  spt = cbor_new_definite_array(pool_elts(vcdp->sessions));
+  pool_foreach (session, vcdp->sessions) {
+    if (!cbor_array_push(spt, vcdp_session_to_cbor(session))) {
+      cbor_decref(&spt);
       return 0;
     }
   }
 
   // Encode the CBOR array into a byte buffer
-  size_t buffer_size, length = cbor_serialize_alloc(root, buffer, &buffer_size);
-
-  cbor_decref(&root);
-  if (root) {
-    clib_warning("Dangling reference somwhere %d", cbor_refcount(root));
+  size_t buffer_size, length = cbor_serialize_alloc(spt, buffer, &buffer_size);
+  cbor_decref(&spt);
+  if (spt) {
+    clib_warning("Dangling reference somwhere %d", cbor_refcount(spt));
   }
   return length;
 }
