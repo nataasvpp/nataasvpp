@@ -201,6 +201,8 @@ format_function_t format_vcdp_session_key;
 format_function_t format_vcdp_session_ip4_key;
 format_function_t format_vcdp_session_ip6_key;
 format_function_t format_vcdp_bitmap;
+format_function_t format_vcdp_tenant_stats;
+
 unformat_function_t unformat_vcdp_service;
 unformat_function_t unformat_vcdp_service_bitmap;
 

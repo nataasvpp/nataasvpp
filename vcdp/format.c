@@ -192,3 +192,23 @@ unformat_vcdp_service_bitmap(unformat_input_t *input, va_list *args)
   }
   return 0;
 }
+
+u8 *
+format_vcdp_tenant_stats(u8 *s, va_list *args)
+{
+  vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
+  u32 tenant_idx = va_arg(*args, u32);
+#define _(NAME, VALUE, STR)                                                                                            \
+  s = format(s, "\t%s: %lu", STR, vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VALUE], tenant_idx));
+  foreach_vcdp_tenant_simple_counter
+#undef _
+    vlib_counter_t counter;
+#define _(NAME, VALUE, STR)                                                                                            \
+  vlib_get_combined_counter(&vcdp->tenant_combined_ctr[VALUE], tenant_idx, &counter);                                  \
+  s = format(s, "\t%s: %lu packets, %lu bytes", STR, counter.packets, counter.bytes);
+  foreach_vcdp_tenant_combined_counter
+#undef _
+
+  return s;
+}
+

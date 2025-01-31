@@ -105,16 +105,7 @@ vcdp_nat_show_stats_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
   u32 nat_idx;
   pool_foreach_index (nat_idx, nat->instances) {
     vlib_cli_output(vm, "%s:", nat->instances[nat_idx].nat_id);
-#define _(NAME, VALUE, STR)                                                                                            \
-  vlib_cli_output(vm, "\t%s: %lu", STR, vlib_get_simple_counter(&nat->simple_counters[VALUE], nat_idx));
-    foreach_vcdp_nat_simple_counter
-#undef _
-      vlib_counter_t counter;
-#define _(NAME, VALUE, STR)                                                                                            \
-  vlib_get_combined_counter(&nat->combined_counters[VALUE], nat_idx, &counter);                                        \
-  vlib_cli_output(vm, "\t%s: %lu packets, %lu bytes", STR, counter.packets, counter.bytes);
-    foreach_vcdp_nat_combined_counter
-#undef _
+    vlib_cli_output(vm, "%U", format_vcdp_nat_stats, nat, nat_idx);
   }
   return err;
 }

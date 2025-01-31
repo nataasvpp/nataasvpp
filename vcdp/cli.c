@@ -88,15 +88,13 @@ vcdp_set_timeout_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-   u32 timeouts[VCDP_N_TIMEOUT] = {0};
+  u32 timeouts[VCDP_N_TIMEOUT] = {0};
   if (!unformat_user(input, unformat_line_input, line_input))
     return 0;
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
     if (0)
       ;
-#define _(x, y, z) \
-  else if (unformat(line_input, z " %d", &timeouts[VCDP_TIMEOUT_##x])) \
-    ;
+#define _(x, y, z) else if (unformat(line_input, z " %d", &timeouts[VCDP_TIMEOUT_##x]));
     foreach_vcdp_timeout
 #undef _
       else
@@ -205,11 +203,12 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
 
         u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
         s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
-                       tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
-                       format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
-                       format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
+                   tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                   format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
+                   format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
 
-        if (session->keys[VCDP_SESSION_KEY_SECONDARY].dst.ip4.as_u32 || session->keys[VCDP_SESSION_KEY_SECONDARY].src.ip4.as_u32)
+        if (session->keys[VCDP_SESSION_KEY_SECONDARY].dst.ip4.as_u32 ||
+            session->keys[VCDP_SESSION_KEY_SECONDARY].src.ip4.as_u32)
           s = format(s, " %U", format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_SECONDARY]);
 
         vlib_cli_output(vm, "%v", s);
@@ -238,26 +237,18 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
   vlib_cli_output(vm, "Active tenants: %d", pool_elts(vcdp->tenants));
   vlib_cli_output(vm, "Timers:");
 
-#define _(x, y, z)                                                                                                     \
-  vlib_cli_output(vm, "  " z ": %d", vcdp->timeouts[VCDP_TIMEOUT_##x]);
+#define _(x, y, z) vlib_cli_output(vm, "  " z ": %d", vcdp->timeouts[VCDP_TIMEOUT_##x]);
   foreach_vcdp_timeout
 #undef _
 
-    vec_foreach_index (thread_index, vcdp->per_thread_data) {
+    vec_foreach_index (thread_index, vcdp->per_thread_data)
+  {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
   }
-  vcdp_tenant_t *tenant;
-  pool_foreach(tenant, vcdp->tenants) {
-    u32 idx = vcdp->tenants - tenant;
-
-    if (idx >= vlib_simple_counter_n_counters(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED]))
-      break;
-
-    counter_t created = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], idx);
-    counter_t removed = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REMOVED], idx);
-    counter_t reused = vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_REUSED], idx);
-    vlib_cli_output(vm, "Tenant: %d created %ld expired %ld reused %ld", idx, created, removed, reused);
+  u32 tenant_idx;
+  pool_foreach_index (tenant_idx, vcdp->tenants) {
+    vlib_cli_output(vm, "%d: %U", vcdp->tenants[tenant_idx].tenant_id, format_vcdp_tenant_stats, vcdp, tenant_idx);
   }
 
   return 0;
@@ -285,10 +276,9 @@ vcdp_show_interface_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cl
         outside_tenant_id = vcdp_tenant_at_index(vcdp, config[0])->tenant_id;
     }
 
-    vlib_cli_output(vm, "%U: tenant: rx %d tx: %d", format_vnet_sw_if_index_name, vnet_get_main(),
-                    sw_if_index, inside_tenant_id, outside_tenant_id);
+    vlib_cli_output(vm, "%U: tenant: rx %d tx: %d", format_vnet_sw_if_index_name, vnet_get_main(), sw_if_index,
+                    inside_tenant_id, outside_tenant_id);
   }
-
   return 0;
 }
 
@@ -339,8 +329,6 @@ vcdp_show_tenant_detail_command_fn(vlib_main_t *vm, unformat_input_t *input, vli
 
   return err;
 }
-  // vlib_simple_counter_main_t tenant_simple_ctr[VCDP_TENANT_COUNTER_N_SIMPLE];
-  // vlib_combined_counter_main_t tenant_combined_ctr[VCDP_TENANT_COUNTER_N_COMBINED];
 
 static clib_error_t *
 vcdp_tenant_show_stats_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
@@ -349,17 +337,7 @@ vcdp_tenant_show_stats_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib
   vcdp_main_t *vcdp = &vcdp_main;
   u32 tenant_idx;
   pool_foreach_index (tenant_idx, vcdp->tenants) {
-    vlib_cli_output(vm, "%d:", vcdp->tenants[tenant_idx].tenant_id);
-#define _(NAME, VALUE, STR)                                                                                            \
-  vlib_cli_output(vm, "\t%s: %lu", STR, vlib_get_simple_counter(&vcdp->tenant_simple_ctr[VALUE], tenant_idx));
-    foreach_vcdp_tenant_simple_counter
-#undef _
-      vlib_counter_t counter;
-#define _(NAME, VALUE, STR)                                                                                            \
-  vlib_get_combined_counter(&vcdp->tenant_combined_ctr[VALUE], tenant_idx, &counter);                                        \
-  vlib_cli_output(vm, "\t%s: %lu packets, %lu bytes", STR, counter.packets, counter.bytes);
-    foreach_vcdp_tenant_combined_counter
-#undef _
+    vlib_cli_output(vm, "%d: %U", vcdp->tenants[tenant_idx].tenant_id, format_vcdp_tenant_stats, vcdp, tenant_idx);
   }
   return err;
 }
@@ -469,7 +447,7 @@ set_vcdp_session_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_c
     return 0;
 
   while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
-    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip46_address, &src, IP46_TYPE_ANY,&sport,
+    if (unformat(line_input, "tenant %d %U:%d %U %U:%d", &tenant_id, unformat_ip46_address, &src, IP46_TYPE_ANY, &sport,
                  unformat_ip_protocol, &proto, unformat_ip46_address, &dst, IP46_TYPE_ANY, &dport)) {
       if (sport == 0 || sport > 65535) {
         error = clib_error_return(0, "invalid port `%U'", format_unformat_error, line_input);
@@ -549,8 +527,8 @@ vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
       vlib_cli_output(vm, "Head index: %d", ptd->lru_head_index[i]);
       dlist_elt_t *lru_entry = pool_elt_at_index(ptd->lru_pool, ptd->lru_head_index[i]);
       while (lru_entry) {
-        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, ptd,
-        lru_entry->next, lru_entry->prev, lru_entry->value);
+        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, ptd, lru_entry->next, lru_entry->prev,
+                        lru_entry->value);
         if (lru_entry->next == ~0 || lru_entry->next == ptd->lru_head_index[i])
           break;
         lru_entry = pool_elt_at_index(ptd->lru_pool, lru_entry->next);
@@ -559,7 +537,6 @@ vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
   }
   return 0;
 }
-
 
 VLIB_CLI_COMMAND(show_vcdp_lru, static) = {
   .path = "show vcdp lru",

@@ -162,6 +162,7 @@ extern nat_main_t nat_main;
 
 format_function_t format_vcdp_nat_rewrite;
 format_function_t format_vcdp_nat64_rewrite;
+format_function_t format_vcdp_nat_stats;
 u8 *format_vcdp_nat_service(u8 *s, u32 thread_index, u32 session_index);
 u8 *format_vcdp_nat64_service(u8 *s, u32 thread_index, u32 session_index);
 

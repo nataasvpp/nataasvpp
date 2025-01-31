@@ -105,3 +105,22 @@ format_vcdp_nat64_service(u8 *s, u32 thread_index, u32 session_index)
   s = format(s, "      reverse: %U\n", format_vcdp_nat64_rewrite, &nat_rewrite[1]);
   return s;
 }
+u8 *
+format_vcdp_nat_stats(u8 *s, va_list *args)
+{
+  nat_main_t *nat = va_arg(*args, nat_main_t *);
+  u32 nat_idx = va_arg(*args, u32);
+#define _(NAME, VALUE, STR)                                                                                            \
+  s = format(s, "\t%s: %lu", STR, vlib_get_simple_counter(&nat->simple_counters[VALUE], nat_idx));
+  foreach_vcdp_nat_simple_counter
+#undef _
+  s = format(s, "\n");
+  vlib_counter_t counter;
+#define _(NAME, VALUE, STR)                                                                                            \
+  vlib_get_combined_counter(&nat->combined_counters[VALUE], nat_idx, &counter);                                        \
+  s = format(s, "\t%s: %lu packets, %lu bytes", STR, counter.packets, counter.bytes);
+  foreach_vcdp_nat_combined_counter
+#undef _
+  return s;
+}
+
