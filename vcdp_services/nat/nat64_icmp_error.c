@@ -23,8 +23,7 @@ format_vcdp_nat64_icmp_error_trace(u8 *s, va_list *args)
   vcdp_nat64_icmp_error_trace_t *t = va_arg(*args, vcdp_nat64_icmp_error_trace_t *);
   nat_main_t *nm = &nat_main;
   u32 session_idx = vcdp_session_from_flow_index(t->flow_id);
-  nat_per_thread_data_t *ptd = vec_elt_at_index(nm->ptd, t->thread_index);
-  nat64_rewrite_data_t *  rewrites = vec_elt_at_index(ptd->flows64, session_idx << 1);
+  nat64_rewrite_data_t *  rewrites = vec_elt_at_index(nm->flows64, session_idx << 1);
 
   s = format(s, "vcdp-nat64-icmp-error: thread: %u flow-id %u (session %u, %s) rewrite #1: %U rewrite #2: %U\n",
              t->thread_index, t->flow_id, t->flow_id >> 1, t->flow_id & 0x1 ? "reverse" : "forward",
@@ -142,8 +141,6 @@ vcdp_nat64_icmp_error_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fr
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   vcdp_session_t *session;
   u32 session_idx;
   nat64_rewrite_data_t *nat_rewrites;
@@ -154,7 +151,7 @@ vcdp_nat64_icmp_error_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fr
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index_check(ptd, session_idx);
+    session = vcdp_session_at_index_check(vcdp, session_idx);
     if (!session) {
       b[0]->error = node->errors[VCDP_NAT_ICMP_ERROR_NO_SESSION];
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
@@ -162,7 +159,7 @@ vcdp_nat64_icmp_error_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_fr
 
       goto next;
     }
-    nat_rewrites = vec_elt_at_index(nptd->flows64, session_idx << 1);
+    nat_rewrites = vec_elt_at_index(nat->flows64, session_idx << 1);
 
     // Call fastpath process on outer and then on inner
     nat64_icmp_error_process_one(node, nat_rewrites, session, to_next, b);

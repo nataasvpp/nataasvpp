@@ -30,7 +30,6 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
   vcdp_main_t *vcdp = &vcdp_main;
 
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 *from = vlib_frame_vector_args(frame);
@@ -40,7 +39,7 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
 
   while (n_left) {
     u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    vcdp_session_t *session = vcdp_session_at_index(ptd, session_idx);
+    vcdp_session_t *session = vcdp_session_at_index(vcdp, session_idx);
     u8 direction = vcdp_direction_from_flow_index(b[0]->flow_id);
     /* TODO: prefetch, 4-loop, remove ifs and do state-transition-timer LUT?
      */
@@ -66,7 +65,7 @@ VLIB_NODE_FN(vcdp_l4_lifecycle_node)
       if (b[0]->flags & VLIB_BUFFER_IS_TRACED) {
         vcdp_l4_lifecycle_trace_t *t = vlib_add_trace(vm, node, b[0], sizeof(*t));
         u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-        vcdp_session_t *session = vcdp_session_at_index(ptd, session_idx);
+        vcdp_session_t *session = vcdp_session_at_index(vcdp, session_idx);
         u16 state = session->state;
         t->flow_id = b[0]->flow_id;
         t->new_state = state;

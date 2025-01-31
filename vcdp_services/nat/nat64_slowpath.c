@@ -24,10 +24,9 @@ format_vcdp_nat64_slowpath_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_nat64_slowpath_trace_t *t = va_arg(*args, vcdp_nat64_slowpath_trace_t *);
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, t->thread_index);
   if (t->flow_id == ~0)
     return format(s, "vcdp-nat64-slowpath: drop");
-  vcdp_session_t *session = &ptd->sessions[t->flow_id >> 1];
+  vcdp_session_t *session = &vcdp->sessions[t->flow_id >> 1];
   s = format(s, "vcdp-nat64-slowpath: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
              t->flow_id & 0x1 ? "reverse" : "forward");
   s = format(s, "  new forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
@@ -45,7 +44,7 @@ nat64_get_v4(ip46_address_t *a)
 
 static_always_inline void
 nat64_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
-                            vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
+                            /*u32 *fib_index_by_sw_if_index,*/
                             u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
                             nat64_rewrite_data_t *nat_session, vcdp_session_t *session, u32 *error, vlib_buffer_t **b)
 {
@@ -155,8 +154,6 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   nat_instance_t *instance;
   u32 session_idx;
   u32 tenant_idx;
@@ -214,7 +211,7 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
       flow_index = value & (~(u32) 0);
       u32 session_index = vcdp_session_from_flow_index(flow_index);
       b[0]->flow_id = flow_index;
-      session = vcdp_session_at_index(ptd, session_index);
+      session = vcdp_session_at_index(vcdp, session_index);
       vcdp_buffer(b[0])->service_bitmap = session->bitmaps[VCDP_FLOW_FORWARD];
       goto next;
     }
@@ -227,10 +224,10 @@ VLIB_NODE_FN(vcdp_nat64_slowpath_node)
     session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat64_early_rewrite);
     session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat64_late_rewrite);
 
-    session_idx = session - ptd->sessions;
+    session_idx = session - vcdp->sessions;
     session->type = VCDP_SESSION_TYPE_NAT64;
-    nat_rewrites = vec_elt_at_index(nptd->flows64, session_idx << 1);
-    nat64_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx,
+    nat_rewrites = vec_elt_at_index(nat->flows64, session_idx << 1);
+    nat64_slow_path_process_one(vcdp, node, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance, nat_idx,
                                 session_idx, nat_rewrites, session, &error, b);
 
   next:

@@ -113,6 +113,7 @@ typedef struct {
   // CLIB_CACHE_LINE_ALIGN_MARK(cache1);
 
   // Slow-path fields
+  u32 thread_index;
   vcdp_session_key_t keys[VCDP_SESSION_N_KEY]; // 80
   u64 session_id;
   u32 created;                       // 4
@@ -125,7 +126,6 @@ STATIC_ASSERT_SIZEOF(vcdp_session_t, 256);
 // _Static_assert(sizeof(vcdp_session_t) == 128, "Size of vcdp_session_t should be 128");
 
 typedef struct {
-  vcdp_session_t *sessions; /* fixed pool */
   f64 current_time;
   u64 session_id_ctr;
   u64 session_id_template;
@@ -149,7 +149,10 @@ typedef struct {
   /* (gw_session_ip4_key_t) -> (thread_index(32 MSB),session_index(31 bits),
    * stored_direction (1 LSB)) */
   clib_bihash_40_8_t session_hash;
+  vcdp_session_t *sessions; /* fixed pool */
+
   clib_bihash_8_8_t session_index_by_id;
+
   u32 frame_queue_index;
   u32 frame_queue_icmp_index;
   u64 session_id_ctr_mask;
@@ -171,7 +174,7 @@ typedef struct {
 
 typedef struct {
   u32 no_tenants;
-  u32 no_sessions_per_thread;
+  u32 no_sessions;
   u32 no_nat_instances;
   u32 no_tunnels;
 } vcdp_cfg_main_t;
@@ -244,17 +247,17 @@ vcdp_session_mk_table_value(u32 thread_index, u32 pseudo_flow_index)
 }
 
 static_always_inline vcdp_session_t *
-vcdp_session_at_index(vcdp_per_thread_data_t *ptd, u32 idx)
+vcdp_session_at_index(vcdp_main_t *vcdp, u32 idx)
 {
-  return pool_elt_at_index(ptd->sessions, idx);
+  return pool_elt_at_index(vcdp->sessions, idx);
 }
 
 static_always_inline vcdp_session_t *
-vcdp_session_at_index_check(vcdp_per_thread_data_t *ptd, u32 idx)
+vcdp_session_at_index_check(vcdp_main_t *vcdp, u32 idx)
 {
-  if (pool_is_free_index(ptd->sessions, idx))
+  if (pool_is_free_index(vcdp->sessions, idx))
     return 0;
-  return pool_elt_at_index(ptd->sessions, idx);
+  return pool_elt_at_index(vcdp->sessions, idx);
 }
 
 static_always_inline u32
@@ -295,11 +298,11 @@ vcdp_session_t *vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary,
 vcdp_session_t *vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, ip_address_t *dst,
                                     u16 dport);
 void vcdp_session_clear(void);
-int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
+int vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, u32 thread_index,
                                        u32 pseudo_flow_index, vcdp_session_key_t *key);
-void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+void vcdp_session_remove(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
-void vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+void vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_index,
                          u32 session_index);
 bool vcdp_session_is_expired(vcdp_session_t *session, f64 time_now);
 void vcdp_session_reopen(vcdp_main_t *vcdp, u32 thread_index, vcdp_session_t *session);

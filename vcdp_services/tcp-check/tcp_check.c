@@ -12,7 +12,7 @@ vcdp_tcp_check_init(vlib_main_t *vm)
   vcdp_tcp_check_per_thread_data_t *ptd;
   vec_validate(vtcm->ptd, vlib_num_workers());
   vec_foreach (ptd, vtcm->ptd)
-    vec_validate(ptd->state, vcdp_cfg_main.no_sessions_per_thread);
+    vec_validate(ptd->state, vcdp_cfg_main.no_sessions);
   return 0;
 };
 

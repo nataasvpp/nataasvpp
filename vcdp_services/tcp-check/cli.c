@@ -41,7 +41,7 @@ vcdp_tcp_check_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input
       table_t session_table_ = {}, *session_table = &session_table_;
       u32 n = 0;
       table_add_header_col(session_table, 8, "id", "tenant", "index", "type", "context", "ingress", "egress", "flags");
-      pool_foreach_index (session_index, ptd->sessions) {
+      pool_foreach_index (session_index, vcdp->sessions) {
         session = vcdp_session_at_index(ptd, session_index);
         tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
         if (tenant_id != ~0 && tenant_id != tenant->tenant_id)

@@ -12,6 +12,7 @@
 #include "lookup_inlines.h"
 #include <vcdp/timer_lru.h>
 #include <vcdp/vcdp.api_enum.h>
+#include <stdbool.h>
 
 typedef struct {
   u32 next_index;
@@ -163,13 +164,13 @@ vcdp_lookup_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_t *fra
       si[0] = session_index;
       b[0]->flow_id = flow_index;
 
-      session = vcdp_session_at_index(ptd, session_index);
+      session = vcdp_session_at_index(vcdp, session_index);
 
       if (vcdp_session_is_expired(session, now)) {
         // Received a packet against an expired session. Recycle the session.
         vcdp_log_debug("Expired session: %u %U (%.02f)", session_index, format_vcdp_session_key, k,
                        vcdp_session_remaining_time(session, now));
-        vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
+        vcdp_session_remove(vcdp, session, thread_index, session_index);
         goto again;
       }
 
@@ -320,7 +321,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
   while (n_left) {
     u32 flow_index = b[0]->flow_id;
     u32 session_index = vcdp_session_from_flow_index(flow_index);
-    vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
+    vcdp_session_t *session = vcdp_session_at_index_check(vcdp, session_index);
     if (!session) {
       // Session has been deleted underneath us
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);
@@ -331,7 +332,7 @@ VLIB_NODE_FN(vcdp_handoff_node)
     // Check if session has expired. If so send it back to the lookup node to be created.
     if (vcdp_session_is_expired(session, now)) {
       vcdp_log_debug("Forwarding against expired handoff session, deleting and recreating %d", session_index);
-      vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
+      vcdp_session_remove(vcdp, session, thread_index, session_index);
 
       // TODO: NOT YET IMPLEMENTED. DROP FOR NOW
       vcdp_buffer(b[0])->service_bitmap = VCDP_SERVICE_MASK(drop);

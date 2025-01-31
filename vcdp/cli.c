@@ -116,7 +116,6 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   unformat_input_t line_input_, *line_input = &line_input_;
   clib_error_t *err = 0;
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
   vcdp_tenant_t *tenant;
   u32 thread_index = ~0;
@@ -155,10 +154,9 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   if (session_idx != ~0) {
     if (thread_index == ~0 || thread_index >= vec_len(vcdp->per_thread_data))
       return clib_error_return(0, "Thread index not set");
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_idx);
+    vcdp_session_t *session = vcdp_session_at_index_check(vcdp, session_idx);
     if (session)
-      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_idx, now);
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, vcdp, session_idx, now);
     else
       err = clib_error_return(0, "Session index %u not found", session_idx);
     return err;
@@ -168,8 +166,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     if (!clib_bihash_search_inline_8_8(&vcdp->session_index_by_id, &kv)) {
       thread_index = vcdp_thread_index_from_lookup(kv.value);
       session_index = vcdp_session_index_from_lookup(kv.value);
-      ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-      vlib_cli_output(vm, "%U", format_vcdp_session_detail, ptd, session_index, now);
+      vlib_cli_output(vm, "%U", format_vcdp_session_detail, vcdp, session_index, now);
     } else {
       err = clib_error_return(0, "Session id 0x%llx not found", session_id);
     }
@@ -177,11 +174,10 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
   }
 
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     if (vec_len(vcdp->per_thread_data) > 1)
       vlib_cli_output(vm, "Thread #%d:", thread_index);
     vlib_cli_output(vm, "session id         tenant  index  type proto        state TTL(s)");
-    pool_foreach (session, ptd->sessions) {
+    pool_foreach (session, vcdp->sessions) {
       tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
       if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
         continue;
@@ -194,16 +190,16 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
 
       u64 session_net = clib_host_to_net_u64(session->session_id);
       if (detail) {
-        vlib_cli_output(vm, "%U\n", format_vcdp_session_detail, ptd, session - ptd->sessions, now);
+        vlib_cli_output(vm, "%U\n", format_vcdp_session_detail, vcdp, session - vcdp->sessions, now);
       } else {
         // if (session->state == VCDP_SESSION_STATE_STATIC)
         //   vlib_cli_output(vm, "0x%U %6d %6d %5U %5U %10U %6s", format_hex_bytes, &session_net, sizeof(session_net),
-        //                   tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+        //                   tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
         //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
 
         u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
         s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
-                   tenant->tenant_id, session - ptd->sessions, format_vcdp_session_type, session->type,
+                   tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
                    format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
                    format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
 
@@ -223,13 +219,12 @@ static clib_error_t *
 vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
   u32 thread_index;
   // u32 n_threads = vlib_num_workers();
 
   vlib_cli_output(vm, "Configuration:");
   vlib_cli_output(vm, "Max Tenants: %d", vcdp_cfg_main.no_tenants);
-  vlib_cli_output(vm, "Max Sessions per thread: %d", vcdp_cfg_main.no_sessions_per_thread);
+  vlib_cli_output(vm, "Max Sessions: %d", vcdp_cfg_main.no_sessions);
   vlib_cli_output(vm, "Max NAT instances: %d", vcdp_cfg_main.no_nat_instances);
   vlib_cli_output(vm, "Max Tunnels: %d", vcdp_cfg_main.no_tunnels);
 
@@ -243,8 +238,7 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
 
     vec_foreach_index (thread_index, vcdp->per_thread_data)
   {
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(ptd->sessions));
+    vlib_cli_output(vm, "Active sessions (%d): %d", thread_index, pool_elts(vcdp->sessions));
   }
   u32 tenant_idx;
   pool_foreach_index (tenant_idx, vcdp->tenants) {
@@ -501,10 +495,10 @@ u8 *
 format_vcdp_lru_entry(u8 *s, va_list *args)
 {
   dlist_elt_t *lru_entry = va_arg(*args, dlist_elt_t *);
-  vcdp_per_thread_data_t *ptd = va_arg(*args, vcdp_per_thread_data_t *);
+  vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
 
   u32 session_index = lru_entry->value;
-  vcdp_session_t *session = vcdp_session_at_index_check(ptd, session_index);
+  vcdp_session_t *session = vcdp_session_at_index_check(vcdp, session_index);
   if (session) {
     s = format(s, "%d %.2f", session_index, session->last_heard);
   } else {
@@ -527,7 +521,7 @@ vcdp_show_lru_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_comm
       vlib_cli_output(vm, "Head index: %d", ptd->lru_head_index[i]);
       dlist_elt_t *lru_entry = pool_elt_at_index(ptd->lru_pool, ptd->lru_head_index[i]);
       while (lru_entry) {
-        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, ptd, lru_entry->next, lru_entry->prev,
+        vlib_cli_output(vm, "LRU: %U %d %d %d", format_vcdp_lru_entry, lru_entry, vcdp, lru_entry->next, lru_entry->prev,
                         lru_entry->value);
         if (lru_entry->next == ~0 || lru_entry->next == ptd->lru_head_index[i])
           break;

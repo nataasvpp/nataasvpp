@@ -79,7 +79,7 @@ vcdp_tcp_state_to_timeout (vcdp_tcp_check_lite_tcp_state_t state)
 
 VCDP_SERVICE_DECLARE(drop)
 static_always_inline void
-update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index, vcdp_tenant_t *tenant,
+update_state_one_pkt(vcdp_main_t *vcdp, u32 thread_index, vcdp_tenant_t *tenant,
                      vcdp_tcp_check_lite_session_state_t *tcp_session, vcdp_session_t *session, u32 session_index,
                      f64 current_time, u8 dir, vlib_buffer_t **b, u32 *sf, u32 *nsf)
 {
@@ -139,7 +139,7 @@ update_state_one_pkt(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_
     // If we see a SYN, we reopen session. It will have the same session id.
     // Otherwise we will just forward against the session until it expires.
     if (tcp_session->flags[VCDP_FLOW_FORWARD] & TCP_FLAG_SYN) {
-      vcdp_log_debug("Reopening session %U", format_vcdp_session_detail, ptd, session_index, 0);
+      vcdp_log_debug("Reopening session %U", format_vcdp_session_detail, vcdp, session_index, 0);
       u32 thread_index = vlib_get_thread_index();
       vcdp_session_reopen(vcdp, thread_index, session);
       next_timeout = VCDP_TIMEOUT_EMBRYONIC;
@@ -168,8 +168,6 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
   vcdp_main_t *vcdp = &vcdp_main;
   vcdp_tcp_check_lite_main_t *vtcm = &vcdp_tcp_lite;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  vcdp_tcp_check_lite_per_thread_data_t *tptd = vec_elt_at_index(vtcm->ptd, thread_index);
   vcdp_session_t *session;
   vcdp_tenant_t *tenant;
   u32 session_idx;
@@ -184,8 +182,8 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
-    tcp_session = vec_elt_at_index(tptd->state, session_idx);
+    session = vcdp_session_at_index(vcdp, session_idx);
+    tcp_session = vec_elt_at_index(vtcm->state, session_idx);
     tenant = vcdp_tenant_at_index(vcdp, vcdp_buffer(b[0])->tenant_index);
 
     /* Ignore IP fragments */
@@ -193,7 +191,7 @@ vcdp_tcp_check_lite_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib
       vcdp_log_err("Fragment ignored");
       goto next;
     }
-    update_state_one_pkt(vcdp, ptd, thread_index, tenant, tcp_session, session, session_idx, current_time,
+    update_state_one_pkt(vcdp, thread_index, tenant, tcp_session, session, session_idx, current_time,
                          vcdp_direction_from_flow_index(b[0]->flow_id), b, sf, nsf);
   next:
     vcdp_next(b[0], to_next);

@@ -20,13 +20,11 @@ typedef struct {
   vcdp_tcp_check_lite_tcp_state_t state;
   session_version_t version;
 } vcdp_tcp_check_lite_session_state_t;
+/* Verify the struct fits in a single cache line */
+STATIC_ASSERT_SIZEOF(vcdp_tcp_check_lite_session_state_t, CLIB_CACHE_LINE_BYTES);
 
 typedef struct {
   vcdp_tcp_check_lite_session_state_t *state; /* vec indexed by session-index */
-} vcdp_tcp_check_lite_per_thread_data_t;
-
-typedef struct {
-  vcdp_tcp_check_lite_per_thread_data_t *ptd;
 } vcdp_tcp_check_lite_main_t;
 
 extern vcdp_tcp_check_lite_main_t vcdp_tcp_lite;

@@ -249,7 +249,6 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
 
   vcdp_main_t *vcdp = &vcdp_main;
   u32 thread_index = vm->thread_index;
-  vcdp_per_thread_data_t *vptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
   u16 next_indices[VLIB_FRAME_SIZE], *to_next = next_indices;
   u32 *from = vlib_frame_vector_args(frame);
@@ -259,7 +258,7 @@ vcdp_tunnel_output_node_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_
 
   while (n_left > 0) {
     u32 session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    vcdp_session_t *session = vcdp_session_at_index(vptd, session_idx);
+    vcdp_session_t *session = vcdp_session_at_index(vcdp, session_idx);
     vcdp_tunnel_t *t = vcdp_tunnel_get(session->rx_id);
     tunnel_idx[0] = session->rx_id;
     tenant_idx[0] = session->tenant_idx;

@@ -20,8 +20,7 @@ format_vcdp_nat_fastpath_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_nat_fastpath_trace_t *t = va_arg(*args, vcdp_nat_fastpath_trace_t *);
   nat_main_t *nm = &nat_main;
-  nat_per_thread_data_t *ptd = vec_elt_at_index(nm->ptd, t->thread_index);
-  nat_rewrite_data_t *rewrite = vec_elt_at_index(ptd->flows, t->flow_id);
+  nat_rewrite_data_t *rewrite = vec_elt_at_index(nm->flows, t->flow_id);
   s = format(s, "vcdp-nat-fastpath: flow-id %u (session %u, %s) rewrite: %U\n", t->flow_id, t->flow_id >> 1,
              t->flow_id & 0x1 ? "reverse" : "forward", format_vcdp_nat_rewrite, rewrite);
 
@@ -54,8 +53,6 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   vcdp_session_t *session;
   u32 session_idx;
   nat_rewrite_data_t *nat_rewrite;
@@ -66,8 +63,8 @@ vcdp_nat_fastpath_inline(vlib_main_t *vm, vlib_node_runtime_t *node, vlib_frame_
   vlib_get_buffers(vm, from, bufs, n_left);
   while (n_left > 0) {
     session_idx = vcdp_session_from_flow_index(b[0]->flow_id);
-    session = vcdp_session_at_index(ptd, session_idx);
-    nat_rewrite = vec_elt_at_index(nptd->flows, b[0]->flow_id); // broken
+    session = vcdp_session_at_index(vcdp, session_idx);
+    nat_rewrite = vec_elt_at_index(nat->flows, b[0]->flow_id); // broken
 
     nat_fastpath_process_one(nat_rewrite, session, to_next, b);
 

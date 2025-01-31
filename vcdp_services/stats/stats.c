@@ -25,7 +25,7 @@ vcdp_stats_init(vlib_main_t *vm)
   vcdp_stats_per_thread_data_t *ptd;
   vec_validate(vsm->ptd, vlib_num_workers());
   vec_foreach (ptd, vsm->ptd)
-    vec_validate(ptd->state, vcdp_cfg_main.no_sessions_per_thread);
+    vec_validate(ptd->state, vcdp_cfg_main.no_sessions);
   return 0;
 };
 VLIB_INIT_FUNCTION(vcdp_stats_init);

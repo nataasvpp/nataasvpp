@@ -45,8 +45,7 @@ static u8 *
 format_vcdp_tcp_check_lite_service(u8 *s, u32 thread_index, u32 session_index)
 {
   vcdp_tcp_check_lite_main_t *vtcm = &vcdp_tcp_lite;
-  vcdp_tcp_check_lite_per_thread_data_t *tptd = vec_elt_at_index(vtcm->ptd, thread_index);
-  vcdp_tcp_check_lite_session_state_t *tcp_session = vec_elt_at_index(tptd->state, session_index);
+  vcdp_tcp_check_lite_session_state_t *tcp_session = vec_elt_at_index(vtcm->state, session_index);
 
   s = format(s, "  tcp-check-lite: flags: %U/%U\n%16sstate: %U\n", format_tcp_flags, tcp_session->flags[VCDP_FLOW_FORWARD],
              format_tcp_flags, tcp_session->flags[VCDP_FLOW_REVERSE], "", format_vcdp_tcp_check_lite_state, tcp_session->state);

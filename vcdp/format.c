@@ -63,19 +63,19 @@ format_vcdp_bitmap(u8 *s, va_list *args)
 u8 *
 format_vcdp_session_detail(u8 *s, va_list *args)
 {
-  vcdp_per_thread_data_t *ptd = va_arg(*args, vcdp_per_thread_data_t *);
+  vcdp_main_t *vcdp = va_arg(*args, vcdp_main_t *);
   u32 session_index = va_arg(*args, u32);
   f64 now = va_arg(*args, f64);
-  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
+  vcdp_session_t *session = vcdp_session_at_index(vcdp, session_index);
 
   f64 remaining_time = vcdp_session_remaining_time(session, now);
   u64 session_net = clib_host_to_net_u64(session->session_id);
-  uword thread_index = ptd - vcdp_main.per_thread_data;
+  // uword thread_index = ptd - vcdp_main.per_thread_data;
   vcdp_session_key_t *skey;
 
   /* TODO: deal with secondary keys */
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
-  s = format(s, "  thread index: %d\n", thread_index);
+  s = format(s, "  thread index: %d\n", 0 /*thread_index*/);
   s = format(s, "  session index: %d\n", session_index);
   skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
   s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);
@@ -101,7 +101,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
     if ((session->bitmaps[VCDP_FLOW_FORWARD] /*| session->bitmaps[VCDP_FLOW_REVERSE]*/) &
         sm->services[i]->service_mask[0]) {
       if (sm->services[i]->format_service)
-        s = sm->services[i]->format_service(s, thread_index, session_index);
+        s = sm->services[i]->format_service(s, 0 /*thread_index*/, session_index);
     }
   }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
 
+#include <stdbool.h>
 #include <vlib/vlib.h>
 #include <vcdp_services/nat/nat.h>
 #include <vcdp_services/nat/nat_inlines.h>
@@ -41,10 +42,9 @@ format_vcdp_nat_slowpath_trace(u8 *s, va_list *args)
   vlib_node_t __clib_unused *node = va_arg(*args, vlib_node_t *);
   vcdp_nat_slowpath_trace_t *t = va_arg(*args, vcdp_nat_slowpath_trace_t *);
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, t->thread_index);
   if (t->flow_id == ~0)
     return format(s, "vcdp-nat-slowpath: drop");
-  vcdp_session_t *session = &ptd->sessions[t->flow_id >> 1];
+  vcdp_session_t *session = &vcdp->sessions[t->flow_id >> 1];
   s = format(s, "vcdp-nat-slowpath: flow-id %u (session %u, %s)\n", t->flow_id, t->flow_id >> 1,
              t->flow_id & 0x1 ? "reverse" : "forward");
   s = format(s, "  new forward service chain: %U\n", format_vcdp_bitmap, session->bitmaps[VCDP_FLOW_FORWARD]);
@@ -115,7 +115,7 @@ VCDP_SERVICE_DECLARE(nat_late_rewrite)
  */
 static_always_inline int
 nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
-                          vcdp_per_thread_data_t *vptd, /*u32 *fib_index_by_sw_if_index,*/
+                          /*u32 *fib_index_by_sw_if_index,*/
                           u16 thread_index, nat_main_t *nm, nat_instance_t *instance, u16 nat_idx, u32 session_index,
                           nat_rewrite_data_t *nat_session, vcdp_session_t *session, u32 *error, vlib_buffer_t **b)
 {
@@ -150,7 +150,7 @@ nat_slow_path_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
 
   pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
 
-  if (nat_try_port_allocation(vcdp, vptd, thread_index, pseudo_flow_index, &session->keys[VCDP_SESSION_KEY_PRIMARY],
+  if (nat_try_port_allocation(vcdp, thread_index, pseudo_flow_index, &session->keys[VCDP_SESSION_KEY_PRIMARY],
                               &new_key, &n_retries, &n_expired) != 0) {
     *error = VCDP_NAT_SLOWPATH_ERROR_PORT_ALLOC_FAILURE;
     vlib_increment_simple_counter(&nm->simple_counters[VCDP_NAT_COUNTER_PORT_ALLOC_FAILURES], thread_index, nat_idx, 1);
@@ -201,8 +201,6 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   nat_instance_t *instance;
   u32 session_idx;
   u32 tenant_idx;
@@ -274,11 +272,11 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_late_rewrite);
 
     vcdp_log_debug("Creating session for: %U", format_vcdp_session_key, &k);
-    session_idx = session - ptd->sessions;
-    nat_rewrites = vec_elt_at_index(nptd->flows, session_idx << 1);
-    if (nat_slow_path_process_one(vcdp, node, ptd, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance,
+    session_idx = session - vcdp->sessions;
+    nat_rewrites = vec_elt_at_index(nat->flows, session_idx << 1);
+    if (nat_slow_path_process_one(vcdp, node, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance,
                                   nat_idx, session_idx, nat_rewrites, session, &error, b) < 0) {
-      vcdp_session_remove(vcdp, ptd, session, thread_index, session_idx);
+      vcdp_session_remove(vcdp, session, thread_index, session_idx);
       goto next;
     }
 
@@ -332,7 +330,7 @@ VCDP_SERVICE_DEFINE(nat_output) = {
  * nat_port_forwarding_process_one
  */
 static_always_inline void
-nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node, vcdp_per_thread_data_t *vptd,
+nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node,
                                 u16 tenant_idx, u16 thread_index, nat_main_t *nm,
                                 nat_port_forwarding_session_t *nat_session, vlib_buffer_t **b, u16 *to_next)
 {
@@ -363,10 +361,8 @@ nat_port_forwarding_process_one(vcdp_main_t *vcdp, vlib_node_runtime_t *node, vc
 
   // Create reverse NAT session
   u32 fib_index = 0; // TODO: fix
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-  nat_per_thread_data_t *nptd = vec_elt_at_index(nat->ptd, thread_index);
   nat_rewrite_data_t *nat_rewrite; /* rewrite data in both directions */
-  nat_rewrite = vec_elt_at_index(nptd->flows, (full_session - ptd->sessions) << 1);
+  nat_rewrite = vec_elt_at_index(nat->flows, (full_session - vcdp->sessions) << 1);
 
   nat_rewrites(NAT_REWRITE_OP_DADDR | NAT_REWRITE_OP_DPORT | NAT_REWRITE_OP_TXFIB, k.dst.ip4.as_u32, reverse_k.src.ip4.as_u32,
                k.dport, reverse_k.sport, fib_index, full_session->session_version, &nat_rewrite[0]);
@@ -420,7 +416,6 @@ VLIB_NODE_FN(vcdp_nat_port_forwarding_node)
   vcdp_main_t *vcdp = &vcdp_main;
   nat_main_t *nat = &nat_main;
   u32 thread_index = vlib_get_thread_index();
-  vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
   nat_port_forwarding_session_t *session;
   u32 *from = vlib_frame_vector_args(frame);
   u32 n_left = frame->n_vectors;
@@ -436,7 +431,7 @@ VLIB_NODE_FN(vcdp_nat_port_forwarding_node)
     }
 
     session = pool_elt_at_index(nat->port_forwarding_sessions, kv.value);
-    nat_port_forwarding_process_one(vcdp, node, ptd, session->tenant_idx, thread_index, nat, session, b, to_next);
+    nat_port_forwarding_process_one(vcdp, node, session->tenant_idx, thread_index, nat, session, b, to_next);
 
   next:
     n_left -= 1;

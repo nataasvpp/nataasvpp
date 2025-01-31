@@ -421,17 +421,12 @@ static clib_error_t *
 nat_init(vlib_main_t *vm)
 {
   nat_main_t *nat = &nat_main;
-  nat_per_thread_data_t *ptd;
-  uword n_threads = vlib_num_workers();
   nat->uuid_hash = hash_create_string(0, sizeof(uword));
   pool_init_fixed(nat->instances, vcdp_cfg_main.no_nat_instances);
-  vec_validate(nat->ptd, n_threads);
 
   // Two flows per session
-  vec_foreach (ptd, nat->ptd) {
-    vec_validate(ptd->flows, 2 * vcdp_cfg_main.no_sessions_per_thread);
-    vec_validate(ptd->flows64, 2 * vcdp_cfg_main.no_sessions_per_thread);
-  }
+  vec_validate(nat->flows, 2 * vcdp_cfg_main.no_sessions);
+  vec_validate(nat->flows64, 2 * vcdp_cfg_main.no_sessions);
 
   // Create a FIB entry for the NAT pool addresses.
   // TODO DPO: vcdp_nat_dpo_module_init(); // Only for pool addresses not for interface addresses?

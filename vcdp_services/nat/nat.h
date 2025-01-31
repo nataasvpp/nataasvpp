@@ -69,7 +69,8 @@ typedef struct {
   session_version_t version;
   u16 nat_idx; // index into nat_main.instances
 } nat_rewrite_data_t;
-_Static_assert(sizeof(nat_rewrite_data_t) == CLIB_CACHE_LINE_BYTES, "nat_rewrite_data_t is not cache aligned");
+/* Verify the struct fits in a single cache line */
+STATIC_ASSERT_SIZEOF(nat_rewrite_data_t, CLIB_CACHE_LINE_BYTES);
 
 typedef enum {
   NAT64_REWRITE_OP_HDR_64 = 1 << 1,
@@ -90,21 +91,8 @@ typedef struct {
   session_version_t version;
   u16 nat_idx; // index into nat_main.instances
 } nat64_rewrite_data_t;
-// _Static_assert(sizeof(nat64_rewrite_data_t) == CLIB_CACHE_LINE_BYTES, "nat64_rewrite_data_t is not cache aligned");
-
-typedef struct {
-  nat_rewrite_data_t *flows; /* by flow_index */
-  nat64_rewrite_data_t *flows64; /* by flow_index */
-} nat_per_thread_data_t;
-
-#define MAX_THREADS 16
-typedef struct {
-    // Each thread gets its own port ranges
-    struct {
-        u16 start_port;
-        u16 end_port;
-    } thread_port_range[MAX_THREADS];
-} nat_port_allocator_t;
+/* Verify the struct fits in a single cache line */
+STATIC_ASSERT_SIZEOF(nat64_rewrite_data_t, CLIB_CACHE_LINE_BYTES);
 
 /*
  * 3-tuple session key
@@ -137,7 +125,9 @@ typedef struct {
   nat_instance_t *instances;        /* vec */
   uword *uuid_hash;
   u16 *instance_by_tenant_idx;
-  nat_per_thread_data_t *ptd;   /* vec */
+  nat_rewrite_data_t *flows; /* by flow_index */
+  nat64_rewrite_data_t *flows64; /* by flow_index */
+
   u16 msg_id_base;
 
   /* Per instance counters */

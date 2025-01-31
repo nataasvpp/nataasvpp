@@ -27,11 +27,11 @@ vcdp_timer_lru_free_one_with_head(vcdp_main_t *vcdp, int thread_index, f64 now, 
   oldest_index = clib_dlist_remove_head(ptd->lru_pool, head_index);
   if (~0 != oldest_index) {
     oldest_elt = pool_elt_at_index(ptd->lru_pool, oldest_index);
-    s = pool_elt_at_index(ptd->sessions, oldest_elt->value);
+    s = pool_elt_at_index(vcdp->sessions, oldest_elt->value);
 
     sess_timeout_time = s->last_heard + (f64) vcdp_session_get_timeout(vcdp, s);
     if (now >= sess_timeout_time) {
-      vcdp_session_remove_no_timer(vcdp, ptd, s, thread_index, oldest_elt->value);
+      vcdp_session_remove_no_timer(vcdp, s, thread_index, oldest_elt->value);
       return 1;
     } else {
       clib_dlist_addhead(ptd->lru_pool, head_index, oldest_index);
@@ -95,7 +95,7 @@ vcdp_session_timer_start(vcdp_main_t *vcdp, vcdp_session_t *s, u32 thread_index,
   s->timer.lru_index = lru_list_elt - ptd->lru_pool;
   s->timer.lru_head_index = ptd->lru_head_index[timeout];
   clib_dlist_addtail(ptd->lru_pool, s->timer.lru_head_index, s->timer.lru_index);
-  lru_list_elt->value = s - ptd->sessions;
+  lru_list_elt->value = s - vcdp->sessions;
   s->timer.last_lru_update = now;
   s->timer.type = timeout;
   s->last_heard = now;

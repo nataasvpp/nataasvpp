@@ -215,7 +215,6 @@ create_session(u32 src, u16 sport, int *n_retries, int *n_expired)
   if (session) {
     // Allocate a port
     u32 thread_index = vlib_get_thread_index();
-    vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
 
     vcdp_session_key_t secondary_key = {
           .dport = k.sport,
@@ -225,11 +224,11 @@ create_session(u32 src, u16 sport, int *n_retries, int *n_expired)
           .context_id = k.context_id,
     };
     secondary_key.dst.ip4.as_u32 = htonl(0x01010101); // 1.1.1.1
-    u32 session_index = session - ptd->sessions;
+    u32 session_index = session - vcdp->sessions;
     u32 pseudo_flow_index = (session_index << 1) | 0x1; // Always 1, since this is always the return flow
-    rv = nat_try_port_allocation(vcdp, ptd, thread_index, pseudo_flow_index, &k, &secondary_key, n_retries, n_expired);
+    rv = nat_try_port_allocation(vcdp, thread_index, pseudo_flow_index, &k, &secondary_key, n_retries, n_expired);
     if (rv) {
-      vcdp_session_remove(vcdp, ptd, session, thread_index, session_index);
+      vcdp_session_remove(vcdp, session, thread_index, session_index);
       goto done;
     }
   } else {

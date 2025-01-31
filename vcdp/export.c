@@ -138,7 +138,6 @@ size_t
 vcdp_sessions_serialize(unsigned char **buffer, u32 *no_sessions)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
   vcdp_session_t *session;
   // vcdp_tenant_t *tenant;
   u32 thread_index = ~0;
@@ -148,12 +147,11 @@ vcdp_sessions_serialize(unsigned char **buffer, u32 *no_sessions)
   *no_sessions = 0;
 
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    clib_warning("thread_index %d session elements: %d", thread_index, pool_elts(ptd->sessions));
-    *no_sessions += pool_elts(ptd->sessions);
-    spt = cbor_new_definite_array(pool_elts(ptd->sessions));
+    clib_warning("thread_index %d session elements: %d", thread_index, pool_elts(vcdp->sessions));
+    *no_sessions += pool_elts(vcdp->sessions);
+    spt = cbor_new_definite_array(pool_elts(vcdp->sessions));
 
-    pool_foreach (session, ptd->sessions) {
+    pool_foreach (session, vcdp->sessions) {
       // tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
       // if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
       //   continue;

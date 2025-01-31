@@ -52,11 +52,12 @@ vcdp_init(vlib_main_t *vm)
   vcdp->session_id_ctr_mask = (((u64) 1 << template_shift) - 1);
 
   /* initialize per-thread data */
+  pool_init_fixed(vcdp->sessions, vcdp_cfg_main.no_sessions);
+
   vec_validate(vcdp->per_thread_data, vlib_num_workers());
   for (int i = 0; i <= vlib_num_workers(); i++) {
     dlist_elt_t *head;
     vcdp_per_thread_data_t *ptd = vec_elt_at_index(vcdp->per_thread_data, i);
-    pool_init_fixed(ptd->sessions, vcdp_cfg_main.no_sessions_per_thread);
     ptd->session_id_template = (u64) epoch << (template_shift + log_n_thread);
     ptd->session_id_template |= (u64) i << template_shift;
 
@@ -76,7 +77,7 @@ vcdp_init(vlib_main_t *vm)
   vcdp_tenant_init_counters_simple(vcdp->tenant_simple_ctr);
   vcdp_tenant_init_counters_combined(vcdp->tenant_combined_ctr);
 
-  u32 session_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_sessions_per_thread);
+  u32 session_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_sessions);
   u32 tenant_buckets = vcdp_calc_bihash_buckets(vcdp_cfg_main.no_tenants);
 
   clib_bihash_init_40_8(&vcdp->session_hash, "vcdp session hash table", session_buckets, 0);
@@ -305,7 +306,7 @@ vcdp_config(vlib_main_t *vm, unformat_input_t *input)
 
   /* Set defaults */
   vcdp_cfg_main.no_nat_instances = 16;            // 1 << 10; // 1024
-  vcdp_cfg_main.no_sessions_per_thread = 128000;    //1 << 20;                            // 1M
+  vcdp_cfg_main.no_sessions = 128000;    //1 << 20;                            // 1M
   vcdp_cfg_main.no_tenants = 1 << 10; // 1024
   vcdp_cfg_main.no_tunnels = 0; //1 << 20; // 1M;
 
@@ -317,8 +318,8 @@ vcdp_config(vlib_main_t *vm, unformat_input_t *input)
       vcdp_cfg_main.no_tunnels = tunnels;
     else if (unformat(input, "nat-instances %d", &nat_instances))
       vcdp_cfg_main.no_nat_instances = nat_instances;
-    else if (unformat(input, "sessions-per-thread %d", &sessions))
-      vcdp_cfg_main.no_sessions_per_thread = sessions;
+    else if (unformat(input, "sessions %d", &sessions))
+      vcdp_cfg_main.no_sessions = sessions;
     else
       return clib_error_return(0, "unknown input '%U'", format_unformat_error, input);
   }

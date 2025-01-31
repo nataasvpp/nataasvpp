@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright(c) 2022 Cisco Systems, Inc.
 
+#include <stdbool.h>
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
 #include <vnet/pg/pg.h>
@@ -50,15 +51,15 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   f64 now = vlib_time_now(vlib_get_main());
   vcdp_timer_lru_free_one(vcdp, thread_index, now);
 
-  if (pool_free_elts(ptd->sessions) == 0) {
+  if (pool_free_elts(vcdp->sessions) == 0) {
     vcdp_log_debug("No free sessions %U", format_vcdp_session_key, primary);
     return 0;
   }
 
   u64 h;
   vcdp_session_t *session;
-  pool_get(ptd->sessions, session);
-  u32 session_idx = session - ptd->sessions;
+  pool_get(vcdp->sessions, session);
+  u32 session_idx = session - vcdp->sessions;
   u32 pseudo_flow_idx = (session_idx << 1);
   u64 value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
   *flow_index = pseudo_flow_idx;
@@ -66,7 +67,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   if (vcdp_session_add_del_key(primary, 2, value, &h)) {
     /* already exists */
     vcdp_log_err("session already exists %U", format_vcdp_session_key, primary);
-    pool_put(ptd->sessions, session);
+    pool_put(vcdp->sessions, session);
     return 0;
   }
   clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_PRIMARY], primary, sizeof(session->keys[0]));
@@ -75,7 +76,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     if (vcdp_session_add_del_key(secondary, 2, value | 0x1, &h)) {
       /* already exists */
       vcdp_log_err("session already exists %U", format_vcdp_session_key, secondary);
-      pool_put(ptd->sessions, session);
+      pool_put(vcdp->sessions, session);
       return 0;
     }
     clib_memcpy_fast(&session->keys[VCDP_SESSION_KEY_SECONDARY], secondary, sizeof(session->keys[1]));
@@ -149,12 +150,16 @@ vcdp_lookup_session(u32 context_id, ip_address_t *src, u16 sport, u8 protocol, i
 }
 
 void
-vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
+vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_index,
                          u32 session_index, bool stop_timer)
 {
   u64 h;
   clib_bihash_kv_8_8_t kv2 = {0};
   kv2.key = session->session_id;
+
+  // assert that we are removing the session from the same thread.
+  // Unless barrier is set.
+//  ASSERT(session->thread_index == vlib_get_thread_index() || vlib_get_barrier_is_set());
 
   /* Stop timer if running */
   vcdp_log_debug("Removing session %u %llx", session_index, session->session_id);
@@ -179,20 +184,18 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_se
                                   session->pkts[VCDP_FLOW_FORWARD], session->bytes[VCDP_FLOW_FORWARD]);
   vlib_increment_combined_counter(&vcdp->tenant_combined_ctr[VCDP_TENANT_COUNTER_RX], thread_index, session->tenant_idx,
                                   session->pkts[VCDP_FLOW_REVERSE], session->bytes[VCDP_FLOW_REVERSE]);
-  pool_put_index(ptd->sessions, session_index);
+  pool_put_index(vcdp->sessions, session_index);
 }
 
 void
-vcdp_session_remove(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
-                    u32 session_index)
+vcdp_session_remove(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_index, u32 session_index)
 {
-  vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, true);
+  vcdp_session_remove_core(vcdp, session, thread_index, session_index, true);
 }
 void
-vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, vcdp_session_t *session, u32 thread_index,
-                             u32 session_index)
+vcdp_session_remove_no_timer(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_index, u32 session_index)
 {
-  vcdp_session_remove_core(vcdp, ptd, session, thread_index, session_index, false);
+  vcdp_session_remove_core(vcdp, session, thread_index, session_index, false);
 }
 
 /*
@@ -222,14 +225,14 @@ vcdp_session_is_expired(vcdp_session_t *session, f64 time_now)
 }
 
 bool
-vcdp_session_is_expired_session_idx(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 session_index)
+vcdp_session_is_expired_session_idx(vcdp_main_t *vcdp, u32 session_index)
 {
-  vcdp_session_t *session = vcdp_session_at_index(ptd, session_index);
+  vcdp_session_t *session = vcdp_session_at_index(vcdp, session_index);
   return vcdp_session_is_expired(session, vlib_time_now(vlib_get_main()));
 }
 
 int
-vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *ptd, u32 thread_index,
+vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, u32 thread_index,
                                    u32 pseudo_flow_index, vcdp_session_key_t *key)
 {
   u64 value;
@@ -239,7 +242,7 @@ vcdp_session_try_add_secondary_key(vcdp_main_t *vcdp, vcdp_per_thread_data_t *pt
 
   value = vcdp_session_mk_table_value(thread_index, pseudo_flow_index);
   session_index = vcdp_session_from_flow_index(pseudo_flow_index);
-  session = vcdp_session_at_index(ptd, session_index);
+  session = vcdp_session_at_index(vcdp, session_index);
   clib_memcpy(&session->keys[VCDP_SESSION_KEY_SECONDARY], key, sizeof(*key));
 
   return vcdp_session_add_del_key(key, 2, value, &h);
@@ -253,23 +256,21 @@ void
 vcdp_session_clear(void)
 {
   vcdp_main_t *vcdp = &vcdp_main;
-  vcdp_per_thread_data_t *ptd;
-  u32 thread_index;
   u32 *to_delete = 0;
   u32 *session_index;
   vcdp_session_t *session;
 
-  vec_foreach_index (thread_index, vcdp->per_thread_data) {
-    ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
-    pool_foreach (session, ptd->sessions) {
-      if (session->state != VCDP_SESSION_STATE_STATIC) {
-        vec_add1(to_delete, session - ptd->sessions);
-      }
+  // assert that barrier is set
+  // ASSERT(vlib_get_barrier_is_set());
+
+  pool_foreach (session, vcdp->sessions) {
+    if (session->state != VCDP_SESSION_STATE_STATIC) {
+      vec_add1(to_delete, session - vcdp->sessions);
     }
-    vec_foreach (session_index, to_delete) {
-      session = vcdp_session_at_index(ptd, *session_index);
-      vcdp_session_remove(vcdp, ptd, session, thread_index, *session_index);
-    }
-    vec_reset_length(to_delete);
   }
+  vec_foreach (session_index, to_delete) {
+    session = vcdp_session_at_index(vcdp, *session_index);
+    vcdp_session_remove(vcdp, session, session->thread_index, *session_index);
+  }
+  vec_reset_length(to_delete);
 }

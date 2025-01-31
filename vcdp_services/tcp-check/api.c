@@ -66,7 +66,7 @@ vl_api_vcdp_tcp_session_dump_t_handler(vl_api_vcdp_tcp_session_dump_t *mp)
   vec_foreach_index (thread_index, vcdp->per_thread_data) {
     ptd = vec_elt_at_index(vcdp->per_thread_data, thread_index);
     vptd = vec_elt_at_index(tcp->ptd, thread_index);
-    pool_foreach_index (session_index, ptd->sessions) {
+    pool_foreach_index (session_index, vcdp->sessions) {
       session = vcdp_session_at_index(ptd, session_index);
       if (session->proto != IP_PROTOCOL_TCP)
         continue;
