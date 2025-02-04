@@ -172,7 +172,7 @@ vcdp_sessions_to_file(const char *filename)
   // Write the CBOR byte buffer to the file
   FILE *fp = fopen(filename, "wb");
   if (fp == NULL) {
-    free(buffer);
+    clib_mem_free(buffer);
     return -1; // Failed to open file
   }
 
@@ -180,7 +180,7 @@ vcdp_sessions_to_file(const char *filename)
   fclose(fp);
 
   // Clean up CBOR object and buffer
-  free(buffer);
+  clib_mem_free(buffer);
   clib_warning("written %d bytes per session: %d", written, written / no_sessions);
   if (written == length) {
     return 0; // Success

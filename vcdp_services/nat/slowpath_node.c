@@ -271,7 +271,7 @@ VLIB_NODE_FN(vcdp_nat_slowpath_node)
     session->bitmaps[VCDP_FLOW_FORWARD] |= VCDP_SERVICE_MASK(nat_early_rewrite);
     session->bitmaps[VCDP_FLOW_REVERSE] |= VCDP_SERVICE_MASK(nat_late_rewrite);
 
-    vcdp_log_debug("Creating session for: %U", format_vcdp_session_key, &k);
+    // vcdp_log_debug("Creating session for: %U", format_vcdp_session_key, &k);
     session_idx = session - vcdp->sessions;
     nat_rewrites = vec_elt_at_index(nat->flows, session_idx << 1);
     if (nat_slow_path_process_one(vcdp, node, /*im->fib_index_by_sw_if_index,*/ thread_index, nat, instance,

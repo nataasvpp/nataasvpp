@@ -74,7 +74,7 @@ format_vcdp_session_detail(u8 *s, va_list *args)
 
   /* TODO: deal with secondary keys */
   s = format(s, "  session id: 0x%U\n", format_hex_bytes, &session_net, sizeof(u64));
-  s = format(s, "  thread index: %d\n", 0 /*thread_index*/);
+  s = format(s, "  thread index: %d\n", session->thread_index);
   s = format(s, "  session index: %d\n", session_index);
   skey = &session->keys[VCDP_SESSION_KEY_PRIMARY];
   s = format(s, "  primary key: %U\n", format_vcdp_session_key, skey);

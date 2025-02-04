@@ -212,7 +212,7 @@ vl_api_vcdp_sessions_cbor_t_handler(vl_api_vcdp_sessions_cbor_t *mp)
   REPLY_MACRO3_END(VL_API_VCDP_SESSIONS_CBOR_REPLY, len, ({
     clib_memcpy(&rmp->cbor_data, buffer, len);
     rmp->len = len;
-    free(buffer); // Use VPP allocator instead
+    clib_mem_free(buffer); // Use VPP allocator instead
   }));
 }
 

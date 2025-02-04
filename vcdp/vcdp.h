@@ -169,6 +169,8 @@ typedef struct {
 
     /* log class */
   vlib_log_class_t log_class;
+
+  u32 trace_filter_table_index;
 } vcdp_main_t;
 
 typedef struct {

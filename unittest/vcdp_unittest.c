@@ -106,7 +106,7 @@ build_packet_with_node(vlib_node_runtime_t *node, char *packetdef, u32 *bi)
 // How does NAT-ED bindings look like for the hairpinning case?
 // Combine with port-forwarding.
 // So an internal host reaching another via the port-forwarding binding.
-static void
+static u32
 test_hairpinning(vlib_node_runtime_t *node, vlib_frame_t *frame)
 {
   u32 bi;
@@ -130,7 +130,7 @@ test_hairpinning(vlib_node_runtime_t *node, vlib_frame_t *frame)
   u32 *to_next = vlib_frame_vector_args(frame);
   to_next[0] = bi;
   frame->n_vectors = 1;
-
+  return bi;
   // vlib_buffer_enqueue_to_next(vm, node, from, nexts, frame->n_vectors);
 }
 
@@ -149,7 +149,7 @@ test_hairpinning(vlib_node_runtime_t *node, vlib_frame_t *frame)
 // }
 // Table of pointers to test functions
 typedef struct {
-  void (*test_fn)(vlib_node_runtime_t *, vlib_frame_t *);
+  u32 (*test_fn)(vlib_node_runtime_t *, vlib_frame_t *);
   u32 sw_if_index;
   char *input_node;
   u32 output_node_index;
@@ -175,6 +175,7 @@ static void
 test_packets(u32 test_id)
 {
   vlib_main_t *vm = vlib_get_main();
+  vcdp_main_t *vcdp = &vcdp_main;
   int no_tests = sizeof(test_functions) / sizeof(test_functions[0]);
 
   for (int i = 0; i < no_tests; i++) {
@@ -187,10 +188,16 @@ test_packets(u32 test_id)
     vlib_node_runtime_t *node_runtime = vlib_node_get_runtime(vm, node->index);
 
     // Run test function
-    test_functions[i].test_fn(node_runtime, frame);
+    u32 bi = test_functions[i].test_fn(node_runtime, frame);
 
     clib_warning("Sending buffer to node: %s", test_functions[i].input_node);
-    vlib_put_frame_to_node(vm, node->index, frame);
+    // vlib_put_frame_to_node(vm, node->index, frame);
+    u32 buffers[1] = {bi};
+    u16 thread_indices[1] = {2};
+    u32 n_packets = 1;
+    u32 n_remote_enq =
+      vlib_buffer_enqueue_to_thread(vm, node_runtime, vcdp->frame_queue_index, buffers, thread_indices, n_packets, 1);
+    clib_warning("Enqueued to thread: %d %d", thread_indices[0], n_remote_enq);
     vlib_process_suspend(vm, 1.0);
   }
 }
@@ -217,11 +224,11 @@ create_session(u32 src, u16 sport, int *n_retries, int *n_expired)
     u32 thread_index = vlib_get_thread_index();
 
     vcdp_session_key_t secondary_key = {
-          .dport = k.sport,
-          .proto = k.proto,
-          .src = k.dst,
-          .sport = k.dport,
-          .context_id = k.context_id,
+      .dport = k.sport,
+      .proto = k.proto,
+      .src = k.dst,
+      .sport = k.dport,
+      .context_id = k.context_id,
     };
     secondary_key.dst.ip4.as_u32 = htonl(0x01010101); // 1.1.1.1
     u32 session_index = session - vcdp->sessions;

@@ -171,7 +171,7 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
     return err;
   }
 
-  vlib_cli_output(vm, "session id         tenant  index  type proto        state TTL(s)");
+  vlib_cli_output(vm, "session id         thread tenant  index  type proto        state TTL(s)");
   pool_foreach (session, vcdp->sessions) {
     tenant = vcdp_tenant_at_index(vcdp, session->tenant_idx);
     if (tenant_id != ~0 && tenant_id != tenant->tenant_id)
@@ -193,8 +193,8 @@ vcdp_show_sessions_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli
       //                   format_ip_protocol, session->proto, format_vcdp_session_state, session->state, "-");
 
       u8 proto = session->keys[VCDP_SESSION_KEY_PRIMARY].proto;
-      s = format(0, "0x%U %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
-                 tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
+      s = format(0, "0x%U %6d %6d %6d %5U %5U %12U %6f %U", format_hex_bytes, &session_net, sizeof(session_net),
+                 session->thread_index, tenant->tenant_id, session - vcdp->sessions, format_vcdp_session_type, session->type,
                  format_ip_protocol, proto, format_vcdp_session_state, session->state, remaining_time,
                  format_vcdp_session_key, &session->keys[VCDP_SESSION_KEY_PRIMARY]);
 
@@ -228,7 +228,7 @@ vcdp_show_summary_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_
   foreach_vcdp_timeout
 #undef _
 
-  vlib_cli_output(vm, "Active sessions: %d",  pool_elts(vcdp->sessions));
+    vlib_cli_output(vm, "Active sessions: %d", pool_elts(vcdp->sessions));
   u32 tenant_idx;
   pool_foreach_index (tenant_idx, vcdp->tenants) {
     vlib_cli_output(vm, "%d: %U", vcdp->tenants[tenant_idx].tenant_id, format_vcdp_tenant_stats, vcdp, tenant_idx);
@@ -525,6 +525,160 @@ VLIB_CLI_COMMAND(show_vcdp_lru, static) = {
   .path = "show vcdp lru",
   .short_help = "show vcdp lru",
   .function = vcdp_show_lru_command_fn,
+};
+
+#include <vnet/classify/vnet_classify.h>
+
+static void
+vcdp_filter_set_trace_chain(vnet_classify_main_t *cm, u32 table_index)
+{
+  clib_warning("Setting trace chain to %d", table_index);
+  // if (table_index == ~0) {
+  //   u32 old_table_index;
+
+  //   old_table_index = vlib_global_main.trace_filter.classify_table_index;
+  //   vnet_classify_delete_table_index(cm, old_table_index, 1);
+  // }
+  // vlib_global_main.trace_filter.classify_table_index = table_index;
+}
+
+static clib_error_t *
+vcdp_set_trace_filter_command_fn(vlib_main_t *vm, unformat_input_t *input, vlib_cli_command_t *cmd)
+{
+  vcdp_main_t *vcdp = &vcdp_main;
+  u32 nbuckets = 8;
+  uword memory_size = (uword) (128 << 10);
+  u32 skip = ~0;
+  u32 match = ~0;
+  u8 *match_vector;
+  int is_add = 1;
+  u32 table_index = ~0;
+  u32 next_table_index = ~0;
+  u32 miss_next_index = ~0;
+  u32 current_data_flag = 0;
+  int current_data_offset = 0;
+  u8 *mask = 0;
+  vnet_classify_main_t *cm = &vnet_classify_main;
+  int rv = 0;
+  clib_error_t *err = 0;
+
+  unformat_input_t _line_input, *line_input = &_line_input;
+
+  /* Get a line of input. */
+  if (!unformat_user(input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input(line_input) != UNFORMAT_END_OF_INPUT) {
+    if (unformat(line_input, "del"))
+      is_add = 0;
+    else if (unformat(line_input, "buckets %d", &nbuckets))
+      ;
+    else if (unformat(line_input, "mask %U", unformat_classify_mask, &mask, &skip, &match))
+      ;
+    else if (unformat(line_input, "memory-size %U", unformat_memory_size, &memory_size))
+      ;
+    else
+      break;
+  }
+
+  if (is_add && mask == 0)
+    err = clib_error_return(0, "Mask required");
+
+  else if (is_add && skip == ~0)
+    err = clib_error_return(0, "skip count required");
+
+  else if (is_add && match == ~0)
+    err = clib_error_return(0, "match count required");
+
+  if (err) {
+    unformat_free(line_input);
+    return err;
+  }
+
+  if (!is_add) {
+    /*
+     * Delete an existing trace classify table.
+     */
+    vcdp_filter_set_trace_chain(cm, ~0);
+
+    vec_free(mask);
+    unformat_free(line_input);
+
+    return 0;
+  }
+
+  /*
+   * Find an existing compatible table or else make a new one.
+   */
+  table_index = vcdp->trace_filter_table_index;
+  if (table_index != ~0) {
+    /*
+     * look for a compatible table in the existing chain
+     *  - if a compatible table is found, table_index is updated with it
+     *  - if not, table_index is updated to ~0 (aka nil) and because of that
+     *    we are going to create one (see below). We save the original head
+     *    in next_table_index so we can chain it with the newly created
+     *    table
+     */
+    next_table_index = table_index;
+    table_index = classify_lookup_chain(table_index, mask, skip, match);
+  }
+
+  /*
+   * When no table is found, make one.
+   */
+  if (table_index == ~0) {
+    u32 new_head_index;
+
+    /*
+     * Matching table wasn't found, so create a new one at the
+     * head of the next_table_index chain.
+     */
+    rv = vnet_classify_add_del_table(cm, mask, nbuckets, memory_size, skip, match, next_table_index, miss_next_index,
+                                     &table_index, current_data_flag, current_data_offset, 1, 0);
+
+    if (rv != 0) {
+      vec_free(mask);
+      unformat_free(line_input);
+      return clib_error_return(0, "vnet_classify_add_del_table returned %d", rv);
+    }
+
+    /*
+     * Reorder tables such that masks are most-specify to least-specific.
+     */
+    new_head_index = classify_sort_table_chain(cm, table_index);
+
+    /*
+     * Put first classifier table in chain in a place where
+     * other data structures expect to find and use it.
+     */
+    vcdp_filter_set_trace_chain(cm, new_head_index);
+  }
+
+  vec_free(mask);
+
+  /*
+   * Now try to parse a and add a filter-match session.
+   */
+  if (unformat(line_input, "match %U", unformat_classify_match, cm, &match_vector, table_index) == 0)
+    return 0;
+
+  /*
+   * We use hit or miss to determine whether to trace or pcap pkts
+   * so the session setup is very limited
+   */
+  rv = vnet_classify_add_del_session(cm, table_index, match_vector, 0 /* hit_next_index */, 0 /* opaque_index */,
+                                     0 /* advance */, 0 /* action */, 0 /* metadata */, 1 /* is_add */);
+
+  vec_free(match_vector);
+
+  return 0;
+}
+
+VLIB_CLI_COMMAND(set_vcdp_trace_filter, static) = {
+  .path = "set vcdp trace filter",
+  .short_help = "set vcdp trace filter",
+  .function = vcdp_set_trace_filter_command_fn,
 };
 
 #if 0

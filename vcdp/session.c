@@ -62,6 +62,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
   u32 session_idx = session - vcdp->sessions;
   u32 pseudo_flow_idx = (session_idx << 1);
   u64 value = vcdp_session_mk_table_value(thread_index, pseudo_flow_idx);
+  session->thread_index = thread_index;
   *flow_index = pseudo_flow_idx;
 
   if (vcdp_session_add_del_key(primary, 2, value, &h)) {
@@ -113,7 +114,7 @@ vcdp_create_session(u16 tenant_idx, vcdp_session_key_t *primary, vcdp_session_ke
     vcdp_session_timer_start(vcdp, session, thread_index, vlib_time_now(vlib_get_main()), VCDP_TIMEOUT_EMBRYONIC);
   }
   vlib_increment_simple_counter(&vcdp->tenant_simple_ctr[VCDP_TENANT_COUNTER_CREATED], thread_index, tenant_idx, 1);
-  vcdp_log_debug("Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
+  // vcdp_log_debug("Creating session: %d %U %llx", session_idx, format_vcdp_session_key, primary, session_id);
 
   return session;
 }
@@ -157,9 +158,8 @@ vcdp_session_remove_core(vcdp_main_t *vcdp, vcdp_session_t *session, u32 thread_
   clib_bihash_kv_8_8_t kv2 = {0};
   kv2.key = session->session_id;
 
-  // assert that we are removing the session from the same thread.
-  // Unless barrier is set.
-//  ASSERT(session->thread_index == vlib_get_thread_index() || vlib_get_barrier_is_set());
+  // Assert that we are removing the session from the same thread. Unless barrier is set.
+  ASSERT(session->thread_index == thread_index || vlib_worker_thread_barrier_held());
 
   /* Stop timer if running */
   vcdp_log_debug("Removing session %u %llx", session_index, session->session_id);
@@ -260,8 +260,7 @@ vcdp_session_clear(void)
   u32 *session_index;
   vcdp_session_t *session;
 
-  // assert that barrier is set
-  // ASSERT(vlib_get_barrier_is_set());
+  ASSERT(vlib_worker_thread_barrier_held());
 
   pool_foreach (session, vcdp->sessions) {
     if (session->state != VCDP_SESSION_STATE_STATIC) {
